@@ -12,6 +12,9 @@ spec/                             - protocol/schema types only, no runtime logic
     identity.ts                   - typed IdentityFact placeholder shape
     expression-sheet.ts           - Expression Sheet interface, MVP_REQUIRED/SPEC_RESERVED tagged fields
     writing-sample.ts             - onboarding writing sample shape (canonical evidence)
+    edit-event.ts                 - AI-output/human-edit pair shape (canonical evidence)
+    edit-metrics.ts                - per-event T0 diff metrics shape (derived)
+    edit-profile.ts                - running T1 aggregate profile shape (derived)
   protocol/
     job.ts                        - Job/JobPriority(P0-P3)/JobStatus queue protocol
   hdna-format/
@@ -30,12 +33,19 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       expression-sheet-compiler.ts - compileExpressionSheet(samples) -> ExpressionSheet, MVP_REQUIRED fields only
       sample-store.ts              - WritingSampleStore: persists onboarding samples (CANONICAL)
       expression-sheet-store.ts    - ExpressionSheetStore: persists compiled sheet (DERIVED), see docs/decisions/0004
+      edit-metrics.ts              - pure T0 diff extractors: levenshteinDistance, jaccardWordOverlap, computeEditMetrics
+      edit-profile.ts              - applyEditMetrics: T1 incremental mean update, no history rescan
+      edit-event-store.ts          - EditEventStore: persists AI-output/human-edit pairs (CANONICAL)
+      edit-metrics-store.ts        - EditMetricsStore: persists per-event T0 diff metrics (DERIVED)
+      edit-profile-store.ts        - EditProfileStore: persists running T1 aggregate (DERIVED)
+      capture.ts                   - captureEditEvent: persist + enqueue P1 job, returns immediately (see docs/decisions/0005)
     storage/
       types.ts                    - StorageAdapter interface
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001)
     queue/
       job-queue.ts                - persistent priority queue over StorageAdapter
       processors/noop-processor.ts - synthetic processor for pipeline tests only
+      processors/edit-event-processor.ts - P1: computes EditMetrics, folds into EditProfile
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
       resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
@@ -43,7 +53,8 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       controls.ts                 - RuntimeControls: pause processing vs pause learning (persisted)
     ui/
       Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
-      Onboarding.svelte, ExpressionSheetSummary.svelte
+      Onboarding.svelte, ExpressionSheetSummary.svelte,
+      EditCapture.svelte, EditProfileSummary.svelte
   tests/                          - vitest, mirrors src/ structure, fake-indexeddb for storage tests
 
 docs/
@@ -53,8 +64,10 @@ docs/
   architecture/mvp-scope.md       - MVP_REQUIRED vs SPEC_RESERVED/PLANNED/EXPERIMENTAL for this PR
   research/references.md          - condensed academic reference notebook
 
-hdna-design-research-document.md  - source-of-truth design/research doc (unmoved, repo root)
 ```
+
+The source design/research document is kept local-only (gitignored), not
+committed to this repository — see `docs/decisions/` for why.
 
 ## Files commonly affected together
 
