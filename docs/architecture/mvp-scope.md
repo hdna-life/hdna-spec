@@ -43,6 +43,16 @@ stands after this PR.
   reconstructable from evidence); `cosineSimilarity`/`queryNearest` retrieval
   primitives. Incremental indexing (`P2`) and full rebuild (`P3`) run through
   the existing job queue.
+- Phase 3C — tiny local classifiers (`docs/decisions/0010`): `TinyClassifier`
+  (execution-context-agnostic interface) implemented by
+  `HeuristicTinyClassifier` (deterministic, explicitly non-validated
+  heuristic baseline — no ML dependency), covering only formality and
+  directness (the two T2 dimensions with the clearest heuristic signal).
+  `TraitClassifierService` mirrors `VectorIndexService`'s rebuild contract
+  and `edit-event-processor.ts`'s idempotency pattern (atomic receipt +
+  profile write). Confidence-weighted incremental aggregation in
+  `T2Profile`. Incremental classification (`P2`) and full rebuild (`P3`)
+  run through the existing job queue.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -52,7 +62,13 @@ stands after this PR.
   not read them.
 - `ExpressionSheet.prosody`, `.gestureProfile`, `.formality`, `.directness`,
   `.warmth` — fields exist per the doc's canonical layers, explicitly tagged
-  `SPEC_RESERVED` in `EXPRESSION_SHEET_FIELD_STATUS`, never populated.
+  `SPEC_RESERVED` in `EXPRESSION_SHEET_FIELD_STATUS`, never populated. (Note:
+  `T2Profile.formality`/`.directness` — the classifier output — are a
+  separate, now-implemented type; wiring them into `ExpressionSheet` itself
+  remains future work, see PLANNED below.)
+- `T2Dimension`'s `warmth`, `assertiveness`, `politeness`,
+  `emotionalIntensity`, `sarcasmLikelihood` — typed in `T2_DIMENSION_STATUS`,
+  explicitly `SPEC_RESERVED`, never computed by `HeuristicTinyClassifier`.
 - `.hdna` manifest shape (`spec/hdna-format/manifest.ts`) — typing only, no
   compiler/export pipeline.
 
@@ -68,8 +84,9 @@ stands after this PR.
   likely requiring an offscreen-document execution context
   (`docs/decisions/0009`). Also: benchmarking retrieval quality against a
   real semantic model, since the current baseline is explicitly non-semantic.
-- Phase 3C — tiny local classifiers (T2: formality/directness/warmth/etc.),
-  its own future PR.
+- A real trained classifier model, or heuristic coverage of the remaining
+  five T2 dimensions — swapped in / added behind the existing
+  `TinyClassifier` interface (`docs/decisions/0010`).
 - Phase 4 persona compiler (events -> patterns -> traits/beliefs).
 - Phase 5 retrieval runtime (query-focused persona assembly).
 - Phase 6 WebGPU expression engine (the actual style-transform model).
@@ -85,13 +102,18 @@ stands after this PR.
 
 ## What remains out of scope after this round
 
-This PR adds embeddings and a rebuildable vector index for the first time,
-using a deterministic non-semantic baseline behind a strict, swappable
-interface — deliberately decoupling "does the vector/index/rebuild contract
-work" from "which neural model do we ship." It still does not implement:
-live/content-script capture, character n-grams or other T0 signals beyond
-diffing, T2 tiny classifiers, a real semantic embedding model, wiring the
-vector index or EditProfile into the Expression Sheet or a retrieval-for-
-generation flow, the WebGPU expression transformation itself, user-
-configurable storage limits, or any benchmark suite. Those remain the next
-round(s) of work (Phase 3C next), unblocked by (not fulfilled by) this PR.
+This PR completes Phase 3 (3A infra, 3B embeddings, 3C classifiers), adding
+T2 formality/directness scoring using the same "deterministic baseline
+behind a strict, swappable interface" pattern as embeddings — deliberately
+decoupling "does the classify/rebuild/aggregate contract work" from "which
+trained model do we ship," and covering only the two dimensions with
+tractable heuristic signal rather than fabricating scores for the rest. It
+still does not implement: live/content-script capture, character n-grams or
+other T0 signals beyond diffing, the remaining five T2 dimensions, a real
+semantic embedding model or trained classifier, wiring any derived signal
+(EditProfile, the vector index, T2Profile) into the Expression Sheet or a
+retrieval-for-generation flow, the WebGPU expression transformation itself,
+user-configurable storage limits, or any benchmark suite. Those remain the
+next round(s) of work (Phase 4 persona compiler is the natural next step —
+it's what would actually consume these derived signals), unblocked by (not
+fulfilled by) this PR.

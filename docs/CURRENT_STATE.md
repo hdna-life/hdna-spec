@@ -4,16 +4,16 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
-Phase 3B — local embeddings + vector index, deterministic hashing baseline
-(see `docs/decisions/0009`). Phase 0, Phase 1, Phase 2's first slice, and
-Phase 3A (batching/eviction infra, `docs/decisions/0008`) are complete.
-Phase 3C (tiny classifiers) is scoped but not started.
+Phase 3C — tiny local classifiers, heuristic baseline, formality + directness
+only (see `docs/decisions/0010`). Phase 0, Phase 1, Phase 2's first slice,
+Phase 3A (batching/eviction infra), and Phase 3B (embeddings/vector index)
+are complete. All of Phase 3 (3A/3B/3C) is now done.
 
 ## Active MVP scope
 
 Infrastructure prerequisites for the MVP hypothesis, Phase 1 cold-start data
-collection, a first Phase 2 passive-collection slice, Phase 3A infrastructure,
-and Phase 3B embeddings/retrieval:
+collection, a first Phase 2 passive-collection slice, and Phase 3
+(batching/eviction infra, embeddings/retrieval, and T2 classifiers):
 
 - MV3 extension runtime (WXT + Svelte), background service worker + popup.
 - Local storage abstraction (`StorageAdapter`) backed by IndexedDB.
@@ -21,10 +21,11 @@ and Phase 3B embeddings/retrieval:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 142 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 176 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
-  storage policy, embeddings, `.hdna` manifest shape.
+  storage policy, embeddings, T2 dimensions/trait scores/profile, `.hdna`
+  manifest shape.
 - Phase 1 onboarding: real writing samples -> deterministic T0 stylometry ->
   Expression Sheet compilation, synchronous (see `docs/decisions/0004`).
 - Phase 2 (first slice): AI-output/human-edit pairs, captured manually in the
@@ -41,6 +42,14 @@ and Phase 3B embeddings/retrieval:
   indexing is `P2`, full rebuild is `P3`, both through the existing job
   queue; query-time embedding runs directly in the popup (see
   `docs/decisions/0009`).
+- Phase 3C: `TinyClassifier` (execution-context-agnostic interface) +
+  `HeuristicTinyClassifier` (deterministic, heuristic baseline covering only
+  formality + directness — the other five T2 dimensions stay
+  `SPEC_RESERVED`) + `TraitClassifierService` (idempotent classify + atomic
+  profile fold-in, rebuildable from evidence, same pattern as
+  `VectorIndexService`). Confidence-weighted incremental aggregation in
+  `T2Profile`. `classify_evidence` is `P2`, `rebuild_t2_profile` is `P3`
+  (see `docs/decisions/0010`).
 
 ## Implemented capabilities
 
@@ -102,6 +111,21 @@ and Phase 3B embeddings/retrieval:
 - Popup UI: Vector Index panel — embedding count, extractor id/version,
   "Rebuild index" button, similarity search (results show
   `sourceType:sourceId (score)`, no text-snippet resolution yet).
+- `HeuristicTinyClassifier`: deterministic formality (word length,
+  contraction/emoji/exclamation rate) and directness (hedge-phrase
+  frequency) scoring, 0-confidence for empty text, confidence saturating at
+  20 words. Non-validated heuristics, explicitly documented as such — see
+  `docs/decisions/0010`.
+- `applyTraitScore()`: confidence-weighted incremental mean per T2 dimension
+  — same "no history rescan" principle as `applyEditMetrics()`.
+- `TraitScoreStore` / `T2ProfileStore` (`DERIVED`).
+- `TraitClassifierService`: `classifyOne()` (idempotent via
+  `TraitScoreRecord.profileAppliedAt`, atomic dual-write) / `rebuild()`
+  (discards and recomputes from `writing_sample` + `edit_event` sources,
+  reusing the exact `embedding-sources.ts` adapters from Phase 3B).
+- Popup UI: Behavioral Estimates (T2) panel — formality/directness as
+  percentages with sample counts, explicit "heuristic estimates, not
+  established traits" note.
 
 ## Known limitations
 
@@ -124,6 +148,11 @@ and Phase 3B embeddings/retrieval:
 - `queryNearest` is a linear scan, not an ANN index — fine at MVP scale,
   untested beyond it.
 - No UI resolution from a vector-search result back to its source text.
+- `HeuristicTinyClassifier`'s formality/directness scores are crude,
+  non-validated heuristics — explicit, accepted tradeoff, not a bug — see
+  `docs/decisions/0010`.
+- T2 confidence only reflects word count, not genre/language/other factors
+  that would affect heuristic reliability.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -133,12 +162,16 @@ and Phase 3B embeddings/retrieval:
   on `host_permissions` scope and privacy review (`docs/decisions/0005`).
 - No character n-grams, typo-pattern detection, response-latency, or
   keystroke/session telemetry yet (Phase 2 T0 items not yet built).
-- No tiny local classifiers (formality/directness/warmth/etc., Phase 3C) —
-  explicitly deferred, its own future PR per `docs/decisions/0008`'s sequencing.
-- EditProfile and the vector index are not yet wired into the Expression
-  Sheet or any retrieval-for-generation flow — that integration belongs to
-  the Phase 4 persona compiler / Phase 5 retrieval runtime, not this slice.
-- No real (neural) embedding model, no persona compiler, no WebGPU model.
+- Five of seven T2 dimensions (warmth, assertiveness, politeness, emotional
+  intensity, sarcasm likelihood) remain `SPEC_RESERVED` — typed, never
+  computed. Sarcasm specifically needs conservative handling a simple
+  heuristic can't provide — see `docs/decisions/0010`.
+- EditProfile, the vector index, and the T2 profile are not yet wired into
+  the Expression Sheet or any retrieval-for-generation flow — that
+  integration belongs to the Phase 4 persona compiler / Phase 5 retrieval
+  runtime, not this slice.
+- No real (neural) embedding model or trained classifier, no persona
+  compiler, no WebGPU model.
 - Governor's WebGPU-contention/battery/memory-pressure signals are typed
   (`SPEC_RESERVED`) but unwired — nothing produces them yet.
 - Expression Sheet's SPEC_RESERVED fields (prosody, gesture, formality,
@@ -151,13 +184,15 @@ and Phase 3B embeddings/retrieval:
 
 ## Current experiments / pending decisions
 
-None open. Nine operator decisions to date are recorded in `docs/decisions/`.
+None open. Ten operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
-call: whether/how to add content-script-based live capture. Phase 3C (tiny
-classifiers) remains `PLANNED`, not started. A future real neural embedding
-provider (swapping `HashingEmbeddingProvider`) is also `PLANNED`, pending its
-own model/library decision and, per `docs/decisions/0009`, likely an
-offscreen-document execution context.
+call: whether/how to add content-script-based live capture. Phase 3 is now
+fully complete (3A/3B/3C). Future work, each `PLANNED` pending its own
+decision: a real neural embedding provider (swapping
+`HashingEmbeddingProvider`, likely needing an offscreen-document execution
+context per `docs/decisions/0009`); a real trained classifier or additional
+heuristic T2 dimensions (`docs/decisions/0010`); and Phase 4 (persona
+compiler) to actually use these derived signals for anything.
 
 ## Current benchmark status
 

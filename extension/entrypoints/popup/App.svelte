@@ -18,10 +18,13 @@
     enqueueEmbeddingIndex,
     enqueueVectorIndexRebuild,
   } from '../../src/queue/processors/embedding-jobs';
+  import { T2ProfileStore } from '../../src/persona/t2-profile-store';
+  import { enqueueEvidenceClassification } from '../../src/queue/processors/trait-classification-jobs';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
   import type { EditProfile } from '@spec/schema/edit-profile';
+  import type { T2Profile } from '@spec/schema/t2-profile';
   import Status from '../../src/ui/Status.svelte';
   import Queue from '../../src/ui/Queue.svelte';
   import StorageUsage from '../../src/ui/StorageUsage.svelte';
@@ -31,6 +34,7 @@
   import EditCapture from '../../src/ui/EditCapture.svelte';
   import EditProfileSummary from '../../src/ui/EditProfileSummary.svelte';
   import VectorIndex from '../../src/ui/VectorIndex.svelte';
+  import T2ProfileSummary from '../../src/ui/T2ProfileSummary.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
@@ -45,6 +49,7 @@
   // Query-time embedding is computed directly here (cheap, pure, read-only);
   // only writes to the index go through the job queue — see docs/decisions/0009.
   const vectorIndex = new VectorIndexService(embeddingProvider, embeddingStore, []);
+  const t2ProfileStore = new T2ProfileStore(storage);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -55,6 +60,7 @@
   let runtimeStatus: RuntimeStatus | undefined;
   let embeddingCount = 0;
   let searchResults: ScoredEmbedding[] = [];
+  let t2Profile: T2Profile | undefined;
 
   async function refresh() {
     counts = await queue.countsByPriority();
@@ -65,6 +71,7 @@
     editProfile = await editProfileStore.get();
     runtimeStatus = await runtimeStatusStore.get();
     embeddingCount = (await embeddingStore.list()).length;
+    t2Profile = await t2ProfileStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -72,6 +79,7 @@
     const samples = await sampleStore.list();
     await expressionSheetStore.recompile(samples);
     await enqueueEmbeddingIndex(queue, 'writing_sample', sample.id, sample.text);
+    await enqueueEvidenceClassification(queue, 'writing_sample', sample.id, sample.text);
     await refresh();
   }
 
@@ -80,6 +88,7 @@
     // background dispatch loop, not here — see docs/decisions/0005.
     const captured = await captureEditEvent(queue, editEventStore, event.detail.sourceText, event.detail.finalText);
     await enqueueEmbeddingIndex(queue, 'edit_event', captured.id, captured.finalText);
+    await enqueueEvidenceClassification(queue, 'edit_event', captured.id, captured.finalText);
     await refresh();
   }
 
@@ -130,6 +139,7 @@
   <ExpressionSheetSummary sheet={expressionSheet} />
   <EditCapture on:capture={captureEdit} />
   <EditProfileSummary profile={editProfile} />
+  <T2ProfileSummary profile={t2Profile} />
   <VectorIndex
     {embeddingCount}
     extractorId={embeddingProvider.extractorId}

@@ -19,6 +19,16 @@ import {
   createIndexEmbeddingProcessor,
   createRebuildVectorIndexProcessor,
 } from '../src/queue/processors/embedding-jobs';
+import { TraitScoreStore } from '../src/persona/trait-score-store';
+import { T2ProfileStore } from '../src/persona/t2-profile-store';
+import { TraitClassifierService } from '../src/persona/trait-classifier-service';
+import { HeuristicTinyClassifier } from '../src/persona/t2-classifier';
+import {
+  CLASSIFY_EVIDENCE_JOB,
+  REBUILD_T2_PROFILE_JOB,
+  createClassifyEvidenceProcessor,
+  createRebuildT2ProfileProcessor,
+} from '../src/queue/processors/trait-classification-jobs';
 import { decide } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals, RuntimeMode } from '../src/governor/types';
@@ -45,6 +55,16 @@ export default defineBackground(() => {
   ]);
   queue.registerProcessor(INDEX_EMBEDDING_JOB, createIndexEmbeddingProcessor(vectorIndex));
   queue.registerProcessor(REBUILD_VECTOR_INDEX_JOB, createRebuildVectorIndexProcessor(vectorIndex));
+
+  const traitClassifier = new TraitClassifierService(
+    storage,
+    new HeuristicTinyClassifier(),
+    new TraitScoreStore(storage),
+    new T2ProfileStore(storage),
+    [writingSampleSource(sampleStore), editEventSource(editEventStore)],
+  );
+  queue.registerProcessor(CLASSIFY_EVIDENCE_JOB, createClassifyEvidenceProcessor(traitClassifier));
+  queue.registerProcessor(REBUILD_T2_PROFILE_JOB, createRebuildT2ProfileProcessor(traitClassifier));
 
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);
