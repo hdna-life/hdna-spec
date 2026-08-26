@@ -35,6 +35,14 @@ stands after this PR.
   replacing the previous hardcoded `false`); `planEviction()`/`evictIfNeeded()`
   actually run (CACHE→DERIVED→RAW, CANONICAL never automatic), deferred while
   `mode === 'INTERACTIVE'`.
+- Phase 3B — local embeddings + vector index (`docs/decisions/0009`):
+  `EmbeddingProvider` (execution-context-agnostic interface) implemented by
+  `HashingEmbeddingProvider` (deterministic, explicitly non-semantic n-gram
+  hashing baseline — no ML dependency); `VectorIndexService` with a
+  `rebuild()` contract (embeddings are derived, never canonical, always
+  reconstructable from evidence); `cosineSimilarity`/`queryNearest` retrieval
+  primitives. Incremental indexing (`P2`) and full rebuild (`P3`) run through
+  the existing job queue.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -55,8 +63,11 @@ stands after this PR.
   manual-only, see `docs/decisions/0005`), character n-grams, typo-pattern
   detection, response latency, keystroke/session aggregation, full context
   metadata taxonomy (writing.public_social / writing.private_message / etc.).
-- Phase 3B — local embeddings + vector index: one model/library decision,
-  benchmark, and retrieval primitives, its own future PR.
+- A real (neural) embedding provider, swapped in behind the existing
+  `EmbeddingProvider` interface — its own future model/library decision,
+  likely requiring an offscreen-document execution context
+  (`docs/decisions/0009`). Also: benchmarking retrieval quality against a
+  real semantic model, since the current baseline is explicitly non-semantic.
 - Phase 3C — tiny local classifiers (T2: formality/directness/warmth/etc.),
   its own future PR.
 - Phase 4 persona compiler (events -> patterns -> traits/beliefs).
@@ -74,11 +85,13 @@ stands after this PR.
 
 ## What remains out of scope after this round
 
-This PR makes the governor's mode output and foreground signal real (both
-were previously computed/hardcoded but unused), and makes storage eviction
-actually run for the first time. It still does not implement: live/
-content-script capture, character n-grams or other T0 signals beyond diffing,
-T2 tiny classifiers, embeddings, a vector index, the WebGPU expression
-transformation itself, wiring EditProfile into the Expression Sheet, user-
+This PR adds embeddings and a rebuildable vector index for the first time,
+using a deterministic non-semantic baseline behind a strict, swappable
+interface — deliberately decoupling "does the vector/index/rebuild contract
+work" from "which neural model do we ship." It still does not implement:
+live/content-script capture, character n-grams or other T0 signals beyond
+diffing, T2 tiny classifiers, a real semantic embedding model, wiring the
+vector index or EditProfile into the Expression Sheet or a retrieval-for-
+generation flow, the WebGPU expression transformation itself, user-
 configurable storage limits, or any benchmark suite. Those remain the next
-round(s) of work (Phase 3B/3C next), unblocked by (not fulfilled by) this PR.
+round(s) of work (Phase 3C next), unblocked by (not fulfilled by) this PR.
