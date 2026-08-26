@@ -2,6 +2,8 @@
   import type { StorageClass } from '@spec/schema/storage-classes';
 
   export let usage: Record<StorageClass, number>;
+  export let lastEvictionAt: string | undefined = undefined;
+  export let lastEvictionBytesFreed: number | undefined = undefined;
 
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -15,6 +17,9 @@
     {#each Object.entries(usage) as [storageClass, bytes]}
       <li>{storageClass}: {formatBytes(bytes)}</li>
     {/each}
+    {#if lastEvictionAt && lastEvictionBytesFreed !== undefined}
+      <li>Last eviction: freed {formatBytes(lastEvictionBytesFreed)}</li>
+    {/if}
   </ul>
 </section>
 

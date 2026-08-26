@@ -7,6 +7,14 @@ export interface StorageEntry<T = unknown> {
   storageClass: StorageClass;
 }
 
+/** Record identity + size, without the value payload — enough to plan and perform eviction. */
+export interface StorageRecordMeta {
+  store: string;
+  key: string;
+  storageClass: StorageClass;
+  size: number;
+}
+
 export interface StorageAdapter {
   get<T>(store: string, key: string): Promise<T | undefined>;
   put<T>(store: string, key: string, value: T, storageClass: StorageClass): Promise<void>;
@@ -23,4 +31,6 @@ export interface StorageAdapter {
   query<T>(store: string): Promise<T[]>;
   /** Total byte estimate per storage class, for the transparency UI. */
   usageByClass(): Promise<Record<StorageClass, number>>;
+  /** Metadata (no value payload) for every record, optionally filtered by storage class. Used for eviction planning. */
+  listRecordMeta(storageClass?: StorageClass): Promise<StorageRecordMeta[]>;
 }

@@ -15,6 +15,7 @@ spec/                             - protocol/schema types only, no runtime logic
     edit-event.ts                 - AI-output/human-edit pair shape (canonical evidence)
     edit-metrics.ts                - per-event T0 diff metrics shape (derived)
     edit-profile.ts                - running T1 aggregate profile shape (derived)
+    storage-policy.ts              - StoragePolicy (total-byte budget), DEFAULT_STORAGE_POLICY
   protocol/
     job.ts                        - Job/JobPriority(P0-P3)/JobStatus queue protocol
   hdna-format/
@@ -40,17 +41,21 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       edit-profile-store.ts        - EditProfileStore: persists running T1 aggregate (DERIVED)
       capture.ts                   - captureEditEvent: persist + enqueue P1 job, returns immediately (see docs/decisions/0005)
     storage/
-      types.ts                    - StorageAdapter interface incl. putMany (atomic multi-key write)
+      types.ts                    - StorageAdapter interface incl. putMany (atomic write), listRecordMeta
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001, 0007)
+      eviction.ts                 - planEviction (pure) + evictIfNeeded: CACHE->DERIVED->RAW, CANONICAL never auto (see docs/decisions/0008)
     queue/
-      job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim (see docs/decisions/0007)
+      job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim; priority-filtered next()/runNext() (see docs/decisions/0007, 0008)
       processors/noop-processor.ts - synthetic processor for pipeline tests only
       processors/edit-event-processor.ts - P1: idempotent EditMetrics compute + atomic EditProfile fold-in (see docs/decisions/0007)
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
       resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
+      mode-priorities.ts          - ALLOWED_PRIORITIES_BY_MODE: which job priorities each mode may dispatch (see docs/decisions/0008)
     runtime/
       controls.ts                 - RuntimeControls: pause processing vs pause learning (persisted)
+      foreground-tracker.ts       - ForegroundTracker: is the popup open, via chrome.runtime.Port (see docs/decisions/0008)
+      status.ts                   - RuntimeStatusStore: persists background loop's live mode/batchSize/eviction state for the popup
     ui/
       Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
       Onboarding.svelte, ExpressionSheetSummary.svelte,
