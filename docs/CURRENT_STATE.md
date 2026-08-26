@@ -21,7 +21,11 @@ replaced with a persisted wall-clock timestamp
 (`RuntimeStatus.foregroundInactiveSince`), alongside a generic
 `JobQueue.enqueueSingleton()` fix for a separate bug where repeated clicks
 on a rebuild button queued unbounded duplicate jobs — see
-`docs/decisions/0014`.
+`docs/decisions/0014`. A further post-3C fix corrected the T2 panel's
+"No evidence classified yet." message, which was indistinguishable from
+"the classifier abstained on all evidence" — see
+`docs/validation/manual-mvp-validation.md` for the full manual-testing
+narrative behind 0012/0013/0014 and this fix.
 
 ## Active MVP scope
 
@@ -172,7 +176,13 @@ Phase 4's deterministic PATTERNS layer:
   percentages with sample counts, explicit "heuristic estimates, not
   established traits" note, "Rebuild T2 Profile" button (enqueues the
   existing `rebuild_t2_profile` P3 job — same rebuild UX as the Vector
-  Index panel's button).
+  Index panel's button). `deriveT2PanelState()`
+  (`extension/src/persona/t2-panel-state.ts`) distinguishes no evidence at
+  all from evidence the classifier abstained on from actually-classified
+  evidence, so the abstention path (all-Turkish corpora on the
+  English-only baseline) reads as "preserved but skipped," not as no
+  samples having been submitted — see
+  `docs/validation/manual-mvp-validation.md`.
 - `aggregateObservations()`: pure, threshold-gated confidence-weighted
   aggregation by (dimension, context) — same weighting principle as
   `applyTraitScore()`.
