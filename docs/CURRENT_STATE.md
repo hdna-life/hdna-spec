@@ -19,10 +19,15 @@ is not a failed implementation. Phase 5A (`SemanticDeltaExtractionService`,
 OpenRouter-based, observation-only, per-source idempotent via receipts)
 implements a new experimental evidence layer — AI-output/human-edit pairs →
 grounded `SemanticDeltaCandidate` observations — to test whether richer
-semantic evidence can be derived upstream of PATTERNS. The prior immediate
-roadmap (retrieval runtime → WebGPU expression engine) is **deferred/
-reordered, not cancelled**, pending this evidence-utility question — see
-`docs/decisions/0016`.
+semantic evidence can be derived upstream of PATTERNS. **The first real run
+against the 5-pair corpus is complete and human-graded: INFORMATION GAIN —
+PASS (the central question), GROUNDEDNESS — FAIL (66.7% vs. required
+≥80%), overall status ITERATE** — see "Current experiments / pending
+decisions" below and `docs/decisions/0016` for the full result. This is
+promising evidence, not proof the hypothesis is fully validated. The prior
+immediate roadmap (retrieval runtime → WebGPU expression engine) is
+**deferred/reordered, not cancelled**, pending this evidence-utility
+question — see `docs/decisions/0016`.
 
 Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
 PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
@@ -370,15 +375,27 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-**Open: Phase 5A itself.** `docs/decisions/0016` implements the experiment
-(schema/protocol/provider/service/job/store/UI, fully tested) but the
-persona-evidence-utility hypothesis it tests is **not yet validated** — that
-requires the human operator to actually run it against the real 5-pair edit
-corpus and grade the resulting `SemanticDeltaCandidate`s
-(`SUPPORTED`/`PARTIALLY_SUPPORTED`/`UNSUPPORTED`/`MISSED_SIGNAL`) against
-the pre-declared acceptance criteria in `docs/decisions/0016`. See
-`docs/validation/manual-mvp-validation.md`'s Phase 5A section for the exact
-manual steps; the grading results are not yet recorded there.
+**Open: Phase 5A's ITERATE result.** `docs/decisions/0016` implements the
+experiment (schema/protocol/provider/service/job/store/UI, fully tested)
+and it has now been run once against the real 5-pair edit corpus and
+human-graded. Result: **PIPELINE EXECUTION — PASS**, **INFORMATION GAIN —
+PASS** (semantic candidates preserve materially more persona-relevant
+information than `compressionRatio`/`lexicalOverlap` alone — the central
+question Phase 5A exists to answer), **COVERAGE — PASS/BORDERLINE** (~1
+`MISSED_SIGNAL` in 5 sources), **GROUNDEDNESS — FAIL** (66.7% `SUPPORTED`
+vs. the required ≥80% — the extractor sometimes attributes to the human
+edit meaning that was already present in the AI-drafted source),
+**SMALL-MODEL VIABILITY — PROMISING / NOT YET VALIDATED** (`gpt-4o-mini`
+extracted meaningful Turkish semantic differences, but the groundedness
+shortfall leaves this open). Overall status: **Phase 5A: ITERATE** — not
+abandoned, not declared validated. The persona-evidence-utility hypothesis
+is not rejected by this result, but is not fully validated either; a
+separate follow-up task is expected to address the identified
+extraction-precision failure mode (confusing human-introduced
+information with information already present in the AI source) — no such
+fix has been implemented yet. See `docs/decisions/0016`'s "First real
+experiment result" section and `docs/validation/manual-mvp-validation.md`'s
+Phase 5A results table for full grading detail.
 
 Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator

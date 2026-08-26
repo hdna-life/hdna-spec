@@ -247,14 +247,15 @@ bottleneck** in the two-dimensional PATTERNS layer, not a pipeline bug and
 not a T3 implementation failure. This finding directly motivated Phase 5A
 (`docs/decisions/0016`) — see below.
 
-## Phase 5A — semantic delta extraction (not yet run by the operator)
+## Phase 5A — semantic delta extraction
 
-Implemented per `docs/decisions/0016`, in response to the finding above.
-**This section documents how to run the experiment and how results should
-be recorded — the operator has not yet run it against the real corpus as of
-this PR, and no grading results exist yet.** Do not treat the presence of
-this section as evidence the experiment has been validated; see 0016's
-pre-declared acceptance criteria, which are graded manually.
+Implemented per `docs/decisions/0016`, in response to the finding above,
+and now run once against the real corpus — see "Results — first real
+experiment (operator-graded)" below. Passing automated tests and a
+completed real run mean the pipeline executes correctly end to end; they
+do **not** by themselves mean the persona-evidence-utility hypothesis is
+validated — see 0016's pre-declared acceptance criteria, which are graded
+manually, and the real result below, which did not clear all of them.
 
 ### How to run it
 
@@ -311,18 +312,131 @@ information than the existing `compressionRatio`/`lexicalOverlap`
 representation — not just a differently-worded restatement of "the text got
 shorter."
 
-### Results — TODO, pending the operator's actual run
+### Results — first real experiment (operator-graded)
 
-| Source EditEvent | Candidate(s) | Grade | Notes |
-|---|---|---|---|
-| _(not yet run)_ | | | |
+Run against the real corpus of 5 Turkish `EditEvent`s (AI-generated source
+text + the operator's actual final edited text), after the strict
+structured-output schema compatibility fix (see 0016's "Post-implementation
+fix" section) was in place.
 
-Model configured: _(not yet recorded)_. Groundedness (% SUPPORTED):
-_(pending)_. MISSED_SIGNAL count: _(pending)_. Information-gain judgment:
-_(pending)_. Small-model viability verdict: _(pending)_.
+**Configuration.**
 
-This table is intentionally left as a TODO rather than filled with
-fabricated results — per `docs/decisions/0016`, passing automated tests
-means the experiment is ready to run, not that the persona-evidence-utility
-hypothesis has been validated. This section should be updated with the
-operator's real findings once the run happens.
+| | |
+|---|---|
+| Provider | OpenRouter |
+| Model configured | `openai/gpt-4o-mini` |
+| Sources processed | 5 |
+| Sources with extracted candidates | 5 |
+| Sources abstained | 0 |
+| Total `SemanticDeltaCandidate`s produced | 15 |
+
+The network run completed successfully — every one of the 5 sources
+reached the model and produced a schema-valid response; no HTTP failures,
+no malformed-response errors, no abstentions on this particular corpus (a
+zero-abstention result on 5 sources does not by itself confirm abstention
+quality — no cosmetic/grammar-only edit happened to occur naturally in
+this real corpus; the synthetic cosmetic-edit fixture in the automated
+test suite remains the guard for that case). This confirms **pipeline
+execution** end to end in the real unpacked extension, against real
+persisted evidence and a real external model.
+
+**Grading (per candidate, human-operator-assigned; all 15 candidates
+graded, none auto-graded):**
+
+| Grade | Count | % |
+|---|---|---|
+| SUPPORTED | 10 | 66.7% |
+| PARTIALLY_SUPPORTED | 4 | 26.7% |
+| UNSUPPORTED | 1 | 6.7% |
+
+**Criterion-by-criterion result, against the pre-declared thresholds in
+`docs/decisions/0016` (not reinterpreted or weakened after seeing this
+result):**
+
+```text
+PIPELINE EXECUTION       PASS
+INFORMATION GAIN         PASS
+COVERAGE                 PASS / BORDERLINE
+GROUNDEDNESS             FAIL (66.7% vs required >=80%)
+SMALL-MODEL VIABILITY    PROMISING / NOT YET VALIDATED
+
+PHASE 5A                 ITERATE
+```
+
+- **Groundedness — FAIL.** 66.7% `SUPPORTED` vs. the required ≥80%.
+  `PARTIALLY_SUPPORTED` (26.7%) does not count toward this threshold, per
+  the pre-declared rule. The threshold itself was not changed after seeing
+  this result.
+- **Coverage — PASS / BORDERLINE.** Manual inspection found approximately
+  one important `MISSED_SIGNAL` in the 5-source corpus, within the
+  pre-declared "no more than 1" bound. The clearest example: an apology
+  edit where the operator's final text removed/reframed meaningful
+  material — including reconciliation/closure language and a sharper
+  semantic change in how the underlying behavior was explained — that the
+  extractor did not fully represent. Recorded as borderline given the
+  corpus is only 5 pairs; not treated as a clean pass.
+- **Information gain — PASS.** The prior deterministic representation
+  (`compressionRatio`, `lexicalOverlap` — see the Phase 4/T3 finding
+  above) reduced these same edits to two scalar measurements that were
+  technically valid but did not preserve their meaning. Semantic-delta
+  extraction recovered substantially richer, human-readable information
+  from the same underlying edits, including observable transformations
+  around: prioritizing an MVP/core-value proof before feature expansion;
+  moving from continued iteration toward shipping and collecting real user
+  feedback; turning neutral recommendations into more direct/blunt ones;
+  formal → informal/conversational language shifts; adding personal
+  experience to advice; strengthened criticism; and changes in how
+  apologies/explanations were framed. None of these distinctions are
+  recoverable from compression ratio or lexical overlap alone. **This does
+  not prove persona reconstruction, stable traits, or downstream persona
+  fidelity** — it is evidence about the semantic-evidence-extraction step
+  only, which is all Phase 5A tests.
+- **Small-model viability — PROMISING / NOT YET VALIDATED.** `gpt-4o-mini`
+  extracted many meaningful Turkish semantic differences from the real
+  corpus without a stronger/more expensive model being substituted in.
+  However, because groundedness missed its threshold, small-model
+  viability is not marked fully validated — the open question is whether
+  the shortfall is a model-capability limit or a prompt/extraction-design
+  issue (see failure mode below), which a small model alone cannot answer.
+- **Model-reported confidence.** Values clustered heavily around
+  ≈0.80–0.95 across the 15 candidates. Per `docs/decisions/0016`, this
+  remains documented strictly as *extraction* confidence — not calibrated
+  persona confidence or trait stability — and this run gives no reason to
+  revisit that distinction.
+
+**Important failure mode observed (recorded as a finding, not yet as a
+fix — a separate follow-up task will decide how to address it; no
+extractor/prompt/schema change was made in response to this run).** The
+main quality problem was not an absence of semantic information — it was
+the extractor sometimes conflating two different things:
+
+1. information actually introduced, removed, strengthened, weakened, or
+   reframed by the human's edit, versus
+2. meaning that was already substantially present in the AI-generated
+   source and merely remained (or was rephrased) in the human's final
+   text.
+
+Example class of failure: if the AI source already says "avoid adding more
+features and test with users," and the human final says "don't
+unnecessarily expand scope; ship the MVP and test it," the extractor may
+emit "prefers avoiding feature expansion" as a semantic delta. That may
+describe the final text accurately, but the preference was already present
+in the AI draft — it cannot automatically be attributed to the human edit
+as newly observed evidence. This distinction appears to be the primary
+driver of the groundedness shortfall above.
+
+**Overall interpretation.** This result did **not** provide a reason to
+reject the underlying Phase 5A hypothesis. It produced evidence that
+meaningful persona-relevant semantic information is present in human edits
+and can be recovered even by a relatively small/cheap model — a real,
+positive information-gain finding directly answering the question that
+motivated Phase 5A (`docs/decisions/0015`'s T3 representation-bottleneck
+finding). The current limitation is extraction **precision**: reliably
+distinguishing information genuinely contributed by the human's
+transformation from meaning already present in the AI-generated source.
+This is promising evidence from a single, very small (5-pair) real corpus
+— not proof that HDNA can reconstruct a persona, and not a basis for
+claiming groundedness is solved. Phase 5A status: **ITERATE** — a
+follow-up task will address the extraction-precision failure mode
+separately; no extractor/prompt/schema/architecture change was made as
+part of recording these results.

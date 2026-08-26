@@ -669,3 +669,97 @@ tests pass, clean `tsc --noEmit`, clean `wxt build`.
 
 The extension is ready to retry the same real 5-`EditEvent` Phase 5A
 experiment that originally surfaced this bug.
+
+## First real experiment result (operator-graded, human dogfood)
+
+**Documentation-only record.** This section reports the first real
+human-operator run and its grading; it does not change the extractor,
+prompt, schemas, architecture, or the acceptance criteria declared above.
+No implementation change was made in response to this run — the failure
+mode identified below is recorded as a finding for a separate follow-up
+task, not addressed here. Full step-by-step results and the per-criterion
+grading table live in `docs/validation/manual-mvp-validation.md`'s
+"Results — first real experiment (operator-graded)" section; this section
+records the outcome against this decision's own pre-declared criteria.
+
+**Run.** OpenRouter, model `openai/gpt-4o-mini`, against the real 5
+Turkish `EditEvent` corpus. 5/5 sources processed, 5/5 produced extracted
+candidates (0 abstained), 15 total `SemanticDeltaCandidate`s produced. The
+run completed with no HTTP/schema errors, confirming pipeline execution
+end to end in the real unpacked extension against real persisted evidence
+and a real external model — the same "pipeline execution: validated"
+distinction this decision and `docs/decisions/0015` before it maintain
+separately from persona-information-richness/hypothesis validation.
+
+**Grading against the pre-declared criteria (§"Pre-declared MVP experiment
+acceptance criteria" above) — none of these thresholds were changed after
+seeing the result:**
+
+```text
+PIPELINE EXECUTION       PASS
+INFORMATION GAIN         PASS
+COVERAGE                 PASS / BORDERLINE
+GROUNDEDNESS             FAIL (66.7% vs required >=80%)
+SMALL-MODEL VIABILITY    PROMISING / NOT YET VALIDATED
+
+PHASE 5A                 ITERATE
+```
+
+- **Groundedness: FAIL.** 10/15 (66.7%) `SUPPORTED`, 4/15 (26.7%)
+  `PARTIALLY_SUPPORTED`, 1/15 (6.7%) `UNSUPPORTED`, against the required
+  ≥80% `SUPPORTED` (`PARTIALLY_SUPPORTED` does not count toward it, per
+  the criterion as originally declared).
+- **Coverage: PASS/BORDERLINE.** ~1 important `MISSED_SIGNAL` in the
+  5-source corpus (an apology edit whose reconciliation/closure-language
+  removal and sharper reframing of the explanation for the behavior were
+  not fully represented) — within the pre-declared "no more than 1" bound,
+  but not treated as a clean pass given the corpus size.
+- **Information gain: PASS.** The central question this decision exists to
+  answer. The extracted candidates preserved observable, human-readable
+  semantic distinctions — e.g. MVP-first prioritization over feature
+  expansion, shipping-and-feedback vs. continued iteration, neutral →
+  direct/blunt recommendation framing, formal → informal register shifts,
+  added personal experience, strengthened criticism, reframed
+  apologies/explanations — that `compressionRatio`/`lexicalOverlap` cannot
+  represent. **This is evidence about the semantic-evidence-extraction
+  step only; it is not evidence of persona reconstruction, stable traits,
+  or downstream persona fidelity**, which remain untested by Phase 5A per
+  the evidence-hierarchy discipline stated at the top of this decision.
+- **Small-model viability: PROMISING / NOT YET VALIDATED.** `gpt-4o-mini`
+  (a deliberately cheap/small model, not upgraded mid-experiment to make
+  the result look better, per this decision's explicit rule) extracted
+  many meaningful Turkish semantic differences from real evidence. Not
+  marked validated because the groundedness shortfall below leaves open
+  whether it is a small-model capability limit or an extraction-design
+  issue — a question a small model's output alone cannot resolve.
+- **Model-reported confidence** clustered ≈0.80–0.95 across the 15
+  candidates. Consistent with, and gives no reason to revisit, this
+  decision's existing rule that `confidence` is extraction confidence
+  only, never persona/trait confidence.
+
+**Failure mode identified (finding only — no fix implemented here; a
+separate follow-up task will decide how to address it).** Groundedness
+loss was driven primarily by the extractor conflating (1) information the
+human's edit actually introduced, removed, strengthened, weakened, or
+reframed with (2) meaning already substantially present in the AI-drafted
+source and merely retained or rephrased in the human's final text. Example
+class: source "avoid adding more features and test with users" → final
+"don't unnecessarily expand scope; ship the MVP and test it" — the
+extractor may emit "prefers avoiding feature expansion" as a delta, which
+describes the final text accurately but was already present pre-edit, so
+it cannot be attributed to the edit as newly observed evidence. This is an
+**extraction-precision** problem, not evidence that the underlying
+semantic information is absent from `EditEvent` pairs (see "Information
+gain" above) or that the hypothesis under test is false.
+
+**Conclusion — Phase 5A: ITERATE, not abandoned, not declared validated.**
+This result does not provide a reason to reject the Phase 5A hypothesis:
+it shows meaningful persona-relevant semantic information is present in
+human edits and recoverable even by a small/cheap model. It also shows the
+current extraction is not yet precise enough to clear the pre-declared
+groundedness bar. Both are true at once, from a single 5-pair real corpus
+— read as promising early evidence, not proof of persona reconstruction.
+Per this task's explicit scope, no extractor, prompt, schema, or
+architecture change was made as part of recording this result; the
+extraction-precision failure mode above is left for a dedicated follow-up
+decision/PR.
