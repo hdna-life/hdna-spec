@@ -44,6 +44,15 @@ import {
   INTERPRET_TRAITS_BELIEFS_JOB,
   createInterpretTraitsBeliefsProcessor,
 } from '../src/queue/processors/persona-interpretation-job';
+import { SemanticDeltaCandidateStore } from '../src/persona/semantic-delta-candidate-store';
+import { SemanticDeltaExtractionReceiptStore } from '../src/persona/semantic-delta-extraction-receipt-store';
+import { SemanticDeltaExtractorConfigStore } from '../src/persona/semantic-delta-extractor-config-store';
+import { OpenRouterSemanticDeltaExtractor } from '../src/persona/openrouter-semantic-delta-extractor';
+import { SemanticDeltaExtractionService } from '../src/persona/semantic-delta-extraction-service';
+import {
+  EXTRACT_SEMANTIC_DELTAS_JOB,
+  createExtractSemanticDeltasProcessor,
+} from '../src/queue/processors/semantic-delta-extraction-job';
 import { decide, decideMode } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals } from '../src/governor/types';
@@ -99,6 +108,16 @@ export default defineBackground(() => {
     new PersonaInterpreterConfigStore(),
   );
   queue.registerProcessor(INTERPRET_TRAITS_BELIEFS_JOB, createInterpretTraitsBeliefsProcessor(personaInterpreter));
+
+  const semanticDeltaExtraction = new SemanticDeltaExtractionService(
+    storage,
+    (apiKey, modelId) => new OpenRouterSemanticDeltaExtractor(apiKey, modelId),
+    editEventStore,
+    new SemanticDeltaCandidateStore(storage),
+    new SemanticDeltaExtractionReceiptStore(storage),
+    new SemanticDeltaExtractorConfigStore(),
+  );
+  queue.registerProcessor(EXTRACT_SEMANTIC_DELTAS_JOB, createExtractSemanticDeltasProcessor(semanticDeltaExtraction));
 
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);

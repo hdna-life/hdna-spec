@@ -84,6 +84,31 @@ stands after this PR.
   operator-requested ASCII-only-Turkish regression test exposed a gap in
   the first (non-ASCII-only) version of the gate.
 
+- Phase 5A — persona evidence utility validation (`docs/decisions/0016`),
+  an explicit **operator-driven roadmap reordering** in response to the
+  first real Phase 4/T3 dogfood finding: the current PATTERNS
+  representation (`compressionRatio`, `lexicalOverlap`) is
+  information-poor for persona construction, even though the T3 pipeline
+  itself is confirmed working end to end. `SemanticDeltaExtractorProvider`
+  (execution-context-agnostic interface) implemented by
+  `OpenRouterSemanticDeltaExtractor`, orchestrated by
+  `SemanticDeltaExtractionService` — per-source idempotent (not
+  full-rebuild) via `SemanticDeltaExtractionReceipt`, since candidate
+  existence alone can't represent a correct abstention (zero candidates).
+  Extracts observation-centered `SemanticDeltaCandidate`s (never a
+  trait/belief/pattern) from `EditEvent` AI-output/human-edit pairs,
+  deliberately sending raw edit-pair text — a disclosed, opt-in-only
+  privacy-boundary difference from T3, gated by its own independent
+  `SemanticDeltaExtractorConfigStore`. `extract_semantic_deltas` is `P3`,
+  manually triggered, mirroring `compile_patterns`'s job shape. Stops at
+  OBSERVATION in the `CANONICAL -> OBSERVATION -> REPEATED PATTERN ->
+  TRAIT/BELIEF` hierarchy — no semantic aggregation/promotion in this
+  phase. **This is a roadmap reordering, not a cancellation**: the
+  previously-planned retrieval runtime / WebGPU expression engine phases
+  are deferred pending this evidence-utility question, not dropped — see
+  `docs/decisions/0016` for the full academic basis, pre-declared
+  human-graded acceptance criteria, and explicitly-deferred scope list.
+
 ## SPEC_RESERVED — typed, not implemented
 
 - `GovernorSignals.webgpuContention` / `.batteryLevel` / `.memoryPressure` —
@@ -120,9 +145,22 @@ stands after this PR.
 - A non-OpenRouter `PersonaInterpreterProvider`, per-request cost/rate
   limiting, or encryption-at-rest for the stored OpenRouter API key — T3
   itself is implemented, see `docs/decisions/0015`.
-- Phase 5 retrieval runtime (query-focused persona assembly), which will
-  need to decide how (or whether) `TraitBeliefClaim`s feed generation.
-- Phase 6 WebGPU expression engine (the actual style-transform model).
+- A non-OpenRouter `SemanticDeltaExtractorProvider` (e.g. local inference),
+  per-request cost/rate limiting for Phase 5A, or the optional (A)
+  human-final-alone vs. (B) contrastive-delta control — Phase 5A extraction
+  itself is implemented, see `docs/decisions/0016`.
+- Semantic candidate clustering, repetition/evidence-threshold aggregation,
+  and `SemanticPattern` promotion from `SemanticDeltaCandidate`s into the
+  existing PATTERNS/TRAITS-BELIEFS hierarchy — explicitly deferred by
+  `docs/decisions/0016` pending Phase 5A's own validation result.
+- **Retrieval runtime and WebGPU expression engine — DEFERRED, not
+  cancelled**, per `docs/decisions/0016`'s explicit operator-driven roadmap
+  reordering, pending the Phase 5A evidence-utility question (query-focused
+  persona assembly, and how/whether `TraitBeliefClaim`s or
+  `SemanticDeltaCandidate`s feed generation, remain the eventual next
+  steps once that question is answered):
+  - Retrieval runtime (query-focused persona assembly).
+  - WebGPU expression engine (the actual style-transform model).
 - Phase 7 optional local neural adaptation (LoRA/adapters).
 - Phase 8 multimodal activation (speech/visual/gesture).
 - Phase 9 export/publish/self-host runtime.

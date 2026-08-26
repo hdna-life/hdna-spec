@@ -231,3 +231,98 @@ human-validated for the current MVP scope.
 
 Next architectural step: T3 / PATTERNS -> TRAITS/BELIEFS persona
 interpretation.
+
+## Phase 4/T3 — real OpenRouter dogfood and the representation-bottleneck finding
+
+Documented in full in `docs/decisions/0015`'s final two sections. Summary:
+the T3 pipeline (evidence → patterns → OpenRouter → persisted claims) was
+run against a real OpenRouter API key and the operator's real persisted
+corpus above (`compressionRatio/unscoped` ≈0.84, `lexicalOverlap/unscoped`
+≈0.09, 5 supporting observations each) and completed successfully —
+**pipeline execution confirmed working end to end.** The resulting claims
+were plausible but not established by the supplied evidence (e.g.
+"compression suggests efficiency/clarity" is not actually supported by a
+compression-ratio number alone) — an **information-representation
+bottleneck** in the two-dimensional PATTERNS layer, not a pipeline bug and
+not a T3 implementation failure. This finding directly motivated Phase 5A
+(`docs/decisions/0016`) — see below.
+
+## Phase 5A — semantic delta extraction (not yet run by the operator)
+
+Implemented per `docs/decisions/0016`, in response to the finding above.
+**This section documents how to run the experiment and how results should
+be recorded — the operator has not yet run it against the real corpus as of
+this PR, and no grading results exist yet.** Do not treat the presence of
+this section as evidence the experiment has been validated; see 0016's
+pre-declared acceptance criteria, which are graded manually.
+
+### How to run it
+
+1. Open the popup and locate the "Semantic Delta Extraction (Phase 5A —
+   experimental)" panel, directly below "Traits / Beliefs (T3)".
+2. Expand "Semantic delta extraction settings" and enter an OpenRouter API
+   key and a model id. Per `docs/decisions/0016`, prefer a deliberately
+   cheap/small model capable of reliable structured output — small-model
+   viability is itself part of what this experiment is meant to report on,
+   not something to route around with a stronger model.
+3. Check "Enabled" and click "Save". Note this is a **separate, independent
+   opt-in** from the T3 settings above it — enabling T3 does not enable
+   this experiment, and vice versa.
+4. Read the panel's warning line: unlike T3, this experiment sends the raw
+   original AI draft and raw human final edited text of each unprocessed
+   `EditEvent` to the configured model. Confirm this is acceptable before
+   proceeding.
+5. Click "Extract semantic deltas (Phase 5A)". This enqueues
+   `extract_semantic_deltas` at `P3` — same scheduling caveat as every
+   other `P3` rebuild button in this popup (`docs/decisions/0013`,
+   `0014`): it only dispatches once the runtime reaches `DEEP_IDLE`
+   (popup closed, ~90s of continuous foreground inactivity), so it will
+   not visibly run immediately if the popup stays open. Check the Queue
+   panel's `P3` count to confirm it's still pending vs. already run.
+6. Once run, the panel shows: how many sources were processed, split into
+   extracted vs. abstained counts, and the list of extracted
+   `SemanticDeltaCandidate`s — each with its kind, observation,
+   preferred/rejected (if a `contrastive_preference`), context, confidence,
+   source `EditEvent` id, extractor id/model, and timestamp.
+7. Running it again only processes `EditEvent`s not yet covered by a
+   receipt from the *same* configured extractor/model — already-processed
+   sources (including ones that correctly abstained) are not resubmitted.
+   Changing the model id and re-running will reprocess every source under
+   the new model.
+
+### Human-operator grading protocol (per `docs/decisions/0016`)
+
+For each extracted `SemanticDeltaCandidate`, the operator grades it:
+
+- **SUPPORTED** — directly justified by the original → final transformation.
+- **PARTIALLY_SUPPORTED** — a real observation, but with interpretation not
+  established by the source evidence.
+- **UNSUPPORTED** — speculative, not established by the edit pair.
+
+For each source `EditEvent` (regardless of outcome), the operator also
+notes:
+
+- **MISSED_SIGNAL** — the edit contains an important semantic
+  preference/behavior difference the extractor failed to represent.
+
+And overall, the operator judges the central, non-checkbox question:
+whether the semantic candidates preserve materially more persona-relevant
+information than the existing `compressionRatio`/`lexicalOverlap`
+representation — not just a differently-worded restatement of "the text got
+shorter."
+
+### Results — TODO, pending the operator's actual run
+
+| Source EditEvent | Candidate(s) | Grade | Notes |
+|---|---|---|---|
+| _(not yet run)_ | | | |
+
+Model configured: _(not yet recorded)_. Groundedness (% SUPPORTED):
+_(pending)_. MISSED_SIGNAL count: _(pending)_. Information-gain judgment:
+_(pending)_. Small-model viability verdict: _(pending)_.
+
+This table is intentionally left as a TODO rather than filled with
+fabricated results — per `docs/decisions/0016`, passing automated tests
+means the experiment is ready to run, not that the persona-evidence-utility
+hypothesis has been validated. This section should be updated with the
+operator's real findings once the run happens.

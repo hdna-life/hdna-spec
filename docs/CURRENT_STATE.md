@@ -4,6 +4,26 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
+**Phase 5A — persona evidence utility validation — is now the immediate
+priority, per an explicit operator-driven roadmap change (see
+`docs/decisions/0016`).** Following the first real Phase 4/T3 human dogfood
+test (`docs/decisions/0015`): **PIPELINE EXECUTION is VALIDATED** (canonical
+evidence → deterministic metrics → patterns → minimized aggregates →
+OpenRouter → persisted claims worked end to end against the real extension
+and a real external API); **PERSONA INFORMATION RICHNESS is NOT VALIDATED**
+— the two deterministic dimensions PATTERNS currently produces
+(`compressionRatio`, `lexicalOverlap`) don't carry enough semantic
+information for T3 to construct a meaningful persona, an
+information-representation bottleneck, not a sample-count problem. T3 itself
+is not a failed implementation. Phase 5A (`SemanticDeltaExtractionService`,
+OpenRouter-based, observation-only, per-source idempotent via receipts)
+implements a new experimental evidence layer — AI-output/human-edit pairs →
+grounded `SemanticDeltaCandidate` observations — to test whether richer
+semantic evidence can be derived upstream of PATTERNS. The prior immediate
+roadmap (retrieval runtime → WebGPU expression engine) is **deferred/
+reordered, not cancelled**, pending this evidence-utility question — see
+`docs/decisions/0016`.
+
 Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
 PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
 using OpenRouter as the concrete MVP provider behind a provider-agnostic
@@ -87,6 +107,19 @@ Phase 4's deterministic PATTERNS layer:
   evidence or prior claims. `interpret_traits_beliefs` is `P3`, manually
   triggered. API key/model/enabled config lives in `chrome.storage.local`,
   outside the persona storage taxonomy — see `docs/decisions/0015`.
+- Phase 5A (persona evidence utility validation): `SemanticDeltaExtractionService`
+  extracts observation-centered `SemanticDeltaCandidate`s from `EditEvent`
+  AI-output/human-edit pairs via a provider-agnostic
+  `SemanticDeltaExtractorProvider` interface, concretely implemented by
+  `OpenRouterSemanticDeltaExtractor`. Deliberately sends raw edit-pair text
+  (unlike T3's minimized aggregates) — an explicit, disclosed
+  privacy-boundary difference, opt-in via its own independent
+  `SemanticDeltaExtractorConfigStore`. Per-source idempotent via
+  `SemanticDeltaExtractionReceipt` (candidate existence alone can't signal
+  "already processed," since a correct abstention produces zero
+  candidates). `extract_semantic_deltas` is `P3`, manually triggered. Stops
+  at OBSERVATION — no semantic aggregation/promotion into patterns or
+  traits in this phase — see `docs/decisions/0016`.
 - Post-3C fix: real-world Turkish evidence (35 samples) exposed that
   `HeuristicTinyClassifier` was silently English-only — `directness`
   saturated at a confidently-wrong 100%, `formality` was biased upward.
@@ -232,6 +265,27 @@ Phase 4's deterministic PATTERNS layer:
   settings form (API key, model id, enabled).
 - `extension/wxt.config.ts`: `host_permissions: ['https://openrouter.ai/*']`
   — scoped to exactly the one provider origin in use.
+- `SemanticDeltaCandidateStore` / `SemanticDeltaExtractionReceiptStore`
+  (both `DERIVED`) — observation-centered evidence candidates and their
+  per-source processing provenance, see `docs/decisions/0016`.
+- `SemanticDeltaExtractorConfigStore` — independent `chrome.storage.local`-
+  backed config (OpenRouter API key, model id, its own `enabled` flag),
+  deliberately separate from `PersonaInterpreterConfigStore`.
+- `OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorProvider`
+  — sends raw `originalText`/`finalText` (Phase 5A's documented,
+  intentional privacy-boundary difference from T3), structured/schema-
+  validated request+response, `validateCandidateDraft()` as the real
+  enforcement point.
+- `SemanticDeltaExtractionService.runExperiment()`: per-source idempotent
+  (not full-rebuild) — skips a source only when an existing receipt's
+  extractor identity matches the currently configured provider, so an
+  intentional model/version change can still reprocess it, while an
+  accidental repeat run never resends raw text for an already-processed
+  source.
+- Popup UI: Semantic Delta Extraction (Phase 5A — experimental) panel —
+  readiness status, explicit raw-text-upload warning next to the trigger
+  button, extracted/abstained receipt counts, candidate list, inline
+  settings form.
 
 ## Known limitations
 
@@ -282,6 +336,11 @@ Phase 4's deterministic PATTERNS layer:
 - No per-request cost/rate limiting or spend cap on T3 interpretation —
   bounded only by `enqueueSingleton`'s existing one-outstanding-job
   coalescing, not by any cost-awareness logic.
+- `SemanticDeltaExtractorConfigStore`'s API key has the same no-encryption-
+  beyond-Chrome tradeoff as `PersonaInterpreterConfigStore`; no per-request
+  cost/rate limiting either — see `docs/decisions/0016`.
+- Phase 5A's optional (A) human-final-text-alone vs. (B) contrastive
+  original+final control is documented but not implemented.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -311,7 +370,17 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Fifteen operator decisions to date are recorded in `docs/decisions/`.
+**Open: Phase 5A itself.** `docs/decisions/0016` implements the experiment
+(schema/protocol/provider/service/job/store/UI, fully tested) but the
+persona-evidence-utility hypothesis it tests is **not yet validated** — that
+requires the human operator to actually run it against the real 5-pair edit
+corpus and grade the resulting `SemanticDeltaCandidate`s
+(`SUPPORTED`/`PARTIALLY_SUPPORTED`/`UNSUPPORTED`/`MISSED_SIGNAL`) against
+the pre-declared acceptance criteria in `docs/decisions/0016`. See
+`docs/validation/manual-mvp-validation.md`'s Phase 5A section for the exact
+manual steps; the grading results are not yet recorded there.
+
+Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider
@@ -319,20 +388,23 @@ call: whether/how to add content-script-based live capture. Future work, each
 execution context per `docs/decisions/0009`); a real trained classifier or
 additional heuristic T2 dimensions (`docs/decisions/0010`); a non-OpenRouter
 `PersonaInterpreterProvider` or per-request cost/rate limiting for T3
-(`docs/decisions/0015`); and Phase 5 (retrieval runtime) to actually wire
-derived signals (including TraitBeliefClaims) into anything user-facing.
-One open research question, not yet an implementation decision: the first
-real T3 dogfood test against the actual OpenRouter API (see
+(`docs/decisions/0015`); Phase 5A's optional (A)-vs-(B) control
+(`docs/decisions/0016`); and retrieval runtime / WebGPU expression engine,
+now explicitly **deferred (not cancelled)** pending the Phase 5A
+evidence-utility answer, to actually wire derived signals (including
+TraitBeliefClaims, and possibly SemanticDeltaCandidates) into anything
+user-facing.
+
+The research question that motivated Phase 5A (see
 `docs/decisions/0015`'s "HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD
 FINDING" section) found that `compressionRatio`/`lexicalOverlap` — the
 only two dimensions PATTERNS currently produces — don't carry enough
 semantic information for T3 to construct a meaningful persona; the T3
 pipeline itself (evidence → patterns → OpenRouter → persisted claims) is
-confirmed working end to end. The next architectural question is how to
-derive higher-information semantic preference/behavioral-delta evidence
-from AI-output → human-edit deltas upstream of PATTERNS, without
-weakening evidence thresholds or the evidence → repeated pattern →
-interpretation discipline.
+confirmed working end to end. Phase 5A is this codebase's answer to "how do
+we derive higher-information semantic preference/behavioral-delta evidence
+from AI-output → human-edit deltas upstream of PATTERNS" — implemented and
+ready to run, not yet validated as actually solving the problem.
 
 ## Current benchmark status
 

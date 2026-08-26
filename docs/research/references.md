@@ -24,6 +24,29 @@ Evidence status values: `ESTABLISHED`, `SUPPORTED`, `PROMISING`,
 | Structured/graph representation is preferable to vector-only storage for multimodal personal memory | SUPPORTED | MobileMem (2026) |
 | Voice/speaker identity should be separated from speaking style/prosody | SUPPORTED | Voicing Personas (2025); CapTalk (2026); VoxCPM2 (2026) |
 
+## Phase 5A additions (`docs/decisions/0016`)
+
+Added for the Phase 5A semantic-delta-extraction experiment. Per this
+notebook's own rule (below), each entry separates what the paper actually
+supports from HDNA's own hypothesis built on top of it — see `docs/decisions/0016`
+for the full three-part (bibliographic fact / what's supported / HDNA
+inference) treatment of each. None of these are claimed to prove HDNA's
+architecture works.
+
+| Claim | Status | Source(s) |
+|---|---|---|
+| Historical text edits carry a human preference signal | SUPPORTED (for the narrow claim; does not extend to persona-construction from edits) | EditPrefs — Majkutewicz & Szymański, *Knowledge-Based Systems* 322 (2025), 113566, DOI 10.1016/j.knosys.2025.113566 |
+| Understanding *why* users prefer a response (inferred persona), not just *what* was preferred, can improve preference-tuning personalization | PROMISING | Balepur et al., ACL 2025, DOI 10.18653/v1/2025.acl-long.168 |
+| Preserving meaningful user-specific preference *differences* (vs. collapsing into generic aggregates) improves LLM personalization | PROMISING | "Measuring What Makes You Unique," Findings of ACL 2025, DOI 10.18653/v1/2025.findings-acl.1095 |
+| Broader user-history representations capture habits/preferences isolated retrieval may miss, improving personalized generation | PROMISING | Persona-Plug, ACL 2025, DOI 10.18653/v1/2025.acl-long.461 |
+
+**HDNA hypothesis under test (Phase 5A, not proven by any of the above):**
+AI-output → human-edit transformations can be converted into explicit,
+grounded, provenance-linked semantic evidence useful for constructing an
+individual persona. See `docs/decisions/0016` for the full framing and the
+pre-declared, human-graded acceptance criteria this hypothesis will actually
+be judged against.
+
 ## Rule this notebook must be maintained under
 
 Per the source doc: a paper supporting an existing HDNA hypothesis must be
