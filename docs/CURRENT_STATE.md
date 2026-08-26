@@ -21,7 +21,7 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 189 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 195 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   storage policy, embeddings, T2 dimensions/trait scores/profile, `.hdna`
@@ -54,7 +54,8 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   non-English text (reported with real Turkish samples) drove `directness`
   to a saturated, confidently-wrong 1.0 and biased `formality` upward. Both
   dimensions now abstain (omit entirely, not a fabricated neutral value) for
-  text that fails a non-ASCII-letter-ratio `isLikelyEnglish` gate — see
+  text that fails the combined non-ASCII-ratio + English-function-word-density
+  `isLikelyEnglish` gate — see
   `docs/decisions/0012`.
 
 ## Implemented capabilities
@@ -122,9 +123,13 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   frequency) scoring, 0-confidence for empty text, confidence saturating at
   20 words. Non-validated heuristics, explicitly documented as such — see
   `docs/decisions/0010`. Both dimensions gated by `isLikelyEnglish()`
-  (non-ASCII-letter ratio ≤ 2%) — abstains entirely for non-English text
-  rather than applying its English-lexicon/calibration-dependent heuristics
-  and producing a saturated or biased score — see `docs/decisions/0012`.
+  (requires BOTH non-ASCII-letter ratio ≤ 2% AND English function-word
+  density ≥ 5% — the second signal was added after an operator-requested
+  ASCII-only-Turkish regression test exposed that the first signal alone
+  is blind to non-English text typed without diacritics) — abstains
+  entirely for non-English text rather than applying its English-lexicon/
+  calibration-dependent heuristics and producing a saturated or biased
+  score — see `docs/decisions/0012`.
 - `applyTraitScore()`: confidence-weighted incremental mean per T2 dimension
   — same "no history rescan" principle as `applyEditMetrics()`.
 - `TraitScoreStore` / `T2ProfileStore` (`DERIVED`).
@@ -163,10 +168,11 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - T2 confidence only reflects word count within the English-gated path — see
   `docs/decisions/0012` for the language-gate fix; genre and other factors
   beyond language-applicability still aren't modeled.
-- `isLikelyEnglish()` doesn't detect every non-English language — romanized/
-  ASCII-only text in another language still passes and would receive the
-  same misapplied-heuristic treatment. Intentional, documented scope
-  boundary — see `docs/decisions/0012`.
+- `isLikelyEnglish()` doesn't attempt general language identification —
+  non-English text that is both ASCII-only *and* happens to reuse enough
+  English function words (rare, but conceivable for heavily code-mixed
+  text) could still pass. Intentional, documented scope boundary — see
+  `docs/decisions/0012`.
 
 ## Known gaps (intentionally deferred, not bugs)
 

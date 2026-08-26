@@ -53,9 +53,12 @@ stands after this PR.
   profile write). Confidence-weighted incremental aggregation in
   `T2Profile`. Incremental classification (`P2`) and full rebuild (`P3`)
   run through the existing job queue. Both heuristics are gated by
-  `isLikelyEnglish()` and abstain (omit the dimension) for non-English
-  text — fixed post-3C after real-world Turkish evidence exposed a
-  saturation/bias bug (`docs/decisions/0012`).
+  `isLikelyEnglish()` (non-ASCII ratio AND English function-word density,
+  both required) and abstain (omit the dimension) for non-English text —
+  fixed post-3C after real-world Turkish evidence exposed a saturation/bias
+  bug, and revised again after an operator-requested ASCII-only-Turkish
+  regression test exposed a gap in the first (non-ASCII-only) version
+  (`docs/decisions/0012`).
 
 ## SPEC_RESERVED — typed, not implemented
 

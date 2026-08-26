@@ -27,6 +27,7 @@ function confidenceFromWordCount(wordCount: number): number {
 }
 
 const NON_ASCII_LETTER_RATIO_THRESHOLD = 0.02;
+const MIN_ENGLISH_FUNCTION_WORD_RATIO = 0.05;
 
 function nonAsciiLetterRatio(text: string): number {
   const letters = text.match(/\p{L}/gu) ?? [];
@@ -36,6 +37,39 @@ function nonAsciiLetterRatio(text: string): number {
     if (!/[A-Za-z]/.test(ch)) nonAscii += 1;
   }
   return nonAscii / letters.length;
+}
+
+/**
+ * Common English closed-class function words (articles, pronouns,
+ * copula/auxiliary/modal verbs, prepositions, conjunctions) plus their
+ * common contracted forms. Closed-class words are a standard, robust
+ * language discriminator: they're extremely frequent in genuine text of
+ * their language and — unlike open-class content words — essentially never
+ * borrowed across languages, so they catch non-English text that a
+ * character-based check alone cannot (see `isLikelyEnglish`).
+ */
+const ENGLISH_FUNCTION_WORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'at', 'for', 'with', 'as', 'if', 'so',
+  'than', 'then', 'there', 'here', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no',
+  'i', 'you', 'he', 'she', 'we', 'they', 'it', 'its', 'my', 'your', 'his', 'her', 'our', 'their',
+  'this', 'that', 'these', 'those',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'do', 'does', 'did', 'have', 'has', 'had',
+  'will', 'would', 'can', 'could', 'should', 'shall', 'may', 'might', 'must',
+  "i'm", "i've", "i'll", "i'd", "you're", "you've", "you'll", "you'd",
+  "he's", "she's", "it's", "we're", "we've", "we'll", "they're", "they've", "they'll",
+  "don't", "doesn't", "didn't", "isn't", "aren't", "wasn't", "weren't",
+  "can't", "couldn't", "won't", "wouldn't", "shouldn't", "that's", "there's", "what's",
+]);
+
+function normalizeForFunctionWordCheck(word: string): string {
+  return word.toLowerCase().replace(/^[^a-z']+|[^a-z']+$/g, '');
+}
+
+function englishFunctionWordRatio(text: string): number {
+  const words = splitWords(text);
+  if (words.length === 0) return 0;
+  const hits = words.filter((w) => ENGLISH_FUNCTION_WORDS.has(normalizeForFunctionWordCheck(w))).length;
+  return hits / words.length;
 }
 
 /**
@@ -52,20 +86,42 @@ function nonAsciiLetterRatio(text: string): number {
  * actual formality, so `scoreFormality` reads as systematically more formal
  * for such languages regardless of register.
  *
- * Rather than attempting general language identification (its own
- * ML-shaped problem, out of scope for a dependency-free heuristic
- * classifier), this checks for non-ASCII letters — e.g. Turkish
- * ç/ğ/ı/ö/ş/ü, or other Latin-script diacritics (French, German, etc.).
- * Genuine English prose is overwhelmingly plain ASCII a-z; most other
- * Latin-script languages are not. This is deliberately conservative (a
- * single stray non-ASCII character among many words won't flip the
- * verdict — it's a ratio, not a presence check) and deliberately narrow in
- * scope: it does not detect every non-English language (romanized/ASCII-
- * only text in another language still passes) — a documented boundary, not
- * an attempt at general language ID. See docs/decisions/0012.
+ * Two independent, complementary signals, both required:
+ *
+ * 1. Non-ASCII letters (e.g. Turkish ç/ğ/ı/ö/ş/ü, or other Latin-script
+ *    diacritics) — catches diacritic-bearing non-English text. Genuine
+ *    English prose is overwhelmingly plain ASCII a-z.
+ * 2. English function-word density — catches non-English text written
+ *    *without* diacritics (e.g. Turkish typed on a non-Turkish keyboard,
+ *    extremely common in practice), which the character-based check alone
+ *    is blind to: stripped of diacritics, "Bugün hava güzeldi" becomes
+ *    "Bugun hava guzeldi," pure ASCII, and would silently pass a
+ *    character-only gate. Function words don't survive that transcription
+ *    problem, because Turkish words don't happen to collide with English
+ *    ones the way Turkish's Latin-alphabet letters can. A first version of
+ *    this gate used only the non-ASCII check and was rejected — see
+ *    docs/decisions/0012 for the ASCII-only-Turkish regression that exposed
+ *    the gap, and why plain function-word density alone (checked first) was
+ *    also rejected: formal-register English has measurably lower
+ *    function-word density than casual English (~9% vs ~40-50% observed
+ *    against this file's own fixtures), which put a single global threshold
+ *    uncomfortably close to misclassifying formal English as non-English —
+ *    exactly the register this classifier exists to distinguish. Requiring
+ *    *both* signals removes that tension: the non-ASCII check needs no
+ *    register-sensitive threshold, and the function-word check only has to
+ *    clear a low floor once, not carry the whole decision.
+ *
+ * Deliberately not general language identification (its own ML-shaped
+ * problem, out of scope for a dependency-free heuristic classifier) — a
+ * documented boundary. Text in a non-English language that is both
+ * ASCII-only *and* happens to reuse enough English function words (rare,
+ * but not impossible for heavily code-mixed text) can still pass.
  */
 export function isLikelyEnglish(text: string): boolean {
-  return nonAsciiLetterRatio(text) <= NON_ASCII_LETTER_RATIO_THRESHOLD;
+  return (
+    nonAsciiLetterRatio(text) <= NON_ASCII_LETTER_RATIO_THRESHOLD &&
+    englishFunctionWordRatio(text) >= MIN_ENGLISH_FUNCTION_WORD_RATIO
+  );
 }
 
 /**

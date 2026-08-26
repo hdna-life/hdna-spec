@@ -121,4 +121,26 @@ describe('TraitClassifierService.rebuild', () => {
     expect(profile?.directness).toBeUndefined();
     expect(profile?.formality).toBeUndefined();
   });
+
+  it('does not saturate the T2 profile for Turkish samples typed without diacritics (ASCII-only, end-to-end regression)', async () => {
+    // The same regression as above, but with diacritics stripped to plain
+    // ASCII — the realistic case of Turkish typed on a non-Turkish keyboard.
+    // This is the exact gap a non-ASCII-character-only detection gate misses:
+    // stripped of diacritics, this text is indistinguishable from English by
+    // character content alone.
+    const asciiTurkishSamples = [
+      'Bugun hava cok guzeldi ve disarida uzun bir yuruyus yaptim.',
+      'Bu urunu cok begendim, gercekten harika bir deneyimdi.',
+      'Yarin toplantiya gec kalmamak icin erken cikmam lazim.',
+      'Kitabi bitirdim ve cok etkilendim, herkese tavsiye ederim.',
+    ];
+    const sources = [fakeSource('writing_sample', asciiTurkishSamples.map((text, i) => ({ id: `s${i}`, text })))];
+    const { profileStore, service } = setup(sources);
+
+    await service.rebuild();
+
+    const profile = await profileStore.get();
+    expect(profile?.directness).toBeUndefined();
+    expect(profile?.formality).toBeUndefined();
+  });
 });
