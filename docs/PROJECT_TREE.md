@@ -11,6 +11,7 @@ spec/                             - protocol/schema types only, no runtime logic
     evidence.ts                   - provenance/confidence/privacy metadata shape
     identity.ts                   - typed IdentityFact placeholder shape
     expression-sheet.ts           - Expression Sheet interface, MVP_REQUIRED/SPEC_RESERVED tagged fields
+    writing-sample.ts             - onboarding writing sample shape (canonical evidence)
   protocol/
     job.ts                        - Job/JobPriority(P0-P3)/JobStatus queue protocol
   hdna-format/
@@ -24,6 +25,11 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       App.svelte                  - mounts ui/ components, polls queue/storage/controls state
       main.ts, index.html
   src/
+    persona/
+      stylometry.ts                - pure T0 deterministic extractors (sentence/word split, punctuation, emoji, casing)
+      expression-sheet-compiler.ts - compileExpressionSheet(samples) -> ExpressionSheet, MVP_REQUIRED fields only
+      sample-store.ts              - WritingSampleStore: persists onboarding samples (CANONICAL)
+      expression-sheet-store.ts    - ExpressionSheetStore: persists compiled sheet (DERIVED), see docs/decisions/0004
     storage/
       types.ts                    - StorageAdapter interface
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001)
@@ -36,7 +42,8 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
     runtime/
       controls.ts                 - RuntimeControls: pause processing vs pause learning (persisted)
     ui/
-      Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte
+      Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
+      Onboarding.svelte, ExpressionSheetSummary.svelte
   tests/                          - vitest, mirrors src/ structure, fake-indexeddb for storage tests
 
 docs/
