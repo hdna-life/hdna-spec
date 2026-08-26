@@ -516,6 +516,166 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
 - 295/295 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
   `host_permissions: ["https://openrouter.ai/*"]` present in the generated
   manifest).
-- Not yet exercised: an actual OpenRouter API key against a real model —
-  left to the operator's own manual validation pass, per this repo's
-  established pattern (see `docs/validation/manual-mvp-validation.md`).
+- Not yet exercised (at the time of the sections above): an actual
+  OpenRouter API key against a real model — left to the operator's own
+  manual validation pass, per this repo's established pattern (see
+  `docs/validation/manual-mvp-validation.md`). That pass has since
+  happened — see the two sections below.
+
+## Positive result: T3 pipeline execution confirmed against the real OpenRouter API
+
+After the MV3 unbound-`fetch` runtime bug fix above, the operator ran the
+first real end-to-end T3 dogfood test with an actual OpenRouter API key
+and model, using real operator evidence already persisted from earlier
+phases. It completed successfully. This confirms, against the real
+extension and a real external API (not mocks):
+
+1. canonical evidence → derived metrics works,
+2. deterministic pattern compilation works,
+3. P3 interpretation scheduling works,
+4. minimized `PatternCandidate` transfer to OpenRouter works,
+5. structured T3 interpretation and persistence works.
+
+The failure documented in the next section — a limitation in how much
+persona-relevant meaning the current two-dimensional deterministic
+representation carries — is a finding about **persona information
+richness**, not about pipeline execution. The pipeline itself, including
+the network call this whole decision exists to make possible, is
+confirmed working end to end.
+
+## HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD FINDING — T3 representation bottleneck
+
+**This section records a real operator observation from the first
+successful real-API T3 run, not an academic or theoretical claim.** It
+does not change any implementation or architecture decision in this PR —
+recorded for a future architecture/research decision, per the operator's
+explicit instruction not to weaken evidence thresholds, add speculative T3
+prompting, or simply feed more samples through the same two dimensions in
+response.
+
+### What ran
+
+The real deterministic pattern set available to T3 for this run was:
+
+- `compressionRatio / unscoped`: ≈0.84 (5 supporting edit observations)
+- `lexicalOverlap / unscoped`: ≈0.09 (5 supporting edit observations)
+
+The provider produced semantic claims broadly equivalent to:
+
+- compressed communication suggests efficiency/clarity
+- low lexical overlap suggests originality/distinctiveness in word choice
+
+### Observation
+
+The T3 network/provider pipeline works, but the two available
+deterministic dimensions do not contain enough semantic information to
+construct a meaningful persona.
+
+`compressionRatio` and `lexicalOverlap` describe **how strongly** a human
+transforms an AI draft at a lexical/length level. They do not describe
+enough of:
+
+- what the user believes,
+- what the user prefers,
+- why the user rejected or changed an AI suggestion,
+- how the user makes decisions,
+- which trade-offs the user consistently chooses,
+- how behavior changes by context,
+- recurring semantic preferences or reasoning patterns.
+
+Therefore, increasing the number of observations while continuing to
+reduce them to the same two dimensions would primarily improve confidence
+in those two measurements; it would not proportionally increase persona
+expressiveness.
+
+**This is an information-representation bottleneck, not merely a
+sample-count problem.**
+
+### Concrete operator example
+
+A real AI → human edit may contain a high-information preference such as:
+
+> "validate the MVP/core idea before spending development effort on
+> additional features"
+
+The current pipeline can observe properties such as compression and
+lexical replacement, but that semantic preference itself is lost before
+T3. Once reduced to:
+
+```
+AI output + human edit
+    ->
+compressionRatio
+lexicalOverlap
+```
+
+T3 cannot reconstruct the discarded semantic information without
+speculation.
+
+### T3 output quality observation
+
+The first real T3 output also crossed from observable behavior into
+unsupported motivation:
+
+- compression was interpreted as a preference for "efficiency and
+  clarity"
+- low lexical overlap was interpreted as valuing "originality or
+  distinctiveness"
+
+Those interpretations are plausible, but the supplied patterns do not
+establish those motivations. For example:
+
+```
+low lexical overlap != evidence that the user values originality
+compression          != evidence that the user values clarity
+```
+
+The model is being asked to infer a richer persona than its input
+representation can support. **This is important: the limitation is not
+necessarily the LLM's reasoning capability. The semantic information was
+already discarded upstream**, before it ever reached T3 — consistent with
+`validateClaimDraft()`'s existing supporting-evidence-key check (which
+confirms a claim cites real patterns) but which has no way to check
+whether those patterns actually carry enough semantic content to support
+the claim's substance.
+
+### Human-operator conclusion
+
+The first real T3 dogfood test validates the five pipeline-execution
+points in the section above. However, it also establishes that **the
+current two-dimensional deterministic pattern representation is
+insufficient for meaningful persona construction.**
+
+**Do NOT respond to this finding by:**
+- weakening evidence thresholds,
+- adding speculative T3 prompting, or
+- simply feeding substantially more samples through the same two
+  dimensions.
+
+**The next research/architecture problem this points to (not an
+implementation decision made in this PR):**
+
+> How can HDNA derive higher-information semantic behavioral/preference
+> evidence from local canonical evidence — particularly AI-output →
+> human-edit deltas — while preserving the local-sovereign,
+> minimized-disclosure architecture?
+
+**Potential future direction, explicitly NOT an implementation decision
+yet:**
+
+```
+AI output + human edit
+    ->
+semantic preference / behavioral delta candidates
+    ->
+repetition + evidence thresholds + context aggregation
+    ->
+semantic patterns
+    ->
+T3 traits/beliefs
+```
+
+A single semantic observation must not automatically become an
+established trait/belief — any future work here must preserve the
+existing evidence → repeated pattern → interpretation discipline this
+decision and `docs/decisions/0011` already established, not bypass it.

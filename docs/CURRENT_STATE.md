@@ -311,6 +311,18 @@ additional heuristic T2 dimensions (`docs/decisions/0010`); a non-OpenRouter
 `PersonaInterpreterProvider` or per-request cost/rate limiting for T3
 (`docs/decisions/0015`); and Phase 5 (retrieval runtime) to actually wire
 derived signals (including TraitBeliefClaims) into anything user-facing.
+One open research question, not yet an implementation decision: the first
+real T3 dogfood test against the actual OpenRouter API (see
+`docs/decisions/0015`'s "HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD
+FINDING" section) found that `compressionRatio`/`lexicalOverlap` — the
+only two dimensions PATTERNS currently produces — don't carry enough
+semantic information for T3 to construct a meaningful persona; the T3
+pipeline itself (evidence → patterns → OpenRouter → persisted claims) is
+confirmed working end to end. The next architectural question is how to
+derive higher-information semantic preference/behavioral-delta evidence
+from AI-output → human-edit deltas upstream of PATTERNS, without
+weakening evidence thresholds or the evidence → repeated pattern →
+interpretation discipline.
 
 ## Current benchmark status
 
