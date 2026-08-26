@@ -16,8 +16,10 @@ spec/                             - protocol/schema types only, no runtime logic
     edit-metrics.ts                - per-event T0 diff metrics shape (derived)
     edit-profile.ts                - running T1 aggregate profile shape (derived)
     storage-policy.ts              - StoragePolicy (total-byte budget), DEFAULT_STORAGE_POLICY
+    embedding.ts                    - Embedding/EmbeddingVector shape (derived, rebuildable)
   protocol/
     job.ts                        - Job/JobPriority(P0-P3)/JobStatus queue protocol
+    embedding-provider.ts          - EmbeddingProvider interface, execution-context-agnostic (see docs/decisions/0009)
   hdna-format/
     manifest.ts                   - `.hdna` package manifest shape (typing only)
 
@@ -40,6 +42,11 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       edit-metrics-store.ts        - EditMetricsStore: persists per-event T0 diff metrics (DERIVED)
       edit-profile-store.ts        - EditProfileStore: persists running T1 aggregate (DERIVED)
       capture.ts                   - captureEditEvent: persist + enqueue P1 job, returns immediately (see docs/decisions/0005)
+      hashing-embedding-provider.ts - HashingEmbeddingProvider: deterministic n-gram hashing baseline (see docs/decisions/0009)
+      vector-index.ts              - cosineSimilarity + queryNearest: pure retrieval primitives
+      embedding-store.ts           - EmbeddingStore: persists Embedding records (DERIVED)
+      embedding-sources.ts         - writingSampleSource/editEventSource: canonical evidence -> {id,text} for indexing
+      vector-index-service.ts      - VectorIndexService: indexOne/rebuild()/query(), the rebuildable-index contract
     storage/
       types.ts                    - StorageAdapter interface incl. putMany (atomic write), listRecordMeta
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001, 0007)
@@ -48,6 +55,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim; priority-filtered next()/runNext() (see docs/decisions/0007, 0008)
       processors/noop-processor.ts - synthetic processor for pipeline tests only
       processors/edit-event-processor.ts - P1: idempotent EditMetrics compute + atomic EditProfile fold-in (see docs/decisions/0007)
+      processors/embedding-jobs.ts - P2 index_embedding (incremental) / P3 rebuild_vector_index (see docs/decisions/0009)
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
       resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
@@ -59,7 +67,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
     ui/
       Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
       Onboarding.svelte, ExpressionSheetSummary.svelte,
-      EditCapture.svelte, EditProfileSummary.svelte
+      EditCapture.svelte, EditProfileSummary.svelte, VectorIndex.svelte
   tests/                          - vitest, mirrors src/ structure, fake-indexeddb for storage tests
 
 docs/

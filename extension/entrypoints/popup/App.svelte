@@ -10,6 +10,14 @@
   import { EditEventStore } from '../../src/persona/edit-event-store';
   import { EditProfileStore } from '../../src/persona/edit-profile-store';
   import { captureEditEvent } from '../../src/persona/capture';
+  import { EmbeddingStore } from '../../src/persona/embedding-store';
+  import { HashingEmbeddingProvider } from '../../src/persona/hashing-embedding-provider';
+  import { VectorIndexService } from '../../src/persona/vector-index-service';
+  import type { ScoredEmbedding } from '../../src/persona/vector-index';
+  import {
+    enqueueEmbeddingIndex,
+    enqueueVectorIndexRebuild,
+  } from '../../src/queue/processors/embedding-jobs';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -22,6 +30,7 @@
   import ExpressionSheetSummary from '../../src/ui/ExpressionSheetSummary.svelte';
   import EditCapture from '../../src/ui/EditCapture.svelte';
   import EditProfileSummary from '../../src/ui/EditProfileSummary.svelte';
+  import VectorIndex from '../../src/ui/VectorIndex.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
@@ -31,6 +40,11 @@
   const editEventStore = new EditEventStore(storage);
   const editProfileStore = new EditProfileStore(storage);
   const runtimeStatusStore = new RuntimeStatusStore(storage);
+  const embeddingStore = new EmbeddingStore(storage);
+  const embeddingProvider = new HashingEmbeddingProvider();
+  // Query-time embedding is computed directly here (cheap, pure, read-only);
+  // only writes to the index go through the job queue — see docs/decisions/0009.
+  const vectorIndex = new VectorIndexService(embeddingProvider, embeddingStore, []);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -39,6 +53,8 @@
   let expressionSheet: ExpressionSheet | undefined;
   let editProfile: EditProfile | undefined;
   let runtimeStatus: RuntimeStatus | undefined;
+  let embeddingCount = 0;
+  let searchResults: ScoredEmbedding[] = [];
 
   async function refresh() {
     counts = await queue.countsByPriority();
@@ -48,20 +64,32 @@
     expressionSheet = await expressionSheetStore.get();
     editProfile = await editProfileStore.get();
     runtimeStatus = await runtimeStatusStore.get();
+    embeddingCount = (await embeddingStore.list()).length;
   }
 
   async function addSample(event: CustomEvent<string>) {
-    await sampleStore.addSample(event.detail);
+    const sample = await sampleStore.addSample(event.detail);
     const samples = await sampleStore.list();
     await expressionSheetStore.recompile(samples);
+    await enqueueEmbeddingIndex(queue, 'writing_sample', sample.id, sample.text);
     await refresh();
   }
 
   async function captureEdit(event: CustomEvent<{ sourceText: string; finalText: string }>) {
     // Persists + enqueues only; actual T0/T1 processing runs deferred in the
     // background dispatch loop, not here — see docs/decisions/0005.
-    await captureEditEvent(queue, editEventStore, event.detail.sourceText, event.detail.finalText);
+    const captured = await captureEditEvent(queue, editEventStore, event.detail.sourceText, event.detail.finalText);
+    await enqueueEmbeddingIndex(queue, 'edit_event', captured.id, captured.finalText);
     await refresh();
+  }
+
+  async function rebuildVectorIndex() {
+    await enqueueVectorIndexRebuild(queue);
+    await refresh();
+  }
+
+  async function searchVectors(event: CustomEvent<string>) {
+    searchResults = await vectorIndex.query(event.detail, 5);
   }
 
   async function toggleProcessing() {
@@ -102,6 +130,14 @@
   <ExpressionSheetSummary sheet={expressionSheet} />
   <EditCapture on:capture={captureEdit} />
   <EditProfileSummary profile={editProfile} />
+  <VectorIndex
+    {embeddingCount}
+    extractorId={embeddingProvider.extractorId}
+    extractorVersion={embeddingProvider.extractorVersion}
+    results={searchResults}
+    on:rebuild={rebuildVectorIndex}
+    on:search={searchVectors}
+  />
   <Queue {counts} />
   <StorageUsage
     {usage}

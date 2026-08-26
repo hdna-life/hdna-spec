@@ -8,6 +8,17 @@ import { ForegroundTracker } from '../src/runtime/foreground-tracker';
 import { EditEventStore } from '../src/persona/edit-event-store';
 import { EditMetricsStore } from '../src/persona/edit-metrics-store';
 import { EditProfileStore } from '../src/persona/edit-profile-store';
+import { WritingSampleStore } from '../src/persona/sample-store';
+import { EmbeddingStore } from '../src/persona/embedding-store';
+import { HashingEmbeddingProvider } from '../src/persona/hashing-embedding-provider';
+import { VectorIndexService } from '../src/persona/vector-index-service';
+import { editEventSource, writingSampleSource } from '../src/persona/embedding-sources';
+import {
+  INDEX_EMBEDDING_JOB,
+  REBUILD_VECTOR_INDEX_JOB,
+  createIndexEmbeddingProcessor,
+  createRebuildVectorIndexProcessor,
+} from '../src/queue/processors/embedding-jobs';
 import { decide } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals, RuntimeMode } from '../src/governor/types';
@@ -21,15 +32,20 @@ export default defineBackground(() => {
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
   queue.registerProcessor('noop', noopProcessor);
+  const editEventStore = new EditEventStore(storage);
   queue.registerProcessor(
     PROCESS_EDIT_EVENT_JOB,
-    createEditEventProcessor(
-      storage,
-      new EditEventStore(storage),
-      new EditMetricsStore(storage),
-      new EditProfileStore(storage),
-    ),
+    createEditEventProcessor(storage, editEventStore, new EditMetricsStore(storage), new EditProfileStore(storage)),
   );
+
+  const sampleStore = new WritingSampleStore(storage);
+  const vectorIndex = new VectorIndexService(new HashingEmbeddingProvider(), new EmbeddingStore(storage), [
+    writingSampleSource(sampleStore),
+    editEventSource(editEventStore),
+  ]);
+  queue.registerProcessor(INDEX_EMBEDDING_JOB, createIndexEmbeddingProcessor(vectorIndex));
+  queue.registerProcessor(REBUILD_VECTOR_INDEX_JOB, createRebuildVectorIndexProcessor(vectorIndex));
+
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);
   const foregroundTracker = new ForegroundTracker();
