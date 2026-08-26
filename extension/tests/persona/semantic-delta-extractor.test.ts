@@ -51,4 +51,9 @@ describe('validateCandidateDraft', () => {
     const d = draft({ kind: 'contrastive_preference', preferred: 'something' });
     expect(validateCandidateDraft(d)).toBe(false);
   });
+
+  it('rejects a contrastive_preference draft with empty-string preferred/rejected — the post-normalization form of a wire-level null (see openrouter-semantic-delta-extractor.ts normalizeWireDraft)', () => {
+    const d = draft({ kind: 'contrastive_preference', preferred: '', rejected: '' });
+    expect(validateCandidateDraft(d)).toBe(false);
+  });
 });

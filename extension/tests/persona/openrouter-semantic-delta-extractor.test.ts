@@ -66,6 +66,22 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
     expect(body.response_format.type).toBe('json_schema');
   });
 
+  it('lists every candidate property in the JSON Schema required array — strict OpenAI/Azure-compatible structured outputs reject a property that is absent from `required`', async () => {
+    const fetchImpl = fakeFetchReturning(JSON.stringify({ candidates: [] }));
+    const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
+
+    await extractor.extract(input);
+
+    const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(init.body);
+    const itemSchema = body.response_format.json_schema.schema.properties.candidates.items;
+    expect(itemSchema.required.sort()).toEqual(
+      ['kind', 'observation', 'preferred', 'rejected', 'context', 'confidence'].sort(),
+    );
+    expect(itemSchema.properties.preferred.type).toEqual(['string', 'null']);
+    expect(itemSchema.properties.rejected.type).toEqual(['string', 'null']);
+  });
+
   it('sends the raw original/final text in the outbound payload — Phase 5A intentionally does NOT minimize, unlike T3', async () => {
     const fetchImpl = fakeFetchReturning(JSON.stringify({ candidates: [] }));
     const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
@@ -85,6 +101,8 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
           {
             kind: 'behavioral_delta',
             observation: 'adds an explicit recommendation to validate before expanding scope',
+            preferred: null,
+            rejected: null,
             context: 'product_development',
             confidence: 0.6,
           },
@@ -98,8 +116,65 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
       {
         kind: 'behavioral_delta',
         observation: 'adds an explicit recommendation to validate before expanding scope',
+        preferred: undefined,
+        rejected: undefined,
         context: 'product_development',
         confidence: 0.6,
+      },
+    ]);
+  });
+
+  it('normalizes a real OpenAI/Azure-compatible strict-schema response — null preferred/rejected on a behavioral_delta candidate — to the domain optional-field representation (the exact shape that triggered the real HTTP 400 dogfood failure before this fix)', async () => {
+    const fetchImpl = fakeFetchReturning(
+      JSON.stringify({
+        candidates: [
+          {
+            kind: 'behavioral_delta',
+            observation: 'Removed explanatory framing while retaining the core recommendation.',
+            preferred: null,
+            rejected: null,
+            context: 'unscoped',
+            confidence: 0.9,
+          },
+        ],
+      }),
+    );
+    const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
+
+    const drafts = await extractor.extract(input);
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].kind).toBe('behavioral_delta');
+    expect(drafts[0].preferred).toBeUndefined();
+    expect(drafts[0].rejected).toBeUndefined();
+    expect('preferred' in drafts[0] ? drafts[0].preferred === undefined : true).toBe(true);
+  });
+
+  it('accepts a contrastive_preference candidate with real string preferred/rejected values (not null)', async () => {
+    const fetchImpl = fakeFetchReturning(
+      JSON.stringify({
+        candidates: [
+          {
+            kind: 'contrastive_preference',
+            observation: 'kept the validate-before-expanding recommendation over adding more features',
+            preferred: 'validate the core product hypothesis before expanding scope',
+            rejected: 'additional product development before validating demand',
+            context: 'product_development',
+            confidence: 0.85,
+          },
+        ],
+      }),
+    );
+    const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
+
+    const drafts = await extractor.extract(input);
+    expect(drafts).toEqual([
+      {
+        kind: 'contrastive_preference',
+        observation: 'kept the validate-before-expanding recommendation over adding more features',
+        preferred: 'validate the core product hypothesis before expanding scope',
+        rejected: 'additional product development before validating demand',
+        context: 'product_development',
+        confidence: 0.85,
       },
     ]);
   });

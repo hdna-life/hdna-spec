@@ -6,6 +6,17 @@ import type {
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+// Strict OpenAI/Azure-compatible structured outputs require every
+// `properties` key to also appear in `required` — a property cannot be
+// "optional" at the JSON Schema level under `strict: true`. HDNA's domain
+// model keeps `preferred`/`rejected` genuinely optional (meaningless for
+// `behavioral_delta`), so the wire schema instead makes them nullable
+// (`type: ['string', 'null']`) and always-`required`, and this file
+// normalizes `null` back to `undefined` after validating the response —
+// see `isValidWireDraftShape`/`normalizeWireDraft` below and
+// docs/decisions/0016. Do not add `preferred`/`rejected` to the domain
+// `SemanticDeltaCandidateDraft`'s required fields to work around this;
+// only the wire representation changes.
 const CANDIDATE_DRAFT_JSON_SCHEMA = {
   type: 'object',
   properties: {
@@ -16,12 +27,12 @@ const CANDIDATE_DRAFT_JSON_SCHEMA = {
         properties: {
           kind: { type: 'string', enum: ['contrastive_preference', 'behavioral_delta'] },
           observation: { type: 'string' },
-          preferred: { type: 'string' },
-          rejected: { type: 'string' },
+          preferred: { type: ['string', 'null'] },
+          rejected: { type: ['string', 'null'] },
           context: { type: 'string' },
           confidence: { type: 'number' },
         },
-        required: ['kind', 'observation', 'context', 'confidence'],
+        required: ['kind', 'observation', 'preferred', 'rejected', 'context', 'confidence'],
         additionalProperties: false,
       },
     },
@@ -47,23 +58,60 @@ function buildPrompt(input: SemanticDeltaExtractionInput): string {
     'or removed reasoning, strengthened or weakened a position, changed ',
     'framing, etc.) that does not reduce to a clean preference pair, use ',
     '"behavioral_delta" and describe it only in "observation" — do not ',
-    'invent a "preferred"/"rejected" pair just to fill those fields.\n\n',
+    'invent a "preferred"/"rejected" pair just to fill those fields. Every ',
+    'candidate object must still include "preferred" and "rejected" keys; ',
+    'set them to null when they do not apply (i.e. for "behavioral_delta", ',
+    'or whenever there is no genuine preference pair).\n\n',
     `Context: ${input.context}\n\n`,
     `Original AI draft:\n${input.originalText}\n\n`,
     `Human final text:\n${input.finalText}`,
   ].join('');
 }
 
-function isValidDraftShape(value: unknown): value is SemanticDeltaCandidateDraft {
+/**
+ * Wire-level shape actually returned by the OpenRouter response, distinct
+ * from the domain `SemanticDeltaCandidateDraft`: `preferred`/`rejected` are
+ * always-present keys per the strict JSON Schema above, but their value is
+ * `string | null` rather than optional — `null` is how the model spells
+ * "not applicable" under a schema where every property must be `required`.
+ */
+interface OpenRouterCandidateDraftWire {
+  kind: 'contrastive_preference' | 'behavioral_delta';
+  observation: string;
+  preferred: string | null;
+  rejected: string | null;
+  context: string;
+  confidence: number;
+}
+
+function isValidWireDraftShape(value: unknown): value is OpenRouterCandidateDraftWire {
   if (typeof value !== 'object' || value === null) return false;
   const draft = value as Record<string, unknown>;
   if (draft.kind !== 'contrastive_preference' && draft.kind !== 'behavioral_delta') return false;
   if (typeof draft.observation !== 'string') return false;
   if (typeof draft.context !== 'string') return false;
   if (typeof draft.confidence !== 'number') return false;
-  if (draft.preferred !== undefined && typeof draft.preferred !== 'string') return false;
-  if (draft.rejected !== undefined && typeof draft.rejected !== 'string') return false;
+  if (draft.preferred !== null && typeof draft.preferred !== 'string') return false;
+  if (draft.rejected !== null && typeof draft.rejected !== 'string') return false;
   return true;
+}
+
+/**
+ * Normalizes the wire representation's `string | null` `preferred`/
+ * `rejected` back to the domain model's `string | undefined` — the only
+ * place this provider-specific `null` convention is translated. Everything
+ * downstream of `extract()` (validateCandidateDraft, the service, storage)
+ * continues to see exactly the same optional-field shape it always has.
+ */
+function normalizeWireDraft(wire: OpenRouterCandidateDraftWire): SemanticDeltaCandidateDraft {
+  return {
+    kind: wire.kind,
+    observation: wire.observation,
+    preferred: wire.preferred ?? undefined,
+    rejected: wire.rejected ?? undefined,
+    context: wire.context,
+    confidence: wire.confidence,
+  };
 }
 
 /**
@@ -129,10 +177,10 @@ export class OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorP
     }
 
     const candidates = (parsed as { candidates?: unknown })?.candidates;
-    if (!Array.isArray(candidates) || !candidates.every(isValidDraftShape)) {
+    if (!Array.isArray(candidates) || !candidates.every(isValidWireDraftShape)) {
       throw new Error('OpenRouter response did not match the expected candidates schema');
     }
 
-    return candidates;
+    return candidates.map(normalizeWireDraft);
   }
 }

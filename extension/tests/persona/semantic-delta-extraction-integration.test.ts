@@ -133,7 +133,7 @@ describe('Phase 5A pipeline: popup save -> background reads persisted config -> 
     await configStore.set({ enabled: true, apiKey: 'sk-or-real', modelId: 'openai/gpt-4o-mini' });
 
     const fetchImpl = fakeFetchReturningCandidates([
-      { kind: 'behavioral_delta', observation: 'strengthens a recommendation', context: 'chat', confidence: 0.6 },
+      { kind: 'behavioral_delta', observation: 'strengthens a recommendation', preferred: null, rejected: null, context: 'chat', confidence: 0.6 },
     ]);
     const background = buildBackgroundWiring(dbName, fetchImpl);
     await background.editEventStore.add('AI original draft', 'human final edit', { surface: 'chat' });
@@ -153,7 +153,7 @@ describe('Phase 5A pipeline: popup save -> background reads persisted config -> 
     await configStore.set({ enabled: true, apiKey: 'sk-or-real', modelId: 'openai/gpt-4o-mini' });
 
     const fetchImpl = fakeFetchReturningCandidates([
-      { kind: 'behavioral_delta', observation: 'would extract if called', context: 'chat', confidence: 0.6 },
+      { kind: 'behavioral_delta', observation: 'would extract if called', preferred: null, rejected: null, context: 'chat', confidence: 0.6 },
     ]);
     const background = buildBackgroundWiring(dbName, fetchImpl);
     const event = await background.editEventStore.add('already processed original', 'already processed final', {
@@ -257,7 +257,7 @@ describe('Phase 5A pipeline: popup save -> background reads persisted config -> 
     await configStore.set({ enabled: true, apiKey: secretApiKey, modelId: 'openai/gpt-4o-mini' });
 
     const fetchImpl = fakeFetchReturningCandidates([
-      { kind: 'behavioral_delta', observation: 'adds a concrete recommendation', context: 'chat', confidence: 0.6 },
+      { kind: 'behavioral_delta', observation: 'adds a concrete recommendation', preferred: null, rejected: null, context: 'chat', confidence: 0.6 },
     ]);
     const background = buildBackgroundWiring(dbName, fetchImpl);
     await background.editEventStore.add('original', 'final', { surface: 'chat' });

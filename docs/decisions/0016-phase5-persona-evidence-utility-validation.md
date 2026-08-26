@@ -585,3 +585,87 @@ until a human operator grades real `SemanticDeltaCandidate` output against
 the real corpus per the rubric and acceptance criteria above (see
 `docs/validation/manual-mvp-validation.md`'s Phase 5A section for the exact
 manual steps). No such grading has been recorded yet as of this decision.
+
+## Post-implementation fix: real-provider JSON Schema `required` incompatibility (found via the first real dogfood run)
+
+The first real Phase 5A dogfood attempt — an actual OpenRouter request
+against real OpenAI/Azure-compatible model providers — failed before any
+candidates could be produced, with OpenRouter returning HTTP 400:
+
+```text
+Invalid schema for response_format 'semantic_delta_candidates':
+In context=('properties', 'candidates', 'items'),
+'required' is required to be supplied and to be an array including every
+key in properties. Missing 'preferred'.
+```
+
+**Root cause.** `CANDIDATE_DRAFT_JSON_SCHEMA`
+(`extension/src/persona/openrouter-semantic-delta-extractor.ts`) declared
+`preferred`/`rejected` in `properties` but omitted them from `required`,
+matching this decision's domain model (optional, meaningful only for
+`contrastive_preference`). Strict OpenAI/Azure-compatible structured
+outputs (`strict: true`) do not support an "optional property" at the JSON
+Schema level at all — every key present in `properties` must also appear
+in `required`, full stop. This is a **wire-format constraint of the
+provider ecosystem**, not a property of the domain model this decision
+established; the two were conflated in the original schema.
+
+**Fix — adapt only the provider/wire representation, not the domain
+model.** `preferred`/`rejected` are now typed `['string', 'null']` and
+listed in `required` in the JSON Schema sent to OpenRouter, so a
+`behavioral_delta` candidate is now spelled with explicit `null`s:
+
+```json
+{
+  "kind": "behavioral_delta",
+  "observation": "Removed explanatory framing while retaining the core recommendation.",
+  "preferred": null,
+  "rejected": null,
+  "context": "unscoped",
+  "confidence": 0.9
+}
+```
+
+A new wire-level type, `OpenRouterCandidateDraftWire` (`preferred`/
+`rejected`: `string | null`, always present), is validated by
+`isValidWireDraftShape()`, then translated to the unchanged domain
+`SemanticDeltaCandidateDraft` (`preferred?`/`rejected?`: `string |
+undefined`) by `normalizeWireDraft()` — the only place in the codebase
+that knows about this provider-specific `null` convention.
+`validateCandidateDraft()`, `SemanticDeltaExtractionService`,
+`SemanticDeltaCandidate`, and every other Phase 5A domain type are
+**unchanged**: `preferred`/`rejected` remain genuinely optional in the
+HDNA domain model, still required together only for
+`contrastive_preference`, and `validateCandidateDraft()` still rejects an
+empty-string or missing preference half exactly as before. The prompt
+sent to the model was also updated to say every candidate must include
+`preferred`/`rejected` keys, set to `null` when not applicable, so the
+model reliably produces the now-required shape rather than omitting the
+keys and re-triggering the same HTTP 400.
+
+**This is a provider-compatibility fix, not a change to Phase 5A's scope,
+evidence hierarchy, candidate-kind taxonomy, or acceptance criteria.** No
+new candidate kind was added, promotion behavior is unchanged, and the
+pre-declared acceptance criteria above are unaffected.
+
+**Regression coverage.**
+`extension/tests/persona/openrouter-semantic-delta-extractor.test.ts` adds:
+a real-shaped response with `preferred`/`rejected` both `null` on a
+`behavioral_delta` candidate, asserting it is accepted and normalized to
+`undefined` (the exact shape that triggered the real HTTP 400 before this
+fix); a `contrastive_preference` response with real string
+`preferred`/`rejected` values; and an assertion that the requested JSON
+Schema's `items.required` array lists all six candidate properties
+(previously only four) with `preferred`/`rejected` typed `['string',
+'null']`. `extension/tests/persona/semantic-delta-extractor.test.ts` adds
+an explicit case confirming `validateCandidateDraft()` still rejects a
+`contrastive_preference` draft with empty-string `preferred`/`rejected` —
+the post-normalization form of a wire-level `null`. The three
+`behavioral_delta` fixtures in
+`extension/tests/persona/semantic-delta-extraction-integration.test.ts`
+were updated to include explicit `preferred: null, rejected: null`,
+matching what a real strict-schema-compliant provider now sends. 380/380
+tests pass, clean `tsc --noEmit`, clean `wxt build`.
+
+The extension is ready to retry the same real 5-`EditEvent` Phase 5A
+experiment that originally surfaced this bug.
