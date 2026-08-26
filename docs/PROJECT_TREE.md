@@ -20,6 +20,8 @@ spec/                             - protocol/schema types only, no runtime logic
     t2-dimensions.ts                - T2Dimension union + T2_DIMENSION_STATUS (formality/directness MVP_REQUIRED, 5 others SPEC_RESERVED)
     trait-score.ts                  - TraitScoreRecord: per-evidence classifier output (derived)
     t2-profile.ts                   - T2DimensionAggregate/T2Profile: confidence-weighted running aggregate (derived)
+    pattern.ts                      - Pattern: context-scoped compiled behavioral tendency (derived, see docs/decisions/0011)
+    pattern-compiler-policy.ts      - PatternCompilerPolicy: evidence thresholds gating pattern compilation
   protocol/
     job.ts                        - Job/JobPriority(P0-P3)/JobStatus queue protocol
     embedding-provider.ts          - EmbeddingProvider interface, execution-context-agnostic (see docs/decisions/0009)
@@ -56,6 +58,9 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       trait-score-store.ts          - TraitScoreStore: persists per-evidence TraitScoreRecord (DERIVED)
       t2-profile-store.ts           - T2ProfileStore: persists T2Profile aggregate (DERIVED)
       trait-classifier-service.ts   - TraitClassifierService: classifyOne (idempotent)/rebuild(), same pattern as VectorIndexService
+      pattern-compiler.ts           - aggregateObservations: pure evidence-threshold-gated aggregation (see docs/decisions/0011)
+      pattern-compiler-service.ts   - PatternCompilerService: gathers EditMetrics/TraitScoreRecord, resolves context, compiles Patterns
+      pattern-store.ts              - PatternStore: persists Pattern records (DERIVED)
     storage/
       types.ts                    - StorageAdapter interface incl. putMany (atomic write), listRecordMeta
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001, 0007)
@@ -66,6 +71,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       processors/edit-event-processor.ts - P1: idempotent EditMetrics compute + atomic EditProfile fold-in (see docs/decisions/0007)
       processors/embedding-jobs.ts - P2 index_embedding (incremental) / P3 rebuild_vector_index (see docs/decisions/0009)
       processors/trait-classification-jobs.ts - P2 classify_evidence (incremental) / P3 rebuild_t2_profile (see docs/decisions/0010)
+      processors/pattern-compilation-job.ts - P3 compile_patterns (full rebuild, manually triggered) (see docs/decisions/0011)
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
       resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
@@ -78,7 +84,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
       Onboarding.svelte, ExpressionSheetSummary.svelte,
       EditCapture.svelte, EditProfileSummary.svelte, VectorIndex.svelte,
-      T2ProfileSummary.svelte
+      T2ProfileSummary.svelte, PatternsSummary.svelte
   tests/                          - vitest, mirrors src/ structure, fake-indexeddb for storage tests
 
 docs/

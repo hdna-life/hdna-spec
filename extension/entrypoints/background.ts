@@ -29,6 +29,12 @@ import {
   createClassifyEvidenceProcessor,
   createRebuildT2ProfileProcessor,
 } from '../src/queue/processors/trait-classification-jobs';
+import { PatternStore } from '../src/persona/pattern-store';
+import { PatternCompilerService } from '../src/persona/pattern-compiler-service';
+import {
+  COMPILE_PATTERNS_JOB,
+  createCompilePatternsProcessor,
+} from '../src/queue/processors/pattern-compilation-job';
 import { decide } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals, RuntimeMode } from '../src/governor/types';
@@ -43,9 +49,10 @@ export default defineBackground(() => {
   const queue = new JobQueue(storage);
   queue.registerProcessor('noop', noopProcessor);
   const editEventStore = new EditEventStore(storage);
+  const editMetricsStore = new EditMetricsStore(storage);
   queue.registerProcessor(
     PROCESS_EDIT_EVENT_JOB,
-    createEditEventProcessor(storage, editEventStore, new EditMetricsStore(storage), new EditProfileStore(storage)),
+    createEditEventProcessor(storage, editEventStore, editMetricsStore, new EditProfileStore(storage)),
   );
 
   const sampleStore = new WritingSampleStore(storage);
@@ -56,15 +63,25 @@ export default defineBackground(() => {
   queue.registerProcessor(INDEX_EMBEDDING_JOB, createIndexEmbeddingProcessor(vectorIndex));
   queue.registerProcessor(REBUILD_VECTOR_INDEX_JOB, createRebuildVectorIndexProcessor(vectorIndex));
 
+  const traitScoreStore = new TraitScoreStore(storage);
   const traitClassifier = new TraitClassifierService(
     storage,
     new HeuristicTinyClassifier(),
-    new TraitScoreStore(storage),
+    traitScoreStore,
     new T2ProfileStore(storage),
     [writingSampleSource(sampleStore), editEventSource(editEventStore)],
   );
   queue.registerProcessor(CLASSIFY_EVIDENCE_JOB, createClassifyEvidenceProcessor(traitClassifier));
   queue.registerProcessor(REBUILD_T2_PROFILE_JOB, createRebuildT2ProfileProcessor(traitClassifier));
+
+  const patternCompiler = new PatternCompilerService(
+    editMetricsStore,
+    editEventStore,
+    traitScoreStore,
+    sampleStore,
+    new PatternStore(storage),
+  );
+  queue.registerProcessor(COMPILE_PATTERNS_JOB, createCompilePatternsProcessor(patternCompiler));
 
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);

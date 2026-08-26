@@ -53,6 +53,15 @@ stands after this PR.
   profile write). Confidence-weighted incremental aggregation in
   `T2Profile`. Incremental classification (`P2`) and full rebuild (`P3`)
   run through the existing job queue.
+- Phase 4 — deterministic PATTERNS layer only (`docs/decisions/0011`):
+  `PatternCompilerService` aggregates `EditMetrics`/`TraitScoreRecord` into
+  context-scoped `Pattern` records, context resolved from each observation's
+  source evidence (`context.surface`, defaulting to `"unscoped"`), gated by
+  an explicit evidence threshold (`PatternCompilerPolicy`) — no `Pattern`
+  below threshold. `compile_patterns` (`P3`, full rebuild, manually
+  triggered) mirrors `VectorIndexService`'s rebuild contract. The
+  TRAITS/BELIEFS step (requires an LLM call) is explicitly not implemented —
+  see PLANNED below.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -87,7 +96,12 @@ stands after this PR.
 - A real trained classifier model, or heuristic coverage of the remaining
   five T2 dimensions — swapped in / added behind the existing
   `TinyClassifier` interface (`docs/decisions/0010`).
-- Phase 4 persona compiler (events -> patterns -> traits/beliefs).
+- Phase 4's TRAITS/BELIEFS step: turning `Pattern`s into higher-level claims
+  via the doc's "T3: rare persona-model interpretation" — requires an actual
+  LLM call (frontier API or local model). No provider abstraction, API key
+  handling, or network permission exists yet — this is the project's first
+  network dependency and needs its own explicit model/provider decision
+  (`docs/decisions/0011`).
 - Phase 5 retrieval runtime (query-focused persona assembly).
 - Phase 6 WebGPU expression engine (the actual style-transform model).
 - Phase 7 optional local neural adaptation (LoRA/adapters).
@@ -102,18 +116,18 @@ stands after this PR.
 
 ## What remains out of scope after this round
 
-This PR completes Phase 3 (3A infra, 3B embeddings, 3C classifiers), adding
-T2 formality/directness scoring using the same "deterministic baseline
-behind a strict, swappable interface" pattern as embeddings — deliberately
-decoupling "does the classify/rebuild/aggregate contract work" from "which
-trained model do we ship," and covering only the two dimensions with
-tractable heuristic signal rather than fabricating scores for the rest. It
-still does not implement: live/content-script capture, character n-grams or
-other T0 signals beyond diffing, the remaining five T2 dimensions, a real
-semantic embedding model or trained classifier, wiring any derived signal
-(EditProfile, the vector index, T2Profile) into the Expression Sheet or a
-retrieval-for-generation flow, the WebGPU expression transformation itself,
-user-configurable storage limits, or any benchmark suite. Those remain the
-next round(s) of work (Phase 4 persona compiler is the natural next step —
-it's what would actually consume these derived signals), unblocked by (not
-fulfilled by) this PR.
+This PR adds the deterministic half of the Phase 4 persona compiler:
+evidence-threshold-gated, context-scoped `Pattern` compilation from existing
+derived signals (`EditMetrics`, `TraitScoreRecord`), with provenance and
+compiler versioning. It deliberately stops before the doc's TRAITS/BELIEFS
+step, which requires an actual LLM call — the project's first network
+dependency — kept out pending its own explicit model/provider decision,
+the same way embeddings and classifiers were split from their contract work.
+It still does not implement: live/content-script capture, character
+n-grams or other T0 signals beyond diffing, the remaining five T2
+dimensions, a real semantic embedding model or trained classifier, LLM-based
+trait/belief inference, wiring any derived signal (EditProfile, the vector
+index, T2Profile, Patterns) into the Expression Sheet or a retrieval-for-
+generation flow, the WebGPU expression transformation itself, user-
+configurable storage limits, or any benchmark suite. Those remain the next
+round(s) of work, unblocked by (not fulfilled by) this PR.

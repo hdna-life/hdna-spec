@@ -4,16 +4,17 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
-Phase 3C — tiny local classifiers, heuristic baseline, formality + directness
-only (see `docs/decisions/0010`). Phase 0, Phase 1, Phase 2's first slice,
-Phase 3A (batching/eviction infra), and Phase 3B (embeddings/vector index)
-are complete. All of Phase 3 (3A/3B/3C) is now done.
+Phase 4 — deterministic PATTERNS layer of the persona compiler, no model call
+(see `docs/decisions/0011`). Phase 0, Phase 1, Phase 2's first slice, and all
+of Phase 3 (3A/3B/3C) are complete. Phase 4's TRAITS/BELIEFS step (requires
+an actual LLM call) is explicitly not started — its own future decision.
 
 ## Active MVP scope
 
 Infrastructure prerequisites for the MVP hypothesis, Phase 1 cold-start data
-collection, a first Phase 2 passive-collection slice, and Phase 3
-(batching/eviction infra, embeddings/retrieval, and T2 classifiers):
+collection, a first Phase 2 passive-collection slice, Phase 3
+(batching/eviction infra, embeddings/retrieval, and T2 classifiers), and
+Phase 4's deterministic PATTERNS layer:
 
 - MV3 extension runtime (WXT + Svelte), background service worker + popup.
 - Local storage abstraction (`StorageAdapter`) backed by IndexedDB.
@@ -21,11 +22,11 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 176 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 200 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
-  storage policy, embeddings, T2 dimensions/trait scores/profile, `.hdna`
-  manifest shape.
+  storage policy, embeddings, T2 dimensions/trait scores/profile, patterns,
+  `.hdna` manifest shape.
 - Phase 1 onboarding: real writing samples -> deterministic T0 stylometry ->
   Expression Sheet compilation, synchronous (see `docs/decisions/0004`).
 - Phase 2 (first slice): AI-output/human-edit pairs, captured manually in the
@@ -50,6 +51,13 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   `VectorIndexService`). Confidence-weighted incremental aggregation in
   `T2Profile`. `classify_evidence` is `P2`, `rebuild_t2_profile` is `P3`
   (see `docs/decisions/0010`).
+- Phase 4 (PATTERNS layer): `PatternCompilerService` aggregates
+  `EditMetrics`/`TraitScoreRecord` into context-scoped `Pattern` records
+  (context resolved from evidence's `context.surface`, defaulting to
+  `"unscoped"`), gated by an explicit evidence threshold
+  (`PatternCompilerPolicy`) — no `Pattern` is emitted below threshold.
+  `compile_patterns` is `P3`, manually triggered. TRAITS/BELIEFS (requires an
+  LLM call) is not implemented — see `docs/decisions/0011`.
 
 ## Implemented capabilities
 
@@ -126,6 +134,16 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - Popup UI: Behavioral Estimates (T2) panel — formality/directness as
   percentages with sample counts, explicit "heuristic estimates, not
   established traits" note.
+- `aggregateObservations()`: pure, threshold-gated confidence-weighted
+  aggregation by (dimension, context) — same weighting principle as
+  `applyTraitScore()`.
+- `PatternStore` (`DERIVED`, keyed by `dimension:context`).
+- `PatternCompilerService.compile()`: full rebuild from `EditMetrics`
+  (`compressionRatio`, `lexicalOverlap`) and `TraitScoreRecord`
+  (`formality`, `directness`), context resolved per-record from the source
+  evidence. Mirrors `VectorIndexService`'s rebuild contract.
+- Popup UI: Patterns panel — dimension/context/value/sample-count list,
+  "Compile patterns" button.
 
 ## Known limitations
 
@@ -153,6 +171,15 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   `docs/decisions/0010`.
 - T2 confidence only reflects word count, not genre/language/other factors
   that would affect heuristic reliability.
+- No UI currently sets `context.surface` on writing samples or edit events,
+  so in practice all pattern observations fall into the `"unscoped"` bucket
+  today — the context-scoping architecture is correct and tested, just not
+  yet exercised with real multi-context data. See `docs/decisions/0011`.
+- Pattern dimensions are limited to what existing derived evidence exposes
+  (`compressionRatio`, `lexicalOverlap`, `formality`, `directness`) —
+  `editDistance`/`sentenceCountChange` excluded as unbounded raw counts.
+- `PatternCompilerService.compile()` is a full rebuild, not incremental —
+  acceptable for this job's `P3`/expensive-rare classification.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -166,12 +193,15 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   intensity, sarcasm likelihood) remain `SPEC_RESERVED` — typed, never
   computed. Sarcasm specifically needs conservative handling a simple
   heuristic can't provide — see `docs/decisions/0010`.
-- EditProfile, the vector index, and the T2 profile are not yet wired into
-  the Expression Sheet or any retrieval-for-generation flow — that
-  integration belongs to the Phase 4 persona compiler / Phase 5 retrieval
-  runtime, not this slice.
-- No real (neural) embedding model or trained classifier, no persona
-  compiler, no WebGPU model.
+- EditProfile, the vector index, the T2 profile, and now Patterns are not
+  yet wired into the Expression Sheet or any retrieval-for-generation flow —
+  that integration belongs to Phase 5 (retrieval runtime), not this slice.
+- Phase 4's TRAITS/BELIEFS step — turning Patterns into higher-level claims
+  via "rare persona-model interpretation" — requires an actual LLM call and
+  is entirely unimplemented, pending its own model/provider decision. No
+  provider abstraction, API key handling, or network permission exists yet.
+  See `docs/decisions/0011`.
+- No real (neural) embedding model or trained classifier, no WebGPU model.
 - Governor's WebGPU-contention/battery/memory-pressure signals are typed
   (`SPEC_RESERVED`) but unwired — nothing produces them yet.
 - Expression Sheet's SPEC_RESERVED fields (prosody, gesture, formality,
@@ -184,15 +214,16 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 
 ## Current experiments / pending decisions
 
-None open. Ten operator decisions to date are recorded in `docs/decisions/`.
+None open. Eleven operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
-call: whether/how to add content-script-based live capture. Phase 3 is now
-fully complete (3A/3B/3C). Future work, each `PLANNED` pending its own
-decision: a real neural embedding provider (swapping
-`HashingEmbeddingProvider`, likely needing an offscreen-document execution
-context per `docs/decisions/0009`); a real trained classifier or additional
-heuristic T2 dimensions (`docs/decisions/0010`); and Phase 4 (persona
-compiler) to actually use these derived signals for anything.
+call: whether/how to add content-script-based live capture. Future work, each
+`PLANNED` pending its own decision: a real neural embedding provider
+(swapping `HashingEmbeddingProvider`, likely needing an offscreen-document
+execution context per `docs/decisions/0009`); a real trained classifier or
+additional heuristic T2 dimensions (`docs/decisions/0010`); Phase 4's
+TRAITS/BELIEFS step — the project's first LLM/network dependency, its own
+model/provider decision (`docs/decisions/0011`); and Phase 5 (retrieval
+runtime) to actually wire derived signals into anything user-facing.
 
 ## Current benchmark status
 

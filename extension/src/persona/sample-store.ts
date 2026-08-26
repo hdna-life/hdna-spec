@@ -22,6 +22,10 @@ export class WritingSampleStore {
     return sample;
   }
 
+  get(id: string): Promise<WritingSample | undefined> {
+    return this.storage.get<WritingSample>(SAMPLE_STORE, id);
+  }
+
   list(): Promise<WritingSample[]> {
     return this.storage.query<WritingSample>(SAMPLE_STORE);
   }
