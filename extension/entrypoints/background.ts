@@ -1,7 +1,11 @@
 import { IndexedDbStorageAdapter } from '../src/storage/indexeddb-adapter';
 import { JobQueue } from '../src/queue/job-queue';
 import { noopProcessor } from '../src/queue/processors/noop-processor';
+import { PROCESS_EDIT_EVENT_JOB, createEditEventProcessor } from '../src/queue/processors/edit-event-processor';
 import { RuntimeControls } from '../src/runtime/controls';
+import { EditEventStore } from '../src/persona/edit-event-store';
+import { EditMetricsStore } from '../src/persona/edit-metrics-store';
+import { EditProfileStore } from '../src/persona/edit-profile-store';
 import { decide } from '../src/governor/resource-governor';
 import type { GovernorSignals } from '../src/governor/types';
 
@@ -12,6 +16,14 @@ export default defineBackground(() => {
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
   queue.registerProcessor('noop', noopProcessor);
+  queue.registerProcessor(
+    PROCESS_EDIT_EVENT_JOB,
+    createEditEventProcessor(
+      new EditEventStore(storage),
+      new EditMetricsStore(storage),
+      new EditProfileStore(storage),
+    ),
+  );
   const controls = new RuntimeControls(storage);
 
   let batchSize = 4;

@@ -21,6 +21,13 @@ stands after this PR.
   + deterministic T0 stylometry extractors (`stylometry.ts`) +
   `compileExpressionSheet()` -> `ExpressionSheetStore` (DERIVED, rebuildable).
   Populates only the Expression Sheet's MVP_REQUIRED fields.
+- Phase 2 first slice — AI-output/human-edit pairs as passive-learning
+  evidence, captured manually (`docs/decisions/0005`), processed via the P1
+  job queue: `EditEventStore` (CANONICAL) -> `computeEditMetrics()` (pure T0
+  diff: Levenshtein distance, compression ratio, sentence-count change,
+  Jaccard lexical overlap) -> `EditMetricsStore` (DERIVED) ->
+  `applyEditMetrics()` (T1 incremental mean, no history rescan) ->
+  `EditProfileStore` (DERIVED).
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -36,12 +43,13 @@ stands after this PR.
 
 ## PLANNED — not started
 
-- Phase 2 passive evidence capture at scale (background T0 telemetry beyond
-  onboarding: character n-grams, AI-output/human-edit diffing, response
-  latency, keystroke/session aggregation, context metadata taxonomy) — routed
-  through the job queue, unlike onboarding's synchronous compute (see
-  `docs/decisions/0004`).
-- Phase 3 local derived analysis (embeddings, tiny classifiers, vector index).
+- Phase 2 passive evidence capture at scale: content-script-based *live*
+  capture of AI-output/human-edit pairs across web pages (this slice is
+  manual-only, see `docs/decisions/0005`), character n-grams, typo-pattern
+  detection, response latency, keystroke/session aggregation, full context
+  metadata taxonomy (writing.public_social / writing.private_message / etc.).
+- Phase 3 local derived analysis (embeddings, tiny classifiers incl. T2
+  formality/directness/warmth/etc., vector index).
 - Phase 4 persona compiler (events -> patterns -> traits/beliefs).
 - Phase 5 retrieval runtime (query-focused persona assembly).
 - Phase 6 WebGPU expression engine (the actual style-transform model).
@@ -57,9 +65,11 @@ stands after this PR.
 
 ## What remains out of scope after this round
 
-This PR adds onboarding/writing-sample capture, basic T0 stylometry, and
-Expression Sheet population on top of the foundation PR. It still does not
-implement: AI-output/human-edit capture, background/passive telemetry beyond
-onboarding, embeddings, the WebGPU expression transformation itself, or any
+This PR adds manual AI-output/human-edit capture, T0 diff metrics, and a T1
+incremental profile, processed asynchronously through the job queue for the
+first time on real (non-synthetic) evidence. It still does not implement:
+live/content-script capture, character n-grams or other T0 signals beyond
+diffing, T2 tiny classifiers, embeddings, the WebGPU expression
+transformation itself, wiring EditProfile into the Expression Sheet, or any
 benchmark suite. Those remain the next round(s) of work, unblocked by (not
 fulfilled by) this PR.
