@@ -17,7 +17,10 @@ function setup() {
   const eventStore = new EditEventStore(storage);
   const metricsStore = new EditMetricsStore(storage);
   const profileStore = new EditProfileStore(storage);
-  queue.registerProcessor(PROCESS_EDIT_EVENT_JOB, createEditEventProcessor(eventStore, metricsStore, profileStore));
+  queue.registerProcessor(
+    PROCESS_EDIT_EVENT_JOB,
+    createEditEventProcessor(storage, eventStore, metricsStore, profileStore),
+  );
   return { storage, queue, eventStore, metricsStore, profileStore };
 }
 
@@ -64,5 +67,49 @@ describe('edit-event capture -> processing pipeline', () => {
     const job = await queue.runNext();
     expect(job?.status).toBe('FAILED');
     expect(job?.lastError).toContain('does-not-exist');
+  });
+
+  it('does not double-count the profile if the same job is run twice (at-least-once safety)', async () => {
+    const { queue, eventStore, profileStore } = setup();
+    const event = await eventStore.add('cat sat.', 'cat sat down.');
+    const payload = { editEventId: event.id };
+
+    // Simulate the queue re-dispatching the same logical job twice — e.g. a
+    // stale-RUNNING reclaim retried it after the service worker died just
+    // after the first run's atomic write had already landed.
+    await queue.enqueue(PROCESS_EDIT_EVENT_JOB, 'P1', payload);
+    await queue.enqueue(PROCESS_EDIT_EVENT_JOB, 'P1', payload);
+
+    await queue.runNext();
+    await queue.runNext();
+
+    const profile = await profileStore.get();
+    expect(profile?.sampleCount).toBe(1);
+  });
+
+  it('treats a pre-existing profileAppliedAt receipt as already-processed and skips re-applying', async () => {
+    const { storage, queue, eventStore, metricsStore, profileStore } = setup();
+    const event = await eventStore.add('cat sat.', 'cat sat down.');
+
+    // Seed a completed state directly, as if a prior run had already landed.
+    const priorProfile = { sampleCount: 1, meanEditDistance: 5, meanCompressionRatio: 1.5, meanLexicalOverlap: 0.5, updatedAt: '2026-01-01T00:00:00.000Z' };
+    await storage.putMany([
+      metricsStore.entryFor({
+        editEventId: event.id,
+        editDistance: 5,
+        compressionRatio: 1.5,
+        sentenceCountChange: 0,
+        lexicalOverlap: 0.5,
+        computedAt: '2026-01-01T00:00:00.000Z',
+        profileAppliedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      profileStore.entryFor(priorProfile),
+    ]);
+
+    await queue.enqueue(PROCESS_EDIT_EVENT_JOB, 'P1', { editEventId: event.id });
+    const job = await queue.runNext();
+
+    expect(job?.status).toBe('COMPLETE');
+    await expect(profileStore.get()).resolves.toEqual(priorProfile);
   });
 });

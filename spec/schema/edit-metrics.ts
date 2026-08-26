@@ -13,4 +13,11 @@ export interface EditMetrics {
   /** Jaccard similarity of the two texts' word sets, 0..1. */
   lexicalOverlap: number;
   computedAt: string;
+  /**
+   * Set once these metrics have been folded into EditProfile. Doubles as the
+   * idempotency receipt for the at-least-once job queue: a reclaimed/retried
+   * job checks this before re-applying, instead of keeping a separate
+   * growing list of processed event ids.
+   */
+  profileAppliedAt?: string;
 }

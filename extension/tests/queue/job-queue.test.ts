@@ -1,8 +1,24 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { IndexedDbStorageAdapter } from '../../src/storage/indexeddb-adapter';
-import { JobQueue } from '../../src/queue/job-queue';
+import { JOB_STORE, JobQueue } from '../../src/queue/job-queue';
 import { noopProcessor } from '../../src/queue/processors/noop-processor';
+import type { Job } from '@spec/protocol/job';
+
+function stuckRunningJob(overrides: Partial<Job> = {}): Job {
+  return {
+    id: 'stuck-job',
+    priority: 'P0',
+    type: 'noop',
+    payload: {},
+    status: 'RUNNING',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    sequence: 0,
+    attempts: 1,
+    startedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('JobQueue', () => {
   let queue: JobQueue;
@@ -36,6 +52,38 @@ describe('JobQueue', () => {
 
     expect(first?.id).toBe(jobA.id);
     expect(second?.id).toBe(jobB.id);
+  });
+
+  it('preserves FIFO order even when createdAt timestamps collide (regression)', async () => {
+    // A fixed clock simulates two enqueue calls landing in the same
+    // millisecond — createdAt alone can't break the tie; sequence must.
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const fixedClock = new JobQueue(adapter, undefined, () => '2026-01-01T00:00:00.000Z');
+    fixedClock.registerProcessor('noop', noopProcessor);
+
+    const jobA = await fixedClock.enqueue('noop', 'P1', { order: 'a' });
+    const jobB = await fixedClock.enqueue('noop', 'P1', { order: 'b' });
+    expect(jobA.createdAt).toBe(jobB.createdAt);
+
+    const first = await fixedClock.runNext();
+    const second = await fixedClock.runNext();
+    expect(first?.id).toBe(jobA.id);
+    expect(second?.id).toBe(jobB.id);
+  });
+
+  it('resumes the sequence counter correctly for a new JobQueue instance sharing storage', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queueA = new JobQueue(adapter);
+    await queueA.enqueue('noop', 'P1', { order: 'a' }); // sequence 0
+
+    // Simulate a service-worker restart: a fresh JobQueue instance, same storage.
+    const queueB = new JobQueue(adapter);
+    queueB.registerProcessor('noop', noopProcessor);
+    const jobC = await queueB.enqueue('noop', 'P1', { order: 'c' }); // must be sequence 1, not reset to 0
+    expect(jobC.sequence).toBe(1);
+
+    const first = await queueB.runNext();
+    expect((first?.payload as { order: string }).order).toBe('a');
   });
 
   it('marks jobs complete after a successful run', async () => {
@@ -76,5 +124,46 @@ describe('JobQueue', () => {
     const queueB = new JobQueue(adapter);
     const counts = await queueB.countsByPriority();
     expect(counts.P0).toBe(1);
+  });
+});
+
+describe('JobQueue stale-RUNNING reclaim', () => {
+  it('does not reclaim a RUNNING job that is still within its lease window', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    let clock = '2026-01-01T00:00:00.000Z';
+    const queue = new JobQueue(adapter, 1000, () => clock);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob(), 'CANONICAL');
+
+    clock = '2026-01-01T00:00:00.500Z'; // 500ms elapsed, under the 1000ms timeout
+    await expect(queue.next()).resolves.toBeUndefined();
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 0 });
+  });
+
+  it('reclaims a RUNNING job whose lease has expired, back to PENDING, and lets it run again', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    let clock = '2026-01-01T00:00:00.000Z';
+    const queue = new JobQueue(adapter, 1000, () => clock);
+    queue.registerProcessor('noop', noopProcessor);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob({ attempts: 1 }), 'CANONICAL');
+
+    clock = '2026-01-01T00:00:02.000Z'; // 2s elapsed, past the 1000ms timeout
+    const job = await queue.runNext();
+
+    expect(job?.id).toBe('stuck-job');
+    expect(job?.status).toBe('COMPLETE');
+    expect(job?.attempts).toBe(2); // incremented again on the reclaimed run
+    expect(job?.startedAt).toBe(clock);
+  });
+
+  it('counts a reclaimed job in countsByPriority once it is back to PENDING', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    let clock = '2026-01-01T00:00:00.000Z';
+    const queue = new JobQueue(adapter, 1000, () => clock);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob(), 'CANONICAL');
+
+    clock = '2026-01-01T00:00:02.000Z';
+    await queue.next(); // reclaim runs as a side effect of next()
+
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1 });
   });
 });

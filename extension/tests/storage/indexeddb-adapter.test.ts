@@ -56,4 +56,37 @@ describe('IndexedDbStorageAdapter', () => {
     expect(usage.DERIVED).toBe(0);
     expect(usage.RAW).toBe(0);
   });
+
+  describe('putMany', () => {
+    it('writes every entry, across different stores, from a single call', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      await adapter.putMany([
+        { store: 'a', key: 'k1', value: { n: 1 }, storageClass: 'CANONICAL' },
+        { store: 'b', key: 'k2', value: { n: 2 }, storageClass: 'DERIVED' },
+      ]);
+
+      await expect(adapter.get('a', 'k1')).resolves.toEqual({ n: 1 });
+      await expect(adapter.get('b', 'k2')).resolves.toEqual({ n: 2 });
+    });
+
+    it('is a no-op for an empty entry list', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      await expect(adapter.putMany([])).resolves.toBeUndefined();
+    });
+
+    it('writes nothing if any single entry fails (all-or-nothing)', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      const unclonable = { fn: () => {} };
+
+      await expect(
+        adapter.putMany([
+          { store: 'a', key: 'ok', value: { n: 1 }, storageClass: 'CANONICAL' },
+          { store: 'a', key: 'bad', value: unclonable, storageClass: 'CANONICAL' },
+        ]),
+      ).rejects.toBeDefined();
+
+      // The valid entry must not be visible either — the transaction aborted as a whole.
+      await expect(adapter.get('a', 'ok')).resolves.toBeUndefined();
+    });
+  });
 });

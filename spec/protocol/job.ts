@@ -16,6 +16,19 @@ export interface Job<TPayload = unknown> {
   payload: TPayload;
   status: JobStatus;
   createdAt: string;
+  /**
+   * Monotonically increasing enqueue order, scoped to this queue's storage.
+   * The actual FIFO tiebreaker within a priority class — `createdAt` is
+   * millisecond-resolution and can collide for near-simultaneous enqueues,
+   * and storage retrieval order is not guaranteed to match insertion order.
+   */
+  sequence: number;
   attempts: number;
   lastError?: string;
+  /**
+   * Set when the job transitions to RUNNING; cleared when it leaves RUNNING
+   * (reclaimed, completed, or failed). Used as the lease timestamp for
+   * stale-RUNNING recovery — see JobQueue's reclaim logic.
+   */
+  startedAt?: string;
 }
