@@ -528,10 +528,12 @@ over-interpreted as motivation rather than recorded as plain removal.
 
 ### Trial 2 — deterministic evidence localization + atomic semantic deltas
 
-**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN.** No real Trial 2
-result is recorded here or in `docs/decisions/0016` as of this writing —
-do not fabricate one. Full design, algorithm choice (a word/token-level
-adaptation of Conijn et al.'s restricted-Damerau-Levenshtein revision
+**Status: REAL RESULT RECORDED — ITERATE. First quantitative groundedness
+improvement (66.7% → 70.6%), still below ≥80%.** See "Trial 2 real result"
+below for the full writeup; full parallel detail is in
+`docs/decisions/0016`'s "Real Trial 2 result" section. Full design,
+algorithm choice (a word/token-level adaptation of Conijn et al.'s
+restricted-Damerau-Levenshtein revision
 classification), and academic grounding are in `docs/decisions/0016`'s
 "Trial 2" section; this is the short operator-facing summary.
 
@@ -573,16 +575,89 @@ it directly.
    ≥80% `SUPPORTED`? Trial 2 may show real improvement on (a) without
    passing (b).
 
-### Trial 2 results — TODO, pending the operator's actual run
+### Trial 2 real result (operator-graded)
 
-| Source EditEvent | Candidate(s) | Grade | Notes |
+Configuration held controlled: same 5 `EditEvent`s, OpenRouter,
+`openai/gpt-4o-mini`, extractor `openrouter/evidence-localized-v2`.
+
+| | Trial 0 | Trial 1 | Trial 2 |
 |---|---|---|---|
-| _(not yet run)_ | | | |
+| Candidates | 15 | 15 | 17 |
+| SUPPORTED | 10 (66.7%) | 10 (66.7%) | 12 (70.6%) |
+| PARTIALLY_SUPPORTED | 4 (26.7%) | 4 (26.7%) | 3 (17.6%) |
+| UNSUPPORTED | 1 (6.7%) | 1 (6.7%) | 2 (11.8%) |
+| Groundedness vs. ≥80% threshold | FAIL | FAIL | FAIL |
 
-Groundedness (% SUPPORTED): _(pending)_. MISSED_SIGNAL count: _(pending)_.
-Qualitative assessment of the three targeted failure classes (mixed
-preserved+changed meaning, redundant candidates, over-interpreted
-removals) vs. Trial 1: _(pending)_. Do not fabricate this table — once the
-operator runs Trial 2, fill in this table and `docs/decisions/0016`'s
-Trial 2 section together, and compare directly against the Trial 0 and
-Trial 1 results above (which must remain visible, not be overwritten).
+**First quantitative groundedness improvement: 66.7% → 70.6% (+3.9
+points).** Still below the ≥80% threshold — **Trial 2 did not pass Phase
+5A.** `PARTIALLY_SUPPORTED` fell (26.7% → 17.6%, consistent with the
+evidence-localization/atomicity objective), but `UNSUPPORTED` *rose* (6.7%
+→ 11.8%) — both directions recorded, not only the favorable one. With only
+5 `EditEvent`s (17 candidates), no statistical-significance or
+generalization claim is made.
+
+**Newly exposed failure class: localized textual change mistaken for
+meaningful semantic evidence.**
+
+```text
+TEXTUAL INTERVENTION != SEMANTIC CHANGE != PERSONA-RELEVANT EVIDENCE
+```
+
+Clearest example: the deterministic layer correctly localized a
+replacement (`davranışlarına` → `hareketine`); the extractor interpreted
+this as narrowing from broader "behavior" to more specific "actions" —
+graded **UNSUPPORTED**. The textual change is real; the claimed semantic
+narrowing is not sufficiently supported by it. A second UNSUPPORTED case
+was an interpretation/comparison error, not a localization failure: a
+candidate claimed the human described the current version as better
+"without explicitly acknowledging prior issues," but the human's FINAL
+text explicitly wrote "diğeri karman çorman bişeydi" — an explicit
+acknowledgment of prior issues, directly contradicting the claim.
+
+**Remaining `PARTIALLY_SUPPORTED` pattern (3 cases):** meaning mixed with
+meaning substantially present in ORIGINAL; correctly-detected
+removal/reframing with unsupported added motivation; observable
+explanation changes reframed as psychology (e.g. "minimizing the impact,"
+"external justification" — went beyond what the edit itself established).
+The boundary to keep enforcing:
+
+```text
+observable semantic transformation != psychological explanation for the transformation
+```
+
+**Positive observations (corpus observations only, not generalization
+evidence):** removal of "Bence" ("I think") correctly read as a more
+assertive/direct formulation — illustrating `textual change magnitude !=
+semantic/pragmatic change magnitude`; **not to be turned into a
+Turkish-specific extraction rule.** Other clean cases: explicit
+introduction of validating the project's core value before further
+development; feature-expansion optimism replaced by explicit skepticism
+about demand/relevance; more direct rest advice; addition of personal
+experience about taking breaks.
+
+**Conservative conclusion:** Trial 2 produced the first quantitative
+groundedness improvement (66.7% → 70.6%) and reduced partially-supported
+candidates (26.7% → 17.6%), but unsupported candidates increased (6.7% →
+11.8%). Deterministic evidence localization appears useful in this small
+experiment but is not sufficient: correctly identifying *where* a human
+edited text does not establish that every localized edit represents a
+meaningful semantic delta or persona-relevant signal.
+
+```text
+localization appears useful
+but localization is not sufficient
+```
+
+No claim of causality, statistical significance, cross-language
+generalization, or persona-reconstruction validation is made.
+
+### Current best Phase 5A result
+
+```text
+70.6% SUPPORTED (Trial 2)
+Acceptance threshold: >=80%
+Phase 5A = ITERATE
+```
+
+Trial 0 and Trial 1's results above remain visible, not overwritten. Trial
+3 is not designed or implemented as of this writing.

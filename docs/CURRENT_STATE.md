@@ -26,14 +26,14 @@ PASS (the central question), GROUNDEDNESS — FAIL (66.7% vs. required
 decisions" below and `docs/decisions/0016` for the full result. This is
 promising evidence, not proof the hypothesis is fully validated. Two
 controlled follow-up trials have since targeted the groundedness shortfall
-specifically: **Trial 1** (transformation-grounding instruction) has a
-real result — groundedness unchanged (66.7%), still ITERATE; **Trial 2**
-(deterministic evidence localization + atomic/redundancy/removal
-discipline) is implemented, awaiting the real operator run — see "Current
-experiments / pending decisions" below for both. The prior immediate
-roadmap (retrieval runtime → WebGPU expression engine) is
-**deferred/reordered, not cancelled**, pending this evidence-utility
-question — see `docs/decisions/0016`.
+specifically: **Trial 1** (transformation-grounding instruction) —
+groundedness unchanged (66.7%), still ITERATE; **Trial 2** (deterministic
+evidence localization + atomic/redundancy/removal discipline) — the first
+quantitative groundedness improvement (66.7% → 70.6%), still below the
+≥80% threshold, still ITERATE — see "Current experiments / pending
+decisions" below for both. The prior immediate roadmap (retrieval runtime
+→ WebGPU expression engine) is **deferred/reordered, not cancelled**,
+pending this evidence-utility question — see `docs/decisions/0016`.
 
 Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
 PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
@@ -419,22 +419,29 @@ aggregate score. Manual grading identified three remaining failure
 classes: preserved+changed meaning mixed within one candidate, overlapping/
 redundant candidates, and over-interpreted removals.
 
-**Trial 2 (`docs/decisions/0016`'s "Trial 2" section): IMPLEMENTED /
-AWAITING REAL OPERATOR RUN, not yet a result.** Targets the three Trial 1
-failure classes directly by adding a deterministic, language-general
-evidence-localization layer (`extension/src/persona/revision-diff.ts`,
-`computeRevisionDiff`) ahead of semantic interpretation — a word/token-
-level adaptation of Conijn et al. (2022)'s restricted-Damerau-Levenshtein
-revision classification (insertion/deletion/substitution/reordering) —
-plus explicit atomic-candidate, local redundancy-avoidance, and removal-
-discipline instruction rules. `providerId` bumped again to
-`openrouter/evidence-localized-v2`, distinct from both prior trials. Same
-5 real `EditEvent`s/model/schema/candidate-kinds/thresholds held fixed;
-no trait/persona promotion, cross-event aggregation, embeddings, or
-language-specific NLP added. **No real Trial 2 result exists yet** — the
-Trial 0 and Trial 1 results above remain the only recorded real outcomes
-until a human operator runs Trial 2 and grades it against the same
-rubric/thresholds.
+**Trial 2 (`docs/decisions/0016`'s "Trial 2" section): REAL RESULT
+RECORDED — ITERATE, first quantitative groundedness improvement.**
+Targeted the three Trial 1 failure classes by adding a deterministic,
+language-general evidence-localization layer
+(`extension/src/persona/revision-diff.ts`, `computeRevisionDiff`) ahead of
+semantic interpretation — a word/token-level adaptation of Conijn et al.
+(2022)'s restricted-Damerau-Levenshtein revision classification
+(insertion/deletion/substitution/reordering) — plus explicit
+atomic-candidate, local redundancy-avoidance, and removal-discipline
+instruction rules. `providerId` `openrouter/evidence-localized-v2`,
+distinct from both prior trials; confirmed by receipts to have reprocessed
+all 5 sources. **Real result: 17 candidates, 12/17 (70.6%) `SUPPORTED` —
+up from Trial 0/1's 66.7%, still below the required ≥80% threshold.**
+`PARTIALLY_SUPPORTED` fell (26.7% → 17.6%) but `UNSUPPORTED` rose (6.7% →
+11.8%) — both reported. A newly exposed failure class: the deterministic
+layer can correctly localize *that* text changed while the semantic
+extractor still assigns unsupported meaning to that change (`TEXTUAL
+INTERVENTION != SEMANTIC CHANGE != PERSONA-RELEVANT EVIDENCE`), e.g. a
+correctly-localized `davranışlarına` → `hareketine` replacement graded
+`UNSUPPORTED` for an unsupported "narrowing" interpretation on top of it.
+Conservative conclusion: localization appears useful but is not
+sufficient. No claim of statistical significance, generalization, or
+persona-reconstruction validation. Trial 3 is not designed or implemented.
 
 Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator

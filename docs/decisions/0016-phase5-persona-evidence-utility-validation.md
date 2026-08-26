@@ -991,10 +991,10 @@ Trial 1 was, and Trial 2 will be, graded against.
 
 ## Trial 2 — deterministic evidence localization + atomic semantic deltas
 
-**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN. No real Trial 2 result
-is recorded in this section.** The human operator performs the real run;
-this decision does not claim, predict, or fabricate its outcome. Trial 0
-and Trial 1's real results above are preserved unchanged.
+**Status: REAL RESULT RECORDED — ITERATE. First quantitative groundedness
+improvement (66.7% → 70.6%), still below the ≥80% threshold.** Trial 0 and
+Trial 1's real results above are preserved unchanged; see "Real Trial 2
+result (operator-graded)" below for what actually happened.
 
 ### Research question
 
@@ -1345,6 +1345,121 @@ clean `wxt build`.
    `docs/validation/manual-mvp-validation.md`'s Trial 2 subsection,
    preserving the Trial 0 and Trial 1 results above rather than
    overwriting them.
+
+### Real Trial 2 result (operator-graded)
+
+Configuration held controlled, as designed: same 5 `EditEvent`s, OpenRouter,
+`openai/gpt-4o-mini`, extractor `openrouter/evidence-localized-v2`.
+
+**Grading (17 real candidates — more than Trial 0/1's 15, itself a
+consequence of the atomic-candidate rule sometimes splitting what was
+previously one bundled candidate into more than one narrower candidate,
+not a change to candidate-count being a goal):**
+
+```text
+SUPPORTED                12 / 17 = 70.6%
+PARTIALLY_SUPPORTED       3 / 17 = 17.6%
+UNSUPPORTED               2 / 17 = 11.8%
+```
+
+```text
+Trial 1 groundedness      66.7%
+Trial 2 groundedness      70.6%
+
+Change                    +3.9 percentage points
+Phase 5A threshold        >=80%
+Phase status               ITERATE
+```
+
+**This is the first observed quantitative improvement in the primary
+groundedness metric.** It does not clear the pre-declared ≥80% threshold.
+**Trial 2 did not pass Phase 5A** — recorded plainly, not softened.
+
+**Secondary result — both directions recorded, not only the positive
+one.** `PARTIALLY_SUPPORTED` share fell (26.7% → 17.6%), directionally
+consistent with Trial 2's evidence-localization/atomicity objective.
+However, `UNSUPPORTED` share *rose* (6.7% → 11.8%) — a real, reported
+regression on that specific category, not omitted in favor of the
+groundedness headline. With a corpus of only 5 `EditEvent`s (17
+candidates), **no claim of statistical significance or generalization is
+made** for any of these percentage-point movements.
+
+**Newly exposed failure class: localized textual change mistaken for
+meaningful semantic evidence.** Trial 2's real output surfaced a
+distinction the implementation had not previously made visible:
+
+```text
+TEXTUAL INTERVENTION != SEMANTIC CHANGE != PERSONA-RELEVANT EVIDENCE
+```
+
+The deterministic localization layer can correctly identify *that* text
+changed while the semantic extractor still assigns unsupported meaning to
+that change — localization succeeding does not guarantee the semantic
+interpretation built on top of it is grounded. Clearest example: the
+deterministic layer correctly localized a replacement (`davranışlarına` →
+`hareketine`); the semantic extractor interpreted this as the human
+narrowing from broader "behavior" to more specific "actions." Manually
+graded **UNSUPPORTED** — the textual change is real, but the claimed
+semantic narrowing is not sufficiently supported by it. This is currently
+one of the clearest remaining failure classes, and it is a new, more
+specific finding than Trial 1's "preserved vs. changed meaning" mixture
+problem: it is possible to pass the counterfactual/localization machinery
+and still assign ungrounded semantic content to a genuinely localized
+change.
+
+**Second unsupported case — an interpretation/comparison error, not a
+localization failure.** A candidate claimed the human described the
+current version as better "without explicitly acknowledging prior
+issues" — but the human's actual final text explicitly wrote "diğeri
+karman çorman bişeydi" (an explicit acknowledgment of prior issues).
+Manually graded **UNSUPPORTED**. Distinct from the localization-vs-meaning
+failure class above: here the deterministic layer was not necessarily at
+fault — the semantic extractor's comparative claim directly contradicts
+text present in FINAL.
+
+**Remaining `PARTIALLY_SUPPORTED` pattern (3 cases).** Continues to show:
+mixing genuinely changed meaning with meaning substantially present in
+ORIGINAL; correctly detecting a removal/reframing but adding unsupported
+motivation for it; and turning an observable change in explanation into
+psychological framing. Descriptions such as "minimizing the impact" or
+"external justification" went beyond what the edit itself directly
+established. The boundary this experiment must keep enforcing:
+
+```text
+observable semantic transformation != psychological explanation for the transformation
+```
+
+**Positive observations (corpus observations only, not evidence of
+generalization).** Several clean cases: removal of "Bence" ("I think") was
+correctly associated with a more assertive/direct formulation — a useful,
+real illustration of the working principle `textual change magnitude !=
+semantic/pragmatic change magnitude` (a single short removed word,
+correctly read as a meaningful pragmatic shift). **This specific example
+must not be turned into a Turkish-specific extraction rule** — it is
+recorded as a corpus observation, not encoded into the language-general
+extractor. Other clean examples: explicit introduction of validating the
+project's core value before further development; feature-expansion
+optimism replaced by explicit skepticism about demand/relevance; more
+direct rest advice; addition of personal experience about taking breaks.
+
+**Conservative interpretation.** Trial 2 produced the first quantitative
+groundedness improvement, from 66.7% to 70.6%, while reducing the share of
+partially-supported candidates from 26.7% to 17.6%. However, unsupported
+candidates increased from 6.7% to 11.8%. Deterministic evidence
+localization therefore appears useful in this small experiment but is not
+sufficient: correctly identifying *where* a human edited text does not
+establish that every localized edit represents a meaningful semantic delta
+or persona-relevant signal.
+
+```text
+localization appears useful
+but localization is not sufficient
+```
+
+No claim of causality, statistical significance, cross-language
+generalization, or persona-reconstruction validation is made from this
+result — 5 `EditEvent`s is not a corpus size that supports any of those
+claims.
 
 ### Academic connection
 
