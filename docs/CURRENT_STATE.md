@@ -4,11 +4,13 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
-Phase 4 — deterministic PATTERNS layer of the persona compiler, no model call
-(see `docs/decisions/0011`). Phase 0, Phase 1, Phase 2's first slice, and all
-of Phase 3 (3A/3B/3C) are complete. Phase 4's TRAITS/BELIEFS step (requires
-an actual LLM call) is explicitly not started — its own future decision.
-Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
+Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
+PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
+using OpenRouter as the concrete MVP provider behind a provider-agnostic
+interface. Phase 0, Phase 1, Phase 2's first slice, and all of Phase 3
+(3A/3B/3C) and Phase 4 (both the deterministic PATTERNS layer and the T3
+TRAITS/BELIEFS step) are complete. This is the project's first
+network/LLM dependency. Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
 English-only, saturating/biasing on non-English (Turkish) evidence — see
 `docs/decisions/0012`. And two post-3A governor fixes on the same branch: `DEEP_IDLE` mode
 selection was gated on an empty queue, which made any pending `P3` job
@@ -74,8 +76,17 @@ Phase 4's deterministic PATTERNS layer:
   (context resolved from evidence's `context.surface`, defaulting to
   `"unscoped"`), gated by an explicit evidence threshold
   (`PatternCompilerPolicy`) — no `Pattern` is emitted below threshold.
-  `compile_patterns` is `P3`, manually triggered. TRAITS/BELIEFS (requires an
-  LLM call) is not implemented — see `docs/decisions/0011`.
+  `compile_patterns` is `P3`, manually triggered — see `docs/decisions/0011`.
+- Phase 4 (T3, TRAITS/BELIEFS): `PersonaInterpreterService` interprets
+  compiled `Pattern`s into `TraitBeliefClaim`s via a provider-agnostic
+  `PersonaInterpreterProvider` interface, concretely implemented by
+  `OpenRouterPersonaInterpreter` (the project's first network/LLM
+  dependency). Gated by a deterministic evidence threshold
+  (`PersonaInterpreterPolicy`) before any network call is made; only
+  minimized `PatternCandidate` aggregates leave the device, never raw
+  evidence or prior claims. `interpret_traits_beliefs` is `P3`, manually
+  triggered. API key/model/enabled config lives in `chrome.storage.local`,
+  outside the persona storage taxonomy — see `docs/decisions/0015`.
 - Post-3C fix: real-world Turkish evidence (35 samples) exposed that
   `HeuristicTinyClassifier` was silently English-only — `directness`
   saturated at a confidently-wrong 100%, `formality` was biased upward.
@@ -200,6 +211,27 @@ Phase 4's deterministic PATTERNS layer:
   `enqueueVectorIndexRebuild`, `enqueuePatternCompilation`) so repeated
   clicks on a rebuild button can't accumulate duplicate `P3` jobs; see
   `docs/decisions/0014`.
+- `TraitBeliefStore` (`DERIVED`, keyed by id) — TRAITS/BELIEFS claims,
+  fully rebuildable from `PatternStore`.
+- `PersonaInterpreterConfigStore` — OpenRouter API key, model id, enabled
+  flag; backed by `chrome.storage.local` directly, deliberately outside
+  `StorageAdapter`/the persona storage-class taxonomy — see
+  `docs/decisions/0015`.
+- `OpenRouterPersonaInterpreter implements PersonaInterpreterProvider` —
+  the sole owner of `fetch`/credential handling; structured/schema-validated
+  request+response, both the request's `response_format` and a defensive
+  `validateClaimDraft()` on the parsed response.
+- `PersonaInterpreterService.interpret()`: deterministic evidence-threshold
+  gate (`isEligibleForInterpretation`, no network call below threshold) ->
+  minimize `Pattern`s to `PatternCandidate`s -> provider call (never given
+  the previous claim set, to avoid self-reinforcing drift) -> validate ->
+  full-rebuild write to `TraitBeliefStore`. Provider constructed fresh from
+  current config on every run, not cached in the service-worker closure.
+- Popup UI: Traits/Beliefs (T3) panel — claim/context/confidence/
+  supporting-pattern-count list, "Interpret traits/beliefs" button, inline
+  settings form (API key, model id, enabled).
+- `extension/wxt.config.ts`: `host_permissions: ['https://openrouter.ai/*']`
+  — scoped to exactly the one provider origin in use.
 
 ## Known limitations
 
@@ -244,6 +276,12 @@ Phase 4's deterministic PATTERNS layer:
   `editDistance`/`sentenceCountChange` excluded as unbounded raw counts.
 - `PatternCompilerService.compile()` is a full rebuild, not incremental —
   acceptable for this job's `P3`/expensive-rare classification.
+- `PersonaInterpreterConfigStore`'s API key has no encryption beyond
+  whatever Chrome provides for extension local storage — an explicit,
+  documented MVP tradeoff, not an oversight. See `docs/decisions/0015`.
+- No per-request cost/rate limiting or spend cap on T3 interpretation —
+  bounded only by `enqueueSingleton`'s existing one-outstanding-job
+  coalescing, not by any cost-awareness logic.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -260,11 +298,6 @@ Phase 4's deterministic PATTERNS layer:
 - EditProfile, the vector index, the T2 profile, and now Patterns are not
   yet wired into the Expression Sheet or any retrieval-for-generation flow —
   that integration belongs to Phase 5 (retrieval runtime), not this slice.
-- Phase 4's TRAITS/BELIEFS step — turning Patterns into higher-level claims
-  via "rare persona-model interpretation" — requires an actual LLM call and
-  is entirely unimplemented, pending its own model/provider decision. No
-  provider abstraction, API key handling, or network permission exists yet.
-  See `docs/decisions/0011`.
 - No real (neural) embedding model or trained classifier, no WebGPU model.
 - Governor's WebGPU-contention/battery/memory-pressure signals are typed
   (`SPEC_RESERVED`) but unwired — nothing produces them yet.
@@ -278,16 +311,28 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Thirteen operator decisions to date are recorded in `docs/decisions/`.
+None open. Fifteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider
 (swapping `HashingEmbeddingProvider`, likely needing an offscreen-document
 execution context per `docs/decisions/0009`); a real trained classifier or
-additional heuristic T2 dimensions (`docs/decisions/0010`); Phase 4's
-TRAITS/BELIEFS step — the project's first LLM/network dependency, its own
-model/provider decision (`docs/decisions/0011`); and Phase 5 (retrieval
-runtime) to actually wire derived signals into anything user-facing.
+additional heuristic T2 dimensions (`docs/decisions/0010`); a non-OpenRouter
+`PersonaInterpreterProvider` or per-request cost/rate limiting for T3
+(`docs/decisions/0015`); and Phase 5 (retrieval runtime) to actually wire
+derived signals (including TraitBeliefClaims) into anything user-facing.
+One open research question, not yet an implementation decision: the first
+real T3 dogfood test against the actual OpenRouter API (see
+`docs/decisions/0015`'s "HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD
+FINDING" section) found that `compressionRatio`/`lexicalOverlap` — the
+only two dimensions PATTERNS currently produces — don't carry enough
+semantic information for T3 to construct a meaningful persona; the T3
+pipeline itself (evidence → patterns → OpenRouter → persisted claims) is
+confirmed working end to end. The next architectural question is how to
+derive higher-information semantic preference/behavioral-delta evidence
+from AI-output → human-edit deltas upstream of PATTERNS, without
+weakening evidence thresholds or the evidence → repeated pattern →
+interpretation discipline.
 
 ## Current benchmark status
 
