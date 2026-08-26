@@ -28,6 +28,13 @@ stands after this PR.
   Jaccard lexical overlap) -> `EditMetricsStore` (DERIVED) ->
   `applyEditMetrics()` (T1 incremental mean, no history rescan) ->
   `EditProfileStore` (DERIVED).
+- Phase 3A — batching/scheduling and storage-eviction infrastructure
+  (`docs/decisions/0008`): `JobQueue` dispatch is mode-gated via
+  `ALLOWED_PRIORITIES_BY_MODE`; `foregroundActive` is a real signal
+  (`ForegroundTracker`, popup-open detection via `chrome.runtime.Port`,
+  replacing the previous hardcoded `false`); `planEviction()`/`evictIfNeeded()`
+  actually run (CACHE→DERIVED→RAW, CANONICAL never automatic), deferred while
+  `mode === 'INTERACTIVE'`.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -48,8 +55,10 @@ stands after this PR.
   manual-only, see `docs/decisions/0005`), character n-grams, typo-pattern
   detection, response latency, keystroke/session aggregation, full context
   metadata taxonomy (writing.public_social / writing.private_message / etc.).
-- Phase 3 local derived analysis (embeddings, tiny classifiers incl. T2
-  formality/directness/warmth/etc., vector index).
+- Phase 3B — local embeddings + vector index: one model/library decision,
+  benchmark, and retrieval primitives, its own future PR.
+- Phase 3C — tiny local classifiers (T2: formality/directness/warmth/etc.),
+  its own future PR.
 - Phase 4 persona compiler (events -> patterns -> traits/beliefs).
 - Phase 5 retrieval runtime (query-focused persona assembly).
 - Phase 6 WebGPU expression engine (the actual style-transform model).
@@ -65,11 +74,11 @@ stands after this PR.
 
 ## What remains out of scope after this round
 
-This PR adds manual AI-output/human-edit capture, T0 diff metrics, and a T1
-incremental profile, processed asynchronously through the job queue for the
-first time on real (non-synthetic) evidence. It still does not implement:
-live/content-script capture, character n-grams or other T0 signals beyond
-diffing, T2 tiny classifiers, embeddings, the WebGPU expression
-transformation itself, wiring EditProfile into the Expression Sheet, or any
-benchmark suite. Those remain the next round(s) of work, unblocked by (not
-fulfilled by) this PR.
+This PR makes the governor's mode output and foreground signal real (both
+were previously computed/hardcoded but unused), and makes storage eviction
+actually run for the first time. It still does not implement: live/
+content-script capture, character n-grams or other T0 signals beyond diffing,
+T2 tiny classifiers, embeddings, a vector index, the WebGPU expression
+transformation itself, wiring EditProfile into the Expression Sheet, user-
+configurable storage limits, or any benchmark suite. Those remain the next
+round(s) of work (Phase 3B/3C next), unblocked by (not fulfilled by) this PR.

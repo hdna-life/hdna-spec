@@ -3,6 +3,8 @@
   import { IndexedDbStorageAdapter } from '../../src/storage/indexeddb-adapter';
   import { JobQueue } from '../../src/queue/job-queue';
   import { RuntimeControls, type RuntimeControlsState } from '../../src/runtime/controls';
+  import { RuntimeStatusStore, type RuntimeStatus } from '../../src/runtime/status';
+  import { FOREGROUND_PORT_NAME } from '../../src/runtime/foreground-tracker';
   import { WritingSampleStore } from '../../src/persona/sample-store';
   import { ExpressionSheetStore } from '../../src/persona/expression-sheet-store';
   import { EditEventStore } from '../../src/persona/edit-event-store';
@@ -28,6 +30,7 @@
   const expressionSheetStore = new ExpressionSheetStore(storage);
   const editEventStore = new EditEventStore(storage);
   const editProfileStore = new EditProfileStore(storage);
+  const runtimeStatusStore = new RuntimeStatusStore(storage);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -35,6 +38,7 @@
   let sampleCount = 0;
   let expressionSheet: ExpressionSheet | undefined;
   let editProfile: EditProfile | undefined;
+  let runtimeStatus: RuntimeStatus | undefined;
 
   async function refresh() {
     counts = await queue.countsByPriority();
@@ -43,6 +47,7 @@
     sampleCount = (await sampleStore.list()).length;
     expressionSheet = await expressionSheetStore.get();
     editProfile = await editProfileStore.get();
+    runtimeStatus = await runtimeStatusStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -72,16 +77,24 @@
   }
 
   let interval: ReturnType<typeof setInterval>;
+  let foregroundPort: chrome.runtime.Port | undefined;
   onMount(() => {
+    // Signals the background dispatch loop that a foreground surface is
+    // open; disconnects automatically when the popup closes.
+    foregroundPort = chrome.runtime.connect({ name: FOREGROUND_PORT_NAME });
     refresh();
     interval = setInterval(refresh, 2000);
   });
-  onDestroy(() => clearInterval(interval));
+  onDestroy(() => {
+    clearInterval(interval);
+    foregroundPort?.disconnect();
+  });
 </script>
 
 <main>
   <h1>HDNA</h1>
   <Status
+    mode={runtimeStatus?.mode}
     processingPaused={controlsState.processingPaused}
     learningPaused={controlsState.learningPaused}
   />
@@ -90,7 +103,11 @@
   <EditCapture on:capture={captureEdit} />
   <EditProfileSummary profile={editProfile} />
   <Queue {counts} />
-  <StorageUsage {usage} />
+  <StorageUsage
+    {usage}
+    lastEvictionAt={runtimeStatus?.lastEvictionAt}
+    lastEvictionBytesFreed={runtimeStatus?.lastEvictionBytesFreed}
+  />
   <Controls
     processingPaused={controlsState.processingPaused}
     learningPaused={controlsState.learningPaused}

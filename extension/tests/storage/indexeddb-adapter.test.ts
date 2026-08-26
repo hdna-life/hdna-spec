@@ -89,4 +89,34 @@ describe('IndexedDbStorageAdapter', () => {
       await expect(adapter.get('a', 'ok')).resolves.toBeUndefined();
     });
   });
+
+  describe('listRecordMeta', () => {
+    it('lists metadata for every record without a filter, across stores', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      await adapter.put('a', 'k1', { n: 1 }, 'CANONICAL');
+      await adapter.put('b', 'k2', { n: 2 }, 'CACHE');
+
+      const meta = await adapter.listRecordMeta();
+      expect(meta.map((m) => `${m.store}:${m.key}`).sort()).toEqual(['a:k1', 'b:k2']);
+      expect(meta.every((m) => m.size > 0)).toBe(true);
+    });
+
+    it('filters by storage class', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      await adapter.put('a', 'k1', { n: 1 }, 'CANONICAL');
+      await adapter.put('b', 'k2', { n: 2 }, 'CACHE');
+
+      const meta = await adapter.listRecordMeta('CACHE');
+      expect(meta).toHaveLength(1);
+      expect(meta[0]).toMatchObject({ store: 'b', key: 'k2', storageClass: 'CACHE' });
+    });
+
+    it('does not include the value payload', async () => {
+      const adapter = new IndexedDbStorageAdapter(dbName);
+      await adapter.put('a', 'k1', { n: 1 }, 'CANONICAL');
+
+      const meta = await adapter.listRecordMeta();
+      expect(meta[0]).not.toHaveProperty('value');
+    });
+  });
 });

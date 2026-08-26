@@ -70,12 +70,19 @@ export class JobQueue {
     }
   }
 
-  /** Returns the highest-priority pending job (P0 first), FIFO within a priority class. Reclaims stale RUNNING jobs first. */
-  async next(): Promise<Job | undefined> {
+  /**
+   * Returns the highest-priority pending job (P0 first), FIFO within a
+   * priority class. Reclaims stale RUNNING jobs first. When
+   * `allowedPriorities` is given, jobs outside that set are left PENDING and
+   * ignored — e.g. the runtime governor restricting dispatch to cheap job
+   * classes while the user is actively interacting.
+   */
+  async next(allowedPriorities?: JobPriority[]): Promise<Job | undefined> {
     await this.reclaimStaleJobs();
 
+    const allowedSet = allowedPriorities ? new Set(allowedPriorities) : undefined;
     const jobs = await this.storage.query<Job>(JOB_STORE);
-    const pending = jobs.filter((j) => j.status === 'PENDING');
+    const pending = jobs.filter((j) => j.status === 'PENDING' && (!allowedSet || allowedSet.has(j.priority)));
     pending.sort((a, b) => {
       const priorityDiff = JOB_PRIORITY_ORDER.indexOf(a.priority) - JOB_PRIORITY_ORDER.indexOf(b.priority);
       if (priorityDiff !== 0) return priorityDiff;
@@ -93,9 +100,9 @@ export class JobQueue {
     return counts;
   }
 
-  /** Runs the next pending job, if any, using its registered processor. Returns the job outcome, or undefined if the queue was empty. */
-  async runNext(): Promise<Job | undefined> {
-    const job = await this.next();
+  /** Runs the next pending job (optionally restricted to `allowedPriorities`), if any, using its registered processor. Returns the job outcome, or undefined if there was nothing eligible. */
+  async runNext(allowedPriorities?: JobPriority[]): Promise<Job | undefined> {
+    const job = await this.next(allowedPriorities);
     if (!job) return undefined;
 
     job.status = 'RUNNING';

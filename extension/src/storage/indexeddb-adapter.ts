@@ -1,6 +1,6 @@
 import type { StorageClass } from '@spec/schema/storage-classes';
 import { STORAGE_CLASS_DELETION_ORDER } from '@spec/schema/storage-classes';
-import type { StorageAdapter, StorageEntry } from './types';
+import type { StorageAdapter, StorageEntry, StorageRecordMeta } from './types';
 
 interface Record_ {
   compositeKey: string;
@@ -146,5 +146,20 @@ export class IndexedDbStorageAdapter implements StorageAdapter {
       usage[record.storageClass] += record.size;
     }
     return usage;
+  }
+
+  async listRecordMeta(storageClass?: StorageClass): Promise<StorageRecordMeta[]> {
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(RECORD_STORE, 'readonly');
+      const objectStore = tx.objectStore(RECORD_STORE);
+      const req: IDBRequest<Record_[]> = storageClass
+        ? objectStore.index('storageClass').getAll(IDBKeyRange.only(storageClass))
+        : objectStore.getAll();
+      req.onsuccess = () => {
+        resolve(req.result.map((r) => ({ store: r.store, key: r.key, storageClass: r.storageClass, size: r.size })));
+      };
+      req.onerror = () => reject(req.error);
+    });
   }
 }

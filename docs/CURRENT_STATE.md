@@ -4,14 +4,17 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
-Phase 2 — Passive Evidence Collection (first slice: manual edit-event
-capture; see `docs/architecture/mvp-scope.md`). Phase 0 (spec/runtime
-contracts) and Phase 1 (cold-start onboarding) are complete.
+Phase 3A — batching/scheduling and storage-eviction infrastructure (see
+`docs/decisions/0008`). Phase 0 (spec/runtime contracts), Phase 1 (cold-start
+onboarding), and Phase 2's first slice (manual edit-event capture) are
+complete. Phase 3B (embeddings + vector index) and 3C (tiny classifiers) are
+scoped but not started — see Current experiments below.
 
 ## Active MVP scope
 
 Infrastructure prerequisites for the MVP hypothesis, Phase 1 cold-start
-data collection, and a first Phase 2 passive-collection slice:
+data collection, a first Phase 2 passive-collection slice, and Phase 3A
+infrastructure:
 
 - MV3 extension runtime (WXT + Svelte), background service worker + popup.
 - Local storage abstraction (`StorageAdapter`) backed by IndexedDB.
@@ -19,15 +22,19 @@ data collection, and a first Phase 2 passive-collection slice:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 86 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 112 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
-  `.hdna` manifest shape.
+  storage policy, `.hdna` manifest shape.
 - Phase 1 onboarding: real writing samples -> deterministic T0 stylometry ->
   Expression Sheet compilation, synchronous (see `docs/decisions/0004`).
 - Phase 2 (first slice): AI-output/human-edit pairs, captured manually in the
   popup, processed asynchronously through the job queue (P1) -> T0 diff
   metrics -> T1 incremental profile (see `docs/decisions/0005`).
+- Phase 3A: dispatch is mode-gated (INTERACTIVE/BACKGROUND/DEEP_IDLE actually
+  restrict which job priorities run), foreground activity is real (popup-open
+  detection via `chrome.runtime.Port`), and storage eviction (CACHE→DERIVED→RAW,
+  CANONICAL never automatic) actually runs (see `docs/decisions/0008`).
 
 ## Implemented capabilities
 
@@ -62,10 +69,22 @@ data collection, and a first Phase 2 passive-collection slice:
   `putMany()` so no crash window can leave the receipt and the profile
   update out of sync (`docs/decisions/0007`).
 - Popup UI: onboarding textarea + Expression Sheet summary + edit-capture form
-  + Edit Profile summary, wired to live queue/storage/controls state, polls
-  every 2s.
+  + Edit Profile summary + real governor mode + last-eviction info, wired to
+  live queue/storage/controls state, polls every 2s.
 - `chrome.alarms`-driven background dispatch loop running the `noop` and
-  `process_edit_event` processors.
+  `process_edit_event` processors, now mode-gated: `JobQueue.next()`/`runNext()`
+  accept an `allowedPriorities` filter, and dispatch is restricted to
+  `ALLOWED_PRIORITIES_BY_MODE[mode]` each tick.
+- `ForegroundTracker`: tracks whether the popup is open via a long-lived
+  `chrome.runtime.Port`, feeding the governor's real `foregroundActive` signal
+  (previously hardcoded `false`).
+- `planEviction()` (pure) / `evictIfNeeded()`: evicts CACHE, then DERIVED,
+  then RAW records until back under `DEFAULT_STORAGE_POLICY.maxTotalBytes`;
+  CANONICAL is never evicted automatically. Runs each dispatch tick, deletions
+  skipped while `mode === 'INTERACTIVE'`.
+- `RuntimeStatusStore`: persists the background loop's live
+  `{ mode, batchSize, lastEvictionAt, lastEvictionBytesFreed }` (CACHE class)
+  so the popup, a separate execution context, can display it.
 
 ## Known limitations
 
@@ -76,6 +95,12 @@ data collection, and a first Phase 2 passive-collection slice:
   keeping all records in one physical object store. A future SQLite/OPFS
   adapter would need its own transaction mechanism to preserve this
   guarantee behind the same `StorageAdapter` interface.
+- Eviction budget (50 MB) is a hardcoded placeholder, not user-configurable —
+  see `docs/decisions/0008`.
+- Within-class eviction order is not LRU/recency-based, just whatever
+  `listRecordMeta()` returns — see `docs/decisions/0008`.
+- `foregroundActive` only reflects "is the popup open," not other foreground
+  signals the doc mentions (tab focus, recent interaction latency).
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -102,11 +127,12 @@ data collection, and a first Phase 2 passive-collection slice:
 
 ## Current experiments / pending decisions
 
-None open. Seven operator decisions to date are recorded in `docs/decisions/`.
+None open. Eight operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
-call: whether/how to add content-script-based live capture. Phase 3 (local
-embeddings/vector index, tiny classifiers, adaptive batching) has not yet
-been scoped — those capabilities are `PLANNED`, not started.
+call: whether/how to add content-script-based live capture. Phase 3 is now
+sequenced as 3A (this PR, done) / 3B (embeddings + vector index: one model
+decision + benchmark + retrieval primitives) / 3C (tiny classifiers) — 3B and
+3C are `PLANNED`, not started.
 
 ## Current benchmark status
 

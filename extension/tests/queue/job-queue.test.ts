@@ -167,3 +167,40 @@ describe('JobQueue stale-RUNNING reclaim', () => {
     await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1 });
   });
 });
+
+describe('JobQueue priority-gated dispatch', () => {
+  it('with no filter, considers every priority (existing behavior)', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('noop', noopProcessor);
+    await queue.enqueue('noop', 'P3', {});
+
+    const job = await queue.runNext();
+    expect(job?.priority).toBe('P3');
+  });
+
+  it('ignores jobs outside the allowed priority set, leaving them PENDING', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('noop', noopProcessor);
+    await queue.enqueue('noop', 'P3', {});
+
+    await expect(queue.next(['P0', 'P1'])).resolves.toBeUndefined();
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+  });
+
+  it('runs the highest-priority job within the allowed set, skipping disallowed higher-priority jobs', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('noop', noopProcessor);
+    await queue.enqueue('noop', 'P0', { which: 'blocked' });
+    const allowedJob = await queue.enqueue('noop', 'P2', { which: 'allowed' });
+
+    // P0 is intentionally excluded here to prove the filter — not realistic
+    // usage (every mode allows P0), just isolates the filtering behavior.
+    const job = await queue.runNext(['P2']);
+    expect(job?.id).toBe(allowedJob.id);
+
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1, P2: 0 });
+  });
+});
