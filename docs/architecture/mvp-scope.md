@@ -53,15 +53,29 @@ stands after this PR.
   profile write). Confidence-weighted incremental aggregation in
   `T2Profile`. Incremental classification (`P2`) and full rebuild (`P3`)
   run through the existing job queue.
-- Phase 4 — deterministic PATTERNS layer only (`docs/decisions/0011`):
+- Phase 4 — deterministic PATTERNS layer (`docs/decisions/0011`):
   `PatternCompilerService` aggregates `EditMetrics`/`TraitScoreRecord` into
   context-scoped `Pattern` records, context resolved from each observation's
   source evidence (`context.surface`, defaulting to `"unscoped"`), gated by
   an explicit evidence threshold (`PatternCompilerPolicy`) — no `Pattern`
   below threshold. `compile_patterns` (`P3`, full rebuild, manually
-  triggered) mirrors `VectorIndexService`'s rebuild contract. The
-  TRAITS/BELIEFS step (requires an LLM call) is explicitly not implemented —
-  see PLANNED below.
+  triggered) mirrors `VectorIndexService`'s rebuild contract.
+- Phase 4 — T3 TRAITS/BELIEFS persona interpretation (`docs/decisions/0015`):
+  the project's first network/LLM dependency. `PersonaInterpreterProvider`
+  (execution-context-agnostic interface, no `fetch`/API-key concept)
+  implemented by `OpenRouterPersonaInterpreter` (OpenRouter as a model
+  gateway, `modelId` caller-configurable). `PersonaInterpreterService`
+  gates any network call behind a deterministic evidence threshold
+  (`PersonaInterpreterPolicy`), sends only minimized `PatternCandidate`
+  aggregates (never raw evidence, never the previous claim set), validates
+  structured responses (`validateClaimDraft`), and full-rebuild-writes
+  `TraitBeliefClaim`s to `TraitBeliefStore` (`DERIVED`). `interpret_traits_beliefs`
+  is `P3`, manually triggered, mirroring `compile_patterns`'s job shape.
+  API key/model/enabled config lives in `chrome.storage.local`, explicitly
+  outside the `CANONICAL`/`DERIVED`/`CACHE`/`RAW` persona storage taxonomy —
+  a credential is not persona evidence and must never surface through
+  storage-usage accounting, eviction, or a future persona-export/evidence
+  API. `host_permissions` scoped to exactly `https://openrouter.ai/*`.
 - Post-3C fix (`docs/decisions/0012`): `HeuristicTinyClassifier`'s formality/
   directness heuristics are gated by `isLikelyEnglish()` — requires BOTH a
   non-ASCII-letter ratio ≤ 2% AND English function-word density ≥ 5% — and
@@ -103,13 +117,11 @@ stands after this PR.
 - A real trained classifier model, or heuristic coverage of the remaining
   five T2 dimensions — swapped in / added behind the existing
   `TinyClassifier` interface (`docs/decisions/0010`).
-- Phase 4's TRAITS/BELIEFS step: turning `Pattern`s into higher-level claims
-  via the doc's "T3: rare persona-model interpretation" — requires an actual
-  LLM call (frontier API or local model). No provider abstraction, API key
-  handling, or network permission exists yet — this is the project's first
-  network dependency and needs its own explicit model/provider decision
-  (`docs/decisions/0011`).
-- Phase 5 retrieval runtime (query-focused persona assembly).
+- A non-OpenRouter `PersonaInterpreterProvider`, per-request cost/rate
+  limiting, or encryption-at-rest for the stored OpenRouter API key — T3
+  itself is implemented, see `docs/decisions/0015`.
+- Phase 5 retrieval runtime (query-focused persona assembly), which will
+  need to decide how (or whether) `TraitBeliefClaim`s feed generation.
 - Phase 6 WebGPU expression engine (the actual style-transform model).
 - Phase 7 optional local neural adaptation (LoRA/adapters).
 - Phase 8 multimodal activation (speech/visual/gesture).

@@ -36,6 +36,14 @@ import {
   COMPILE_PATTERNS_JOB,
   createCompilePatternsProcessor,
 } from '../src/queue/processors/pattern-compilation-job';
+import { TraitBeliefStore } from '../src/persona/trait-belief-store';
+import { PersonaInterpreterConfigStore } from '../src/persona/persona-interpreter-config-store';
+import { OpenRouterPersonaInterpreter } from '../src/persona/openrouter-persona-interpreter';
+import { PersonaInterpreterService } from '../src/persona/persona-interpreter-service';
+import {
+  INTERPRET_TRAITS_BELIEFS_JOB,
+  createInterpretTraitsBeliefsProcessor,
+} from '../src/queue/processors/persona-interpretation-job';
 import { decide, decideMode } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals } from '../src/governor/types';
@@ -83,6 +91,14 @@ export default defineBackground(() => {
     new PatternStore(storage),
   );
   queue.registerProcessor(COMPILE_PATTERNS_JOB, createCompilePatternsProcessor(patternCompiler));
+
+  const personaInterpreter = new PersonaInterpreterService(
+    (apiKey, modelId) => new OpenRouterPersonaInterpreter(apiKey, modelId),
+    new PatternStore(storage),
+    new TraitBeliefStore(storage),
+    new PersonaInterpreterConfigStore(),
+  );
+  queue.registerProcessor(INTERPRET_TRAITS_BELIEFS_JOB, createInterpretTraitsBeliefsProcessor(personaInterpreter));
 
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);

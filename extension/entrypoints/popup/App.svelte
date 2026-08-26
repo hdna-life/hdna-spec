@@ -25,12 +25,19 @@
   } from '../../src/queue/processors/trait-classification-jobs';
   import { PatternStore } from '../../src/persona/pattern-store';
   import { enqueuePatternCompilation } from '../../src/queue/processors/pattern-compilation-job';
+  import { TraitBeliefStore } from '../../src/persona/trait-belief-store';
+  import {
+    PersonaInterpreterConfigStore,
+    type PersonaInterpreterConfig,
+  } from '../../src/persona/persona-interpreter-config-store';
+  import { enqueuePersonaInterpretation } from '../../src/queue/processors/persona-interpretation-job';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
   import type { EditProfile } from '@spec/schema/edit-profile';
   import type { T2Profile } from '@spec/schema/t2-profile';
   import type { Pattern } from '@spec/schema/pattern';
+  import type { TraitBeliefClaim } from '@spec/schema/trait-belief';
   import Status from '../../src/ui/Status.svelte';
   import Queue from '../../src/ui/Queue.svelte';
   import StorageUsage from '../../src/ui/StorageUsage.svelte';
@@ -42,6 +49,7 @@
   import VectorIndex from '../../src/ui/VectorIndex.svelte';
   import T2ProfileSummary from '../../src/ui/T2ProfileSummary.svelte';
   import PatternsSummary from '../../src/ui/PatternsSummary.svelte';
+  import TraitsBeliefsSummary from '../../src/ui/TraitsBeliefsSummary.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
@@ -58,6 +66,8 @@
   const vectorIndex = new VectorIndexService(embeddingProvider, embeddingStore, []);
   const t2ProfileStore = new T2ProfileStore(storage);
   const patternStore = new PatternStore(storage);
+  const traitBeliefStore = new TraitBeliefStore(storage);
+  const personaInterpreterConfigStore = new PersonaInterpreterConfigStore();
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -70,6 +80,8 @@
   let searchResults: ScoredEmbedding[] = [];
   let t2Profile: T2Profile | undefined;
   let patterns: Pattern[] = [];
+  let traitBeliefs: TraitBeliefClaim[] = [];
+  let personaInterpreterConfig: PersonaInterpreterConfig = { enabled: false };
 
   async function refresh() {
     counts = await queue.countsByPriority();
@@ -82,6 +94,8 @@
     embeddingCount = (await embeddingStore.list()).length;
     t2Profile = await t2ProfileStore.get();
     patterns = await patternStore.list();
+    traitBeliefs = await traitBeliefStore.list();
+    personaInterpreterConfig = await personaInterpreterConfigStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -118,6 +132,16 @@
 
   async function compilePatterns() {
     await enqueuePatternCompilation(queue);
+    await refresh();
+  }
+
+  async function interpretTraitsBeliefs() {
+    await enqueuePersonaInterpretation(queue);
+    await refresh();
+  }
+
+  async function saveInterpreterConfig(event: CustomEvent<PersonaInterpreterConfig>) {
+    await personaInterpreterConfigStore.set(event.detail);
     await refresh();
   }
 
@@ -161,6 +185,13 @@
   <EditProfileSummary profile={editProfile} />
   <T2ProfileSummary profile={t2Profile} on:rebuild={rebuildT2Profile} />
   <PatternsSummary {patterns} on:compile={compilePatterns} />
+  <TraitsBeliefsSummary
+    claims={traitBeliefs}
+    patternCount={patterns.length}
+    config={personaInterpreterConfig}
+    on:interpret={interpretTraitsBeliefs}
+    on:saveConfig={saveInterpreterConfig}
+  />
   <VectorIndex
     {embeddingCount}
     extractorId={embeddingProvider.extractorId}
