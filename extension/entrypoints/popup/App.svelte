@@ -19,6 +19,7 @@
     enqueueVectorIndexRebuild,
   } from '../../src/queue/processors/embedding-jobs';
   import { T2ProfileStore } from '../../src/persona/t2-profile-store';
+  import { TraitScoreStore } from '../../src/persona/trait-score-store';
   import {
     enqueueEvidenceClassification,
     enqueueT2ProfileRebuild,
@@ -57,6 +58,7 @@
   // only writes to the index go through the job queue — see docs/decisions/0009.
   const vectorIndex = new VectorIndexService(embeddingProvider, embeddingStore, []);
   const t2ProfileStore = new T2ProfileStore(storage);
+  const traitScoreStore = new TraitScoreStore(storage);
   const patternStore = new PatternStore(storage);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
@@ -69,6 +71,8 @@
   let embeddingCount = 0;
   let searchResults: ScoredEmbedding[] = [];
   let t2Profile: T2Profile | undefined;
+  let t2EvidenceCount = 0;
+  let t2ClassifiedCount = 0;
   let patterns: Pattern[] = [];
 
   async function refresh() {
@@ -81,6 +85,13 @@
     runtimeStatus = await runtimeStatusStore.get();
     embeddingCount = (await embeddingStore.list()).length;
     t2Profile = await t2ProfileStore.get();
+    const [writingSamples, editEvents, traitScores] = await Promise.all([
+      sampleStore.list(),
+      editEventStore.list(),
+      traitScoreStore.list(),
+    ]);
+    t2EvidenceCount = writingSamples.length + editEvents.length;
+    t2ClassifiedCount = traitScores.filter((record) => Object.keys(record.scores).length > 0).length;
     patterns = await patternStore.list();
   }
 
@@ -159,7 +170,12 @@
   <ExpressionSheetSummary sheet={expressionSheet} />
   <EditCapture on:capture={captureEdit} />
   <EditProfileSummary profile={editProfile} />
-  <T2ProfileSummary profile={t2Profile} on:rebuild={rebuildT2Profile} />
+  <T2ProfileSummary
+    profile={t2Profile}
+    evidenceCount={t2EvidenceCount}
+    classifiedCount={t2ClassifiedCount}
+    on:rebuild={rebuildT2Profile}
+  />
   <PatternsSummary {patterns} on:compile={compilePatterns} />
   <VectorIndex
     {embeddingCount}
