@@ -3,25 +3,43 @@
   import { IndexedDbStorageAdapter } from '../../src/storage/indexeddb-adapter';
   import { JobQueue } from '../../src/queue/job-queue';
   import { RuntimeControls, type RuntimeControlsState } from '../../src/runtime/controls';
+  import { WritingSampleStore } from '../../src/persona/sample-store';
+  import { ExpressionSheetStore } from '../../src/persona/expression-sheet-store';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
+  import type { ExpressionSheet } from '@spec/schema/expression-sheet';
   import Status from '../../src/ui/Status.svelte';
   import Queue from '../../src/ui/Queue.svelte';
   import StorageUsage from '../../src/ui/StorageUsage.svelte';
   import Controls from '../../src/ui/Controls.svelte';
+  import Onboarding from '../../src/ui/Onboarding.svelte';
+  import ExpressionSheetSummary from '../../src/ui/ExpressionSheetSummary.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
   const controls = new RuntimeControls(storage);
+  const sampleStore = new WritingSampleStore(storage);
+  const expressionSheetStore = new ExpressionSheetStore(storage);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
   let controlsState: RuntimeControlsState = { processingPaused: false, learningPaused: false };
+  let sampleCount = 0;
+  let expressionSheet: ExpressionSheet | undefined;
 
   async function refresh() {
     counts = await queue.countsByPriority();
     usage = await storage.usageByClass();
     controlsState = await controls.get();
+    sampleCount = (await sampleStore.list()).length;
+    expressionSheet = await expressionSheetStore.get();
+  }
+
+  async function addSample(event: CustomEvent<string>) {
+    await sampleStore.addSample(event.detail);
+    const samples = await sampleStore.list();
+    await expressionSheetStore.recompile(samples);
+    await refresh();
   }
 
   async function toggleProcessing() {
@@ -50,6 +68,8 @@
     processingPaused={controlsState.processingPaused}
     learningPaused={controlsState.learningPaused}
   />
+  <Onboarding {sampleCount} on:addSample={addSample} />
+  <ExpressionSheetSummary sheet={expressionSheet} />
   <Queue {counts} />
   <StorageUsage {usage} />
   <Controls

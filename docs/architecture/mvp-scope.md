@@ -15,7 +15,12 @@ stands after this PR.
 - Transparency UI (status, queue, storage usage, controls).
 - Deterministic test infrastructure (vitest + fake-indexeddb).
 - `spec/` protocol/schema type definitions: storage classes, evidence
-  metadata, identity facts, Expression Sheet shape, `.hdna` manifest shape.
+  metadata, identity facts, Expression Sheet shape, writing sample shape,
+  `.hdna` manifest shape.
+- Phase 1 cold-start onboarding: `WritingSampleStore` (real samples, CANONICAL)
+  + deterministic T0 stylometry extractors (`stylometry.ts`) +
+  `compileExpressionSheet()` -> `ExpressionSheetStore` (DERIVED, rebuildable).
+  Populates only the Expression Sheet's MVP_REQUIRED fields.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -31,8 +36,11 @@ stands after this PR.
 
 ## PLANNED — not started
 
-- Phase 2 passive evidence capture (T0 deterministic telemetry: character
-  n-grams, punctuation distributions, AI-output/human-edit diffing, etc.).
+- Phase 2 passive evidence capture at scale (background T0 telemetry beyond
+  onboarding: character n-grams, AI-output/human-edit diffing, response
+  latency, keystroke/session aggregation, context metadata taxonomy) — routed
+  through the job queue, unlike onboarding's synchronous compute (see
+  `docs/decisions/0004`).
 - Phase 3 local derived analysis (embeddings, tiny classifiers, vector index).
 - Phase 4 persona compiler (events -> patterns -> traits/beliefs).
 - Phase 5 retrieval runtime (query-focused persona assembly).
@@ -47,11 +55,11 @@ stands after this PR.
   (TinyStyler-adjacent) — requires semantic-preservation, persona-similarity,
   multilingual, and WebGPU-performance benchmarks before any implementation.
 
-## What this PR deliberately does not attempt
+## What remains out of scope after this round
 
-Per the operator's task scope for this round, this PR does not implement any
-of the doc's "Current MVP should prioritize" items beyond infrastructure — no
-onboarding/writing-sample capture, no AI-output/human-edit capture, no basic
-stylometry, no compact Expression Sheet population, no WebGPU expression
-transformation, and no benchmark suite. Those remain the next round(s) of work,
-unblocked by (not fulfilled by) this foundation.
+This PR adds onboarding/writing-sample capture, basic T0 stylometry, and
+Expression Sheet population on top of the foundation PR. It still does not
+implement: AI-output/human-edit capture, background/passive telemetry beyond
+onboarding, embeddings, the WebGPU expression transformation itself, or any
+benchmark suite. Those remain the next round(s) of work, unblocked by (not
+fulfilled by) this PR.
