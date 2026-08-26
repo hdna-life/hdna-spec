@@ -86,6 +86,34 @@ actually improves groundedness on HDNA's real corpus remains an open,
 to-be-measured question — see `docs/decisions/0016`'s Trial 1 and Trial 2
 sections for status.
 
+## Phase 5A Trial 3 additions (`docs/decisions/0016`)
+
+Added for Trial 3, which redesigns the extractor around a much smaller,
+WebGPU-scale-proxy model (`qwen/qwen3-1.7b`) judging one deterministically
+localized intervention at a time, with an explicit `'uncertain'` abstention
+verdict distinct from `'no_meaningful_change'`.
+
+| Claim | Status | Source(s) |
+|---|---|---|
+| A classifier can be given, and can meaningfully use, an explicit "abstain/reject" option rather than being forced to output a class for every input, trading coverage for reduced error rate on what it does answer | SUPPORTED — general motivation for Trial 3's `'uncertain'` verdict as a first-class outcome distinct from `'no_meaningful_change'` | Chow, "On Optimum Recognition Error and Reject Tradeoff," IEEE Trans. Information Theory (1970) — the foundational reject-option/selective-classification result |
+| Selective classification (predict-or-abstain) has a formal foundation and known coverage/risk tradeoff properties, independent of model architecture | SUPPORTED (as general motivation) | El-Yaniv & Wiener, "On the Foundations of Noise-Free Selective Classification," JMLR (2010) |
+
+**What these do NOT establish:** neither source is about semantic revision
+judgment, persona evidence, or LLMs specifically — both are general
+classification-theory results from decades before LLM-based structured
+output existed. They support only the narrow claim that giving a
+classifier (here, the small judge model) a legitimate "I don't know"
+output is a well-founded design choice, not evidence that Trial 3's
+specific narrow prompt, `SemanticRevisionJudgmentDraft` schema, or
+deterministic admission gate improves groundedness on HDNA's real corpus —
+that remains open and unmeasured until the real operator run (see
+`docs/decisions/0016`'s Trial 3 section and
+`docs/validation/manual-mvp-validation.md`'s Trial 3 subsection). Trial 3's
+deterministic localization layer itself makes no new claim beyond what
+Trial 2's Conijn et al. grounding already establishes above —
+`revision-intervention.ts` only filters/repackages `RevisionDiff` output,
+it does not change the underlying alignment algorithm.
+
 ## Rule this notebook must be maintained under
 
 Per the source doc: a paper supporting an existing HDNA hypothesis must be

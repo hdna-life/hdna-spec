@@ -41,6 +41,11 @@
     type SemanticDeltaExtractorConfig,
   } from '../../src/persona/semantic-delta-extractor-config-store';
   import { enqueueSemanticDeltaExtraction } from '../../src/queue/processors/semantic-delta-extraction-job';
+  import {
+    SemanticRevisionJudgeConfigStore,
+    type SemanticRevisionJudgeConfig,
+  } from '../../src/persona/semantic-revision-judge-config-store';
+  import { enqueueSemanticRevisionJudge } from '../../src/queue/processors/semantic-revision-judge-job';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -85,6 +90,7 @@
   const semanticDeltaCandidateStore = new SemanticDeltaCandidateStore(storage);
   const semanticDeltaExtractionReceiptStore = new SemanticDeltaExtractionReceiptStore(storage);
   const semanticDeltaExtractorConfigStore = new SemanticDeltaExtractorConfigStore();
+  const semanticRevisionJudgeConfigStore = new SemanticRevisionJudgeConfigStore();
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -104,6 +110,7 @@
   let semanticDeltaCandidates: SemanticDeltaCandidate[] = [];
   let semanticDeltaReceipts: SemanticDeltaExtractionReceipt[] = [];
   let semanticDeltaExtractorConfig: SemanticDeltaExtractorConfig = { enabled: false };
+  let semanticRevisionJudgeConfig: SemanticRevisionJudgeConfig = { enabled: false };
   // Same pure gate PersonaInterpreterService.interpret() itself checks
   // before ever calling the provider — computed here so the panel can show
   // *before* the user clicks "Interpret" whether this run will make any
@@ -134,6 +141,7 @@
     semanticDeltaCandidates = await semanticDeltaCandidateStore.list();
     semanticDeltaReceipts = await semanticDeltaExtractionReceiptStore.list();
     semanticDeltaExtractorConfig = await semanticDeltaExtractorConfigStore.get();
+    semanticRevisionJudgeConfig = await semanticRevisionJudgeConfigStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -185,6 +193,16 @@
 
   async function extractSemanticDeltas() {
     await enqueueSemanticDeltaExtraction(queue);
+    await refresh();
+  }
+
+  async function judgeSemanticRevisions() {
+    await enqueueSemanticRevisionJudge(queue);
+    await refresh();
+  }
+
+  async function saveSemanticRevisionJudgeConfig(event: CustomEvent<SemanticRevisionJudgeConfig>) {
+    await semanticRevisionJudgeConfigStore.set(event.detail);
     await refresh();
   }
 
@@ -251,8 +269,11 @@
     candidates={semanticDeltaCandidates}
     receipts={semanticDeltaReceipts}
     config={semanticDeltaExtractorConfig}
+    judgeConfig={semanticRevisionJudgeConfig}
     on:extract={extractSemanticDeltas}
+    on:judgeRevisions={judgeSemanticRevisions}
     on:saveConfig={saveSemanticDeltaExtractorConfig}
+    on:saveJudgeConfig={saveSemanticRevisionJudgeConfig}
   />
   <VectorIndex
     {embeddingCount}

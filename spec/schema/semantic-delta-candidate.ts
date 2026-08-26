@@ -43,4 +43,18 @@ export interface SemanticDeltaCandidate {
   extractorId: string;
   extractorVersion: string;
   computedAt: string;
+  /**
+   * Trial 3 only (docs/decisions/0016's Trial 3 section) — the
+   * HDNA-generated id of the deterministic `RevisionIntervention`
+   * (`extension/src/persona/revision-intervention.ts`) this candidate was
+   * judged from, e.g. `"edit_event:<id>#2"`. Never model-generated. Absent
+   * for Trial 0/1/2 candidates, which judge a whole EditEvent in one call
+   * rather than one localized intervention at a time. This is the minimal,
+   * additive schema change Trial 3 required to retain per-judgment
+   * provenance (Trial 3 §5.4): the full intervention text/operation-kind
+   * is deliberately NOT persisted here (it is not canonical evidence, see
+   * Trial 3 §5.2) and can always be recomputed deterministically by
+   * re-running `computeRevisionDiff` against the same EditEvent.
+   */
+  interventionId?: string;
 }

@@ -8,14 +8,23 @@
     deriveExtractionReadiness,
     resolveSavedConfig,
   } from '../persona/semantic-delta-extractor-form-state';
+  import type { SemanticRevisionJudgeConfig } from '../persona/semantic-revision-judge-config-store';
+  import {
+    computeFormHydration as computeJudgeFormHydration,
+    deriveJudgeReadiness,
+    resolveSavedConfig as resolveSavedJudgeConfig,
+  } from '../persona/semantic-revision-judge-form-state';
 
   export let candidates: SemanticDeltaCandidate[] = [];
   export let receipts: SemanticDeltaExtractionReceipt[] = [];
   export let config: SemanticDeltaExtractorConfig = { enabled: false };
+  export let judgeConfig: SemanticRevisionJudgeConfig = { enabled: false };
 
   const dispatch = createEventDispatcher<{
     extract: void;
+    judgeRevisions: void;
     saveConfig: SemanticDeltaExtractorConfig;
+    saveJudgeConfig: SemanticRevisionJudgeConfig;
   }>();
 
   let apiKeyInput = '';
@@ -51,6 +60,39 @@
     dispatch('saveConfig', resolveSavedConfig({ apiKeyInput, modelIdInput, enabledInput }, config));
     apiKeyInput = '';
   }
+
+  // --- Trial 3 (local MLX) settings — a structurally separate form from
+  // the OpenRouter settings above; no apiKey field exists here at all. ---
+  let judgeBaseUrlInput = '';
+  let judgeModelIdInput = '';
+  let judgeEnabledInput = false;
+  let judgeDirty = false;
+
+  $: judgeReadiness = deriveJudgeReadiness(judgeConfig);
+
+  $: {
+    const hydration = computeJudgeFormHydration(judgeDirty, judgeConfig);
+    if (hydration) {
+      judgeBaseUrlInput = hydration.baseUrlInput;
+      judgeModelIdInput = hydration.modelIdInput;
+      judgeEnabledInput = hydration.enabledInput;
+    }
+  }
+
+  function markJudgeDirty() {
+    judgeDirty = true;
+  }
+
+  function saveJudgeConfig() {
+    dispatch(
+      'saveJudgeConfig',
+      resolveSavedJudgeConfig({
+        baseUrlInput: judgeBaseUrlInput,
+        modelIdInput: judgeModelIdInput,
+        enabledInput: judgeEnabledInput,
+      }),
+    );
+  }
 </script>
 
 <section>
@@ -79,6 +121,31 @@
     {receipts.length} source(s) processed: {extractedCount} extracted,
     {abstainedCount} abstained (no meaningful delta).
   </p>
+
+  <h2 class="trial3">Trial 3 — LOCAL MLX · Qwen/Qwen3-0.6B</h2>
+  {#if judgeReadiness.kind === 'not-configured'}
+    <p class="status">
+      Not configured — missing: {judgeReadiness.missing.join(', ')}. Save the
+      local MLX settings below (start <code>mlx_lm.server</code> first — see
+      docs/decisions/0016's Trial 3 section for the exact command). No
+      request is made until then.
+    </p>
+  {:else}
+    <p class="status">
+      Ready — judges the same 5 EditEvents against a <strong>locally
+      running</strong> MLX-LM server at {judgeConfig.baseUrl}, one
+      intervention at a time. No cloud request, no API key sent.
+    </p>
+  {/if}
+  <button on:click={() => dispatch('judgeRevisions')}>
+    Judge semantic revisions (Trial 3 — narrow small-model judge)
+  </button>
+  <p class="status">
+    Trial 3 is a structurally separate extractor from Phase 5A's Trial 0-2
+    above — its candidates/receipts carry a distinct
+    <code>extractorId</code> (<code>local-mlx/deterministic-semantic-judge-v3</code>)
+    and never overwrite the Trial 0-2 results above.
+  </p>
   {#if candidates.length === 0}
     <p>No semantic delta candidates yet.</p>
   {:else}
@@ -92,7 +159,8 @@
           <br />context: {c.context}, confidence: {(c.confidence * 100).toFixed(0)}%
           <br />
           <span class="note">
-            source: {c.sourceEvidenceId} · {c.extractorId}/{c.extractorVersion} · {c.computedAt}
+            source: {c.sourceEvidenceId}{#if c.interventionId} ({c.interventionId}){/if} ·
+            {c.extractorId}/{c.extractorVersion} · {c.computedAt}
           </span>
         </li>
       {/each}
@@ -126,6 +194,35 @@
       edit-pair text (not just statistics) to the configured model.
     </p>
   </details>
+
+  <details>
+    <summary>Trial 3 — local MLX settings</summary>
+    <label>
+      Local MLX server base URL
+      <input
+        type="text"
+        bind:value={judgeBaseUrlInput}
+        on:input={markJudgeDirty}
+        placeholder="http://127.0.0.1:8080"
+      />
+    </label>
+    <label>
+      Model id
+      <input type="text" bind:value={judgeModelIdInput} on:input={markJudgeDirty} placeholder="Qwen/Qwen3-0.6B" />
+    </label>
+    <label>
+      <input type="checkbox" bind:checked={judgeEnabledInput} on:change={markJudgeDirty} />
+      Enabled
+    </label>
+    <button on:click={saveJudgeConfig}>Save</button>
+    <p class="note">
+      No API key field — the local MLX server requires none, and this
+      config structurally cannot hold one (see
+      <code>SemanticRevisionJudgeConfigStore</code>). Requests go only to the
+      base URL above, on this machine; nothing is sent to OpenRouter or any
+      other cloud endpoint from this form.
+    </p>
+  </details>
 </section>
 
 <style>
@@ -137,6 +234,10 @@
     text-transform: uppercase;
     color: #666;
     margin: 0 0 4px;
+  }
+  h2.trial3 {
+    margin-top: 10px;
+    color: #2a6b3f;
   }
   p,
   ul {

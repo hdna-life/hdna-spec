@@ -659,5 +659,235 @@ Acceptance threshold: >=80%
 Phase 5A = ITERATE
 ```
 
-Trial 0 and Trial 1's results above remain visible, not overwritten. Trial
-3 is not designed or implemented as of this writing.
+Trial 0 and Trial 1's results above remain visible, not overwritten.
+
+### Trial 3 — deterministic intervention pipeline + narrow small-model judge
+
+**Status: COMPLETE.** Qwen3-0.6B / thinking OFF via local MLX-LM —
+zero-shot semantic capability **FAIL** (falsified), local runtime
+feasibility **PASS**. See "Real Trial 3A result" and "Trial 3 — final
+zero-shot capability assessment" below for the pipeline-level and
+capability-level records respectively. Full design in
+`docs/decisions/0016`'s "Trial 3" section; this is the short
+operator-facing summary. Unlike Trial 1/2
+(single-variable prompt changes on the same
+provider/call-shape), Trial 3 is an **architecture validation trial**: it
+changes model scale, call granularity, the semantic contract, and the
+admission architecture all at once, so it is not read as a clean ablation
+against Trial 2's 70.6%.
+
+**What changed.** The whole-EditEvent extraction call
+(`OpenRouterSemanticDeltaExtractor.extract()`) is replaced, for Trial 3
+only, by a deterministic pipeline that hands the model one localized
+textual intervention at a time:
+
+```text
+EditEvent
+  -> computeRevisionDiff()              (Trial 2's localization, reused unchanged)
+  -> buildRevisionInterventions()       (new: drops preserved spans, one unit per real edit)
+  -> SemanticRevisionJudgeProvider.judge()   (new: one narrow call per intervention; local-MLX transport — see below)
+  -> admitJudgment()                    (new: deterministic accept/reject + candidate kind)
+  -> SemanticDeltaCandidate
+```
+
+The model's only decision per call: does this one localized change carry a
+directly observable semantic effect, and if so, a one-sentence description
+of it (`no_meaningful_change` / `meaning_added` / `meaning_removed` /
+`meaning_transformed` / `uncertain`). HDNA decides admission, candidate
+`kind`, ids, and every provenance field deterministically.
+
+**Model/runtime: `Qwen/Qwen3-0.6B` via a local MLX-LM server on Apple
+Silicon — superseding the originally planned `qwen/qwen3-1.7b` via
+OpenRouter.** See `docs/decisions/0016`'s "Trial 3 addendum — local MLX
+transport" section for the full record of this change, made before any
+real Trial 3 result existed. `Qwen/Qwen3-0.6B` is deliberately much
+smaller than both Trial 0-2's `openai/gpt-4o-mini` and the originally
+planned `qwen/qwen3-1.7b` — the operator explicitly wants to test whether
+the deterministic Trial 3 architecture can make a genuinely tiny, locally
+runnable model useful, as a research precursor to eventual WebGPU
+integration. **MLX-LM/Apple Silicon is transport only — it does not prove
+anything about WebGPU's eventual runtime performance; only the local
+0.6B model's semantic quality is the current research target, and that is
+a separate question from runtime performance.** No fallback to a stronger
+or cloud model exists anywhere in `local-mlx-semantic-revision-judge.ts`;
+a transport/schema failure is surfaced as a per-intervention judge failure
+(`stats.judgeFailures`, with the failing message in
+`stats.lastJudgeFailureMessage`), never silently routed around.
+
+**Extractor identity:** `local-mlx/deterministic-semantic-judge-v3`
+(`LocalMlxSemanticRevisionJudge.providerId`) — distinct from Trial 0's
+`openrouter`, Trial 1's `openrouter/transformation-grounded-v1`, Trial 2's
+`openrouter/evidence-localized-v2`, **and** the earlier-planned
+`openrouter/deterministic-semantic-judge-v3` (which was never actually run
+against the real corpus, since this transport change was made first).
+Trial 3 candidates additionally carry `interventionId` (e.g.
+`edit_event:<id>#2`), which Trial 0-2 candidates never have.
+
+**Exact operator command to start the local model** (verified against the
+installed `mlx-lm==0.29.1`; see the ADR addendum for the full verification
+record):
+
+```bash
+mlx_lm.server \
+  --model Qwen/Qwen3-0.6B \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --chat-template-args '{"enable_thinking": false}'
+```
+
+Leave this running in a terminal for the duration of the experiment. The
+`--chat-template-args` flag disables Qwen3's "thinking" behavior at the
+server level — the cleanly-supported mechanism, preferred over fragile
+client-side `<think>`-tag parsing (a client-side stripper still exists as
+defense-in-depth, but this flag is the primary mechanism).
+
+**How to run Trial 3 against the same 5 real EditEvents:**
+
+1. Start the local server with the exact command above and confirm it's
+   listening (`curl http://127.0.0.1:8080/health` should return
+   `{"status": "ok"}`).
+2. Open the popup's "Semantic Delta Extraction (Phase 5A — experimental)"
+   panel. Expand the new "Trial 3 — local MLX settings" block (separate
+   from the OpenRouter settings above it — no API key field here at all):
+   set base URL to `http://127.0.0.1:8080`, model id to `Qwen/Qwen3-0.6B`,
+   check Enabled, Save.
+3. Click "Judge semantic revisions (Trial 3 — narrow small-model judge)" —
+   a structurally separate trigger/job (`judge_semantic_revisions`, P3)
+   from "Extract semantic deltas (Phase 5A)" above it, which remains wired
+   to Trial 0-2's OpenRouter pipeline unchanged.
+4. Once the P3 job runs (same `DEEP_IDLE` scheduling caveat as prior
+   trials), the panel shows newly-processed sources and candidates. Each
+   Trial 3 candidate's note line reads
+   `edit_event:<id> (edit_event:<id>#N) · local-mlx/deterministic-semantic-judge-v3/Qwen/Qwen3-0.6B · <timestamp>`
+   — confirm the `extractorId` to be sure it is Trial 3, not a stale
+   Trial 0-2 result. If the panel instead reports the local MLX settings
+   as "Not configured" or the job fails, check the terminal running
+   `mlx_lm.server` is still up — a `LocalMlxUnreachableError` message
+   (visible via `stats.lastJudgeFailureMessage` if inspecting the service
+   result directly) means the local server could not be reached, not a
+   semantic judgment failure.
+5. Grade with the exact same rubric/thresholds as Trial 0/1/2 (≥80%
+   `SUPPORTED`, ≤1 `MISSED_SIGNAL`) — do not adjust them based on outcome.
+   Additionally apply the pre-declared Trial 3 feasibility bands below.
+6. **How to filter Trial 3 receipts/candidates afterward:** in IndexedDB
+   (`semantic_delta_candidates`/`semantic_delta_extraction_receipts`
+   object stores, or by reading with `SemanticDeltaCandidateStore.list()`/
+   `SemanticDeltaExtractionReceiptStore.list()`), filter records where
+   `extractorId === 'local-mlx/deterministic-semantic-judge-v3'`; Trial
+   3-only candidates additionally have a defined `interventionId` field
+   (Trial 0-2 candidates never set it).
+7. **How to inspect interventions/judgments directly (not just persisted
+   candidates):** interventions and rejected/abstained judgments are not
+   persisted (per Trial 3's "no preserved-only interventions,"
+   "`no_meaningful_change`/`uncertain` are not evidence" design) — to see
+   the full per-intervention picture (including admission-gate rejections),
+   call `SemanticRevisionJudgeExtractionService.runExperiment()` directly
+   from a script/console rather than only the popup button; its returned
+   `stats` object reports `interventionsTotal`, `judgeCalls`,
+   `judgeFailures`, `lastJudgeFailureMessage`, `noMeaningfulChange`,
+   `uncertain`, and `admitted` for the run, which is the pathological-
+   abstention check the pre-run interpretation below depends on.
+
+**Pre-declared Trial 3 feasibility interpretation (recorded before the
+real run — see `docs/decisions/0016`'s addendum for the full text):**
+
+```text
+Phase 5A's formal acceptance threshold is UNCHANGED: >=80% SUPPORTED.
+
+Separately, for THIS architecture-validation experiment specifically:
+  >=66% SUPPORTED   very strong feasibility result
+  60-66% SUPPORTED  strong positive result
+  50-60% SUPPORTED  positive small-model feasibility signal
+  40-50% SUPPORTED  weak but potentially actionable signal
+  <40% SUPPORTED    evidence the semantic-judge task may still be too
+                     large for this model class
+
+A >=50% SUPPORTED result only counts as a positive feasibility signal if
+coverage has not collapsed through excessive abstention — check
+stats.admitted / stats.judgeCalls is not near-zero before treating a high
+SUPPORTED percentage as good news.
+```
+
+**Real Trial 3A result (operator-reported):**
+
+```text
+SEMANTIC JUDGE TRANSPORT     PASS
+LOCAL INFERENCE              PASS
+LATENCY                      PASS (~0.5-1s/intervention)
+
+FORMAT COMPLIANCE            FAIL
+SEMANTIC ADMISSION           COLLAPSED
+COVERAGE                     FAIL
+
+Trial 3A (Qwen3-0.6B / thinking OFF): NOT VIABLE in current form
+```
+
+The local transport engineering worked exactly as designed (real local
+inference over the narrow localhost host permission, no cloud call, real
+sub-second per-intervention latency). The failure is specifically that
+Qwen3-0.6B did not reliably return the narrow structured JSON output the
+semantic-judge stage requires; the untrusted-output validator correctly
+rejected the malformed responses rather than repairing them, which
+correctly propagated into a semantic-admission collapse and a coverage
+failure — the exact pathological pattern this section's pre-declared
+warning above named in advance. No SUPPORTED/PARTIALLY_SUPPORTED/
+UNSUPPORTED human grading was possible against the rubric, since too few
+candidates survived to grade. See `docs/decisions/0016`'s "Real Trial 3A
+result" section for the full failure-cascade analysis and why this is a
+finding about this specific model/thinking-mode configuration, not a
+falsification of the Trial 3 architecture. No implementation change was
+made in response to this result — a follow-up (e.g. Trial 3B) is a
+separate, explicit decision.
+
+**Trial 3 — final zero-shot capability assessment, and Trial 3 marked
+COMPLETE.** A broader set of targeted zero-shot capability probes (prompt
+decomposition/micro-classifications, label-order falsification, A/B
+forced-choice falsification, coarse feature classification) was run
+against the same `Qwen3-0.6B`/MLX/thinking-off configuration, to quantify
+the capability gap the categorical read above already pointed at:
+
+```text
+Local runtime / MLX                    PASS
+Broad semantic matrix                  52.9%
+A/B discrimination                     51%
+Coarse feature classification          14.9%
+Zero-shot semantic capability          FAIL
+
+RUNTIME FEASIBILITY   PASS
+ZERO-SHOT SEMANTIC CAPABILITY   FAIL
+```
+
+A/B discrimination at 51% is chance-level on a two-way forced choice;
+coarse feature classification at 14.9% falls below even the weakest
+pre-declared feasibility band above. **Trial 3 falsifies the hypothesis
+that unmodified `Qwen3-0.6B` has sufficient zero-shot semantic capability
+for the Phase 5A transformation — this is explicitly not a WebGPU/MLX/
+local-runtime blocker**, since local execution itself passed independently
+in both this assessment and the pipeline run above. These three scores
+(Broad semantic matrix 52.9%, A/B discrimination 51%, Coarse feature
+classification 14.9%) are recorded as the **official Phase 5A zero-shot
+tiny-model baseline**. See `docs/decisions/0016`'s "Trial 3 — final
+zero-shot capability assessment" section for the full record. **Trial 3
+is now COMPLETE.**
+
+### Phase 5A — Trial 4 (planned, external — not implemented)
+
+**Research direction:** DeepSeek teacher model → filtered lore/training
+dataset → tiny-model LoRA/SFT (target: `Qwen3-0.6B`, the same model Trial
+3's baseline was measured against) → held-out falsification benchmark →
+failure-driven dataset expansion. Tests whether distillation/specialization
+training can close the zero-shot semantic-capability gap Trial 3 measured,
+while preserving tiny/local execution. Smaller models (e.g. SmolLM ~360M)
+may be evaluated later under the same protocol, as a separate follow-up.
+
+**Evaluation integrity (pre-declared):** the held-out falsification
+benchmark must remain isolated from training; failure categories may
+motivate new teacher examples, but the literal held-out examples must
+never enter the training set. Trial 4 results will be compared directly
+against the Trial 3 baseline above (52.9% / 51% / 14.9%).
+
+**This repository currently contains no Trial 4 implementation, dataset,
+training code, or evaluation harness** — Trial 4 will be conducted
+externally, with results provided later for recording. See
+`docs/decisions/0016`'s "Trial 4 (planned — external, not implemented)"
+section for the full record.
