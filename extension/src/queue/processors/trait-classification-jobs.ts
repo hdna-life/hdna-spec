@@ -29,7 +29,7 @@ export function enqueueEvidenceClassification(
 }
 
 export function enqueueT2ProfileRebuild(queue: JobQueue): Promise<unknown> {
-  return queue.enqueue(REBUILD_T2_PROFILE_JOB, REBUILD_T2_PROFILE_PRIORITY, {});
+  return queue.enqueueSingleton(REBUILD_T2_PROFILE_JOB, REBUILD_T2_PROFILE_PRIORITY, {});
 }
 
 /** P2: classify one piece of evidence and fold it into T2Profile. Idempotent — see TraitClassifierService.classifyOne(). */

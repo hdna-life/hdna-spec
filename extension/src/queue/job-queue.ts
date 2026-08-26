@@ -56,6 +56,24 @@ export class JobQueue {
     return job;
   }
 
+  /**
+   * Enqueues a job of `type` only if none is currently outstanding
+   * (`PENDING` or `RUNNING`) — otherwise returns the existing outstanding
+   * job unchanged, with no new job created. For coalescable singleton work
+   * (a full rebuild/recompile that repeated triggers — e.g. a user clicking
+   * a "Rebuild" button multiple times — shouldn't queue up N duplicate
+   * copies of). `COMPLETE`/`FAILED` jobs don't count as outstanding, so a
+   * fresh trigger after completion (or after a failure) always creates a
+   * new job normally. Keyed by job `type` alone, generic across any job
+   * type — not specific to any one rebuild job. See docs/decisions/0014.
+   */
+  async enqueueSingleton<TPayload>(type: string, priority: JobPriority, payload: TPayload): Promise<Job<TPayload>> {
+    const jobs = await this.storage.query<Job>(JOB_STORE);
+    const outstanding = jobs.find((j) => j.type === type && (j.status === 'PENDING' || j.status === 'RUNNING'));
+    if (outstanding) return outstanding as Job<TPayload>;
+    return this.enqueue(type, priority, payload);
+  }
+
   /** Flips any RUNNING job whose lease has expired back to PENDING, clearing startedAt. */
   private async reclaimStaleJobs(): Promise<void> {
     const jobs = await this.storage.query<Job>(JOB_STORE);

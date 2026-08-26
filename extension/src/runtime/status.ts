@@ -10,9 +10,18 @@ export interface RuntimeStatus {
   updatedAt: string;
   lastEvictionAt?: string;
   lastEvictionBytesFreed?: number;
+  /**
+   * ISO timestamp of when the foreground last transitioned from active to
+   * inactive; `undefined` while foreground is currently active. Persisted
+   * (not held in service-worker memory) specifically so DEEP_IDLE
+   * eligibility — derived from wall-clock elapsed time since this
+   * timestamp — survives MV3 service-worker termination between dispatch
+   * ticks. See docs/decisions/0014.
+   */
+  foregroundInactiveSince?: string;
 }
 
-/** Persists the background dispatch loop's live state so the popup (a separate execution context) can display it. */
+/** Persists the background dispatch loop's live state so the popup (a separate execution context) can display it, and so lifecycle-sensitive state survives service-worker restarts. */
 export class RuntimeStatusStore {
   constructor(private storage: StorageAdapter) {}
 

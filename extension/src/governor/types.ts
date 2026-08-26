@@ -14,6 +14,16 @@ export interface GovernorSignals {
   lastJobLatencyMs: number;
   expectedJobLatencyMs: number;
   foregroundActive: boolean;
+  /**
+   * Wall-clock milliseconds since the foreground last transitioned to
+   * inactive; 0 while `foregroundActive` is true. Computed at the runtime
+   * boundary (`background.ts`) from a *persisted* timestamp, not an
+   * in-memory counter — an in-memory tick count cannot survive MV3
+   * service-worker termination between dispatch alarms, which made
+   * DEEP_IDLE unreachable in real Chrome even though it worked in
+   * isolated tests. See docs/decisions/0014.
+   */
+  foregroundInactiveDurationMs: number;
 
   /**
    * SPEC_RESERVED hooks — typed now so the governor's decision function
@@ -31,11 +41,4 @@ export interface GovernorDecision {
   mode: RuntimeMode;
   /** Recommended batch size for the next job class run, derived from latency ratio. */
   nextBatchSize: number;
-  /**
-   * Consecutive dispatch ticks with the foreground inactive, carried forward
-   * across calls (0 while foreground is active) — the state DEEP_IDLE is
-   * derived from. See docs/decisions/0013 for why this replaced queue
-   * backlog as the DEEP_IDLE signal.
-   */
-  nextIdleTicks: number;
 }

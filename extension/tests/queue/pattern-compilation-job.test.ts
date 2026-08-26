@@ -57,4 +57,19 @@ describe('compile_patterns job', () => {
 
     await expect(patternStore.get('lexicalOverlap', 'unscoped')).resolves.toMatchObject({ value: 0.6 });
   });
+
+  it('coalesces repeated clicks into a single outstanding job, and allows a new one after completion', async () => {
+    const { queue } = setup();
+    const first = await enqueuePatternCompilation(queue);
+    for (let i = 0; i < 10; i += 1) await enqueuePatternCompilation(queue);
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+
+    const completed = await queue.runNext();
+    expect(completed?.id).toBe((first as { id: string }).id);
+    expect(completed?.status).toBe('COMPLETE');
+
+    const after = await enqueuePatternCompilation(queue);
+    expect((after as { id: string }).id).not.toBe((first as { id: string }).id);
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+  });
 });

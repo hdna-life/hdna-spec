@@ -168,6 +168,81 @@ describe('JobQueue stale-RUNNING reclaim', () => {
   });
 });
 
+describe('JobQueue.enqueueSingleton — rebuild-job coalescing (docs/decisions/0014)', () => {
+  it('creates a job on the first call', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    const job = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+    expect(job.status).toBe('PENDING');
+  });
+
+  it('returns the existing job instead of creating a duplicate while one is PENDING — repeated clicks stay at one outstanding job', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    const first = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    for (let i = 0; i < 81; i += 1) {
+      // Simulates the manual-test scenario: 82 repeated clicks on "Rebuild
+      // T2 Profile" must not accumulate 82 pending jobs.
+      await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    }
+    const second = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    expect(second.id).toBe(first.id);
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+  });
+
+  it('treats a RUNNING job as outstanding too, not just PENDING', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('rebuild_t2_profile', () => new Promise(() => {})); // never resolves, stays RUNNING
+    const first = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    void queue.runNext(); // moves `first` to RUNNING
+
+    // Give the microtask queue a tick so runNext's status write lands.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const second = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    expect(second.id).toBe(first.id);
+    const jobs = await adapter.query('jobs');
+    expect(jobs).toHaveLength(1);
+  });
+
+  it('allows a fresh job once the prior one has COMPLETEd — legitimate rebuilds after completion are not blocked', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('rebuild_t2_profile', noopProcessor);
+    const first = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    const completed = await queue.runNext();
+    expect(completed?.id).toBe(first.id);
+    expect(completed?.status).toBe('COMPLETE');
+
+    const second = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    expect(second.id).not.toBe(first.id);
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+  });
+
+  it('allows a fresh job once the prior one has FAILED', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    const first = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {}); // no processor registered -> FAILED
+    const failed = await queue.runNext();
+    expect(failed?.id).toBe(first.id);
+    expect(failed?.status).toBe('FAILED');
+
+    const second = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    expect(second.id).not.toBe(first.id);
+  });
+
+  it('does not let different job types interfere with each other', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    const t2 = await queue.enqueueSingleton('rebuild_t2_profile', 'P3', {});
+    const vectorIndex = await queue.enqueueSingleton('rebuild_vector_index', 'P3', {});
+    expect(t2.id).not.toBe(vectorIndex.id);
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 2 });
+  });
+});
+
 describe('JobQueue priority-gated dispatch', () => {
   it('with no filter, considers every priority (existing behavior)', async () => {
     const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);

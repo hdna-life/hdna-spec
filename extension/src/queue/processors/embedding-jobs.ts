@@ -29,7 +29,7 @@ export function enqueueEmbeddingIndex(
 }
 
 export function enqueueVectorIndexRebuild(queue: JobQueue): Promise<unknown> {
-  return queue.enqueue(REBUILD_VECTOR_INDEX_JOB, REBUILD_VECTOR_INDEX_PRIORITY, {});
+  return queue.enqueueSingleton(REBUILD_VECTOR_INDEX_JOB, REBUILD_VECTOR_INDEX_PRIORITY, {});
 }
 
 /** P2: compute and store one embedding. Recomputing/overwriting is harmless — embed() is a pure function of the text. */

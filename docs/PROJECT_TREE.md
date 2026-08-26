@@ -66,20 +66,21 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001, 0007)
       eviction.ts                 - planEviction (pure) + evictIfNeeded: CACHE->DERIVED->RAW, CANONICAL never auto (see docs/decisions/0008)
     queue/
-      job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim; priority-filtered next()/runNext() (see docs/decisions/0007, 0008)
+      job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim; priority-filtered next()/runNext(); enqueueSingleton() coalesces PENDING/RUNNING duplicates by job type (see docs/decisions/0007, 0008, 0014)
       processors/noop-processor.ts - synthetic processor for pipeline tests only
       processors/edit-event-processor.ts - P1: idempotent EditMetrics compute + atomic EditProfile fold-in (see docs/decisions/0007)
       processors/embedding-jobs.ts - P2 index_embedding (incremental) / P3 rebuild_vector_index (see docs/decisions/0009)
       processors/trait-classification-jobs.ts - P2 classify_evidence (incremental) / P3 rebuild_t2_profile (see docs/decisions/0010)
       processors/pattern-compilation-job.ts - P3 compile_patterns (full rebuild, manually triggered) (see docs/decisions/0011)
     governor/
-      types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
-      resource-governor.ts        - pure decide(signals, prevBatchSize, prevIdleTicks) -> {mode, nextBatchSize, nextIdleTicks}; mode from foreground idleness only, never backlog (see docs/decisions/0013)
+      types.ts                    - RuntimeMode, GovernorSignals (incl. foregroundInactiveDurationMs; some fields SPEC_RESERVED/unwired)
+      resource-governor.ts        - pure decideMode(foregroundActive, inactiveDurationMs) -> RuntimeMode (exported separately, computed before dispatch); decide(signals, prevBatchSize) -> {mode, nextBatchSize}; mode from foreground idleness only, never backlog, never an in-memory tick counter (see docs/decisions/0013, 0014)
       mode-priorities.ts          - ALLOWED_PRIORITIES_BY_MODE: which job priorities each mode may dispatch (see docs/decisions/0008)
     runtime/
       controls.ts                 - RuntimeControls: pause processing vs pause learning (persisted)
       foreground-tracker.ts       - ForegroundTracker: is the popup open, via chrome.runtime.Port (see docs/decisions/0008)
-      status.ts                   - RuntimeStatusStore: persists background loop's live mode/batchSize/eviction state for the popup
+      foreground-inactivity.ts    - computeForegroundInactivity: pure fn deriving inactive duration from a persisted timestamp, survives MV3 SW restart (see docs/decisions/0014)
+      status.ts                   - RuntimeStatusStore: persists background loop's live mode/batchSize/eviction/foregroundInactiveSince state for the popup
     ui/
       Status.svelte, Queue.svelte, StorageUsage.svelte, Controls.svelte,
       Onboarding.svelte, ExpressionSheetSummary.svelte,
