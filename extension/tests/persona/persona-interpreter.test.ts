@@ -5,6 +5,7 @@ import {
   toPatternCandidate,
   validateClaimDraft,
 } from '../../src/persona/persona-interpreter';
+import { DEFAULT_PERSONA_INTERPRETER_POLICY } from '@spec/schema/persona-interpreter-policy';
 import type { Pattern } from '@spec/schema/pattern';
 import type { TraitBeliefClaimDraft } from '@spec/protocol/persona-interpreter';
 
@@ -64,6 +65,24 @@ describe('isEligibleForInterpretation', () => {
   it('is eligible above the threshold', () => {
     const patterns = [pattern(), pattern({ dimension: 'directness' }), pattern({ dimension: 'compressionRatio' })];
     expect(isEligibleForInterpretation(patterns, policy)).toBe(true);
+  });
+
+  it('is eligible for the operator\'s exact real persisted corpus under the DEFAULT policy', () => {
+    // Regression fixture: the operator's manually-tested extension produced
+    // exactly these two compiled Patterns (docs/validation/manual-mvp-validation.md,
+    // Phase 4) — no formality/directness patterns, since the T2 baseline
+    // abstains on Turkish evidence. `isEligibleForInterpretation` checks
+    // patterns.length >= minPatternCount only; per-pattern sampleCount/
+    // confidence are already enforced one layer down by
+    // PatternCompilerPolicy before a Pattern ever reaches PatternStore, so
+    // this pair — two distinct dimensions, both real, both already
+    // persisted — is eligible under the DEFAULT_PERSONA_INTERPRETER_POLICY
+    // (minPatternCount: 2) exactly as decision 0015 intends.
+    const realPersistedPatterns: Pattern[] = [
+      pattern({ dimension: 'compressionRatio', context: 'unscoped', value: 0.84, sampleCount: 5 }),
+      pattern({ dimension: 'lexicalOverlap', context: 'unscoped', value: 0.09, sampleCount: 5 }),
+    ];
+    expect(isEligibleForInterpretation(realPersistedPatterns, DEFAULT_PERSONA_INTERPRETER_POLICY)).toBe(true);
   });
 });
 

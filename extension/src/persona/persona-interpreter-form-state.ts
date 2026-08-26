@@ -69,7 +69,12 @@ export function resolveSavedConfig(
   };
 }
 
-export type PersonaInterpretationReadiness = 'not-configured' | 'below-threshold' | 'ready';
+export type PersonaInterpretationMissingField = 'enabled' | 'apiKey' | 'modelId';
+
+export type PersonaInterpretationReadiness =
+  | { kind: 'not-configured'; missing: PersonaInterpretationMissingField[] }
+  | { kind: 'below-threshold' }
+  | { kind: 'ready' };
 
 /**
  * Makes the pre-network gate in PersonaInterpreterService.interpret()
@@ -78,13 +83,20 @@ export type PersonaInterpretationReadiness = 'not-configured' | 'below-threshold
  * because PatternStore doesn't yet have enough distinct patterns) never
  * has to be inferred after the fact from an empty OpenRouter dashboard.
  * Mirrors the exact same two pre-network exits
- * PersonaInterpreterService.interpret() itself checks, in the same order.
+ * PersonaInterpreterService.interpret() itself checks, in the same order,
+ * and — for `not-configured` — names exactly which field(s) are missing
+ * rather than a single generic "not configured" verdict, so the operator
+ * doesn't have to guess which deterministic condition actually failed.
  */
 export function deriveInterpretationReadiness(
   config: PersonaInterpreterConfig,
   eligible: boolean,
 ): PersonaInterpretationReadiness {
-  if (!config.enabled || !config.apiKey || !config.modelId) return 'not-configured';
-  if (!eligible) return 'below-threshold';
-  return 'ready';
+  const missing: PersonaInterpretationMissingField[] = [];
+  if (!config.enabled) missing.push('enabled');
+  if (!config.apiKey) missing.push('apiKey');
+  if (!config.modelId) missing.push('modelId');
+  if (missing.length > 0) return { kind: 'not-configured', missing };
+  if (!eligible) return { kind: 'below-threshold' };
+  return { kind: 'ready' };
 }

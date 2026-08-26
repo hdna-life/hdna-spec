@@ -55,18 +55,23 @@
 
 <section>
   <h2>Traits / Beliefs (T3)</h2>
-  {#if readiness === 'not-configured'}
+  {#if readiness.kind === 'not-configured'}
     <p class="status">
-      Not configured — save an OpenRouter API key and enable AI interpretation
-      below. No network request is made until then.
+      Not configured — missing: {readiness.missing.join(', ')}. Save settings
+      below to fix this. No network request is made until then.
     </p>
-  {:else if readiness === 'below-threshold'}
+  {:else if readiness.kind === 'below-threshold'}
     <p class="status">
-      Below evidence threshold ({patternCount}/{minPatternCount} patterns) —
-      no network request is made until enough patterns are compiled.
+      Not eligible: {patternCount} pattern(s) found; requires at least
+      {minPatternCount}. No network request is made until enough patterns are
+      compiled.
     </p>
   {:else}
-    <p class="status">Ready — interpreting will send {patternCount} pattern(s) to OpenRouter.</p>
+    <p class="status">
+      Ready — interpreting will send {patternCount} pattern(s) to OpenRouter.
+      This runs as a low-priority background job and may not fire
+      immediately if the popup stays open — see the Queue panel's P3 count.
+    </p>
   {/if}
   <button on:click={() => dispatch('interpret')}>Interpret traits/beliefs</button>
   {#if claims.length === 0}

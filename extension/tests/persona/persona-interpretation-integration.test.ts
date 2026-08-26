@@ -172,4 +172,42 @@ describe('T3 pipeline: popup save -> background reads persisted config -> enqueu
     expect(background.createProvider).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+
+  it('reaches fetch() exactly once for the operator\'s exact real persisted corpus (compressionRatio/unscoped + lexicalOverlap/unscoped)', async () => {
+    // Regression fixture: docs/validation/manual-mvp-validation.md's Phase 4
+    // observed exactly these two compiled Patterns from the operator's real
+    // corpus. This proves the deterministic eligibility path is not the
+    // reason a manual retest saw zero OpenRouter requests — the exact same
+    // two Pattern records, read from PatternStore the same way the real
+    // background service worker reads them, do reach an actual fetch()
+    // call end to end: PatternStore -> isEligibleForInterpretation (true)
+    // -> P3 processor -> PersonaInterpreterService -> provider factory ->
+    // fetch, exactly once.
+    const dbName = `hdna-t3-${Math.random()}`;
+    const popupConfigStore = new PersonaInterpreterConfigStore();
+    await popupConfigStore.set({ enabled: true, apiKey: 'sk-or-real', modelId: 'openai/gpt-4o-mini' });
+
+    const fetchImpl = fakeFetchReturningNoClaims();
+    const background = buildBackgroundWiring(dbName, fetchImpl);
+    await background.patternStore.put(
+      pattern({ dimension: 'compressionRatio', context: 'unscoped', value: 0.84, sampleCount: 5 }),
+    );
+    await background.patternStore.put(
+      pattern({ dimension: 'lexicalOverlap', context: 'unscoped', value: 0.09, sampleCount: 5 }),
+    );
+
+    // Sanity check: this is exactly the corpus PatternStore.list() would
+    // return to any reader — popup or background — since both talk to the
+    // same underlying storage; nothing about this fixture depends on which
+    // context reads it.
+    await expect(background.patternStore.list()).resolves.toHaveLength(2);
+
+    await enqueuePersonaInterpretation(background.queue);
+    const job = await background.queue.runNext();
+
+    expect(job?.status).toBe('COMPLETE');
+    expect(background.createProvider).toHaveBeenCalledTimes(1);
+    expect(background.createProvider).toHaveBeenCalledWith('sk-or-real', 'openai/gpt-4o-mini');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });

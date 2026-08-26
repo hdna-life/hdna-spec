@@ -85,28 +85,36 @@ describe('resolveSavedConfig', () => {
 });
 
 describe('deriveInterpretationReadiness', () => {
-  it('is not-configured when disabled', () => {
+  it('is not-configured when disabled, naming exactly "enabled" as missing', () => {
     const config: PersonaInterpreterConfig = { enabled: false, apiKey: 'sk', modelId: 'm' };
-    expect(deriveInterpretationReadiness(config, true)).toBe('not-configured');
+    expect(deriveInterpretationReadiness(config, true)).toEqual({ kind: 'not-configured', missing: ['enabled'] });
   });
 
-  it('is not-configured when enabled but missing an api key', () => {
+  it('is not-configured when enabled but missing an api key, naming exactly "apiKey" as missing', () => {
     const config: PersonaInterpreterConfig = { enabled: true, modelId: 'm' };
-    expect(deriveInterpretationReadiness(config, true)).toBe('not-configured');
+    expect(deriveInterpretationReadiness(config, true)).toEqual({ kind: 'not-configured', missing: ['apiKey'] });
   });
 
-  it('is not-configured when enabled with a key but missing a model id', () => {
+  it('is not-configured when enabled with a key but missing a model id, naming exactly "modelId" as missing', () => {
     const config: PersonaInterpreterConfig = { enabled: true, apiKey: 'sk' };
-    expect(deriveInterpretationReadiness(config, true)).toBe('not-configured');
+    expect(deriveInterpretationReadiness(config, true)).toEqual({ kind: 'not-configured', missing: ['modelId'] });
+  });
+
+  it('names every missing field when more than one is missing', () => {
+    const config: PersonaInterpreterConfig = { enabled: false };
+    expect(deriveInterpretationReadiness(config, true)).toEqual({
+      kind: 'not-configured',
+      missing: ['enabled', 'apiKey', 'modelId'],
+    });
   });
 
   it('is below-threshold when fully configured but not eligible', () => {
     const config: PersonaInterpreterConfig = { enabled: true, apiKey: 'sk', modelId: 'm' };
-    expect(deriveInterpretationReadiness(config, false)).toBe('below-threshold');
+    expect(deriveInterpretationReadiness(config, false)).toEqual({ kind: 'below-threshold' });
   });
 
   it('is ready when fully configured and eligible', () => {
     const config: PersonaInterpreterConfig = { enabled: true, apiKey: 'sk', modelId: 'm' };
-    expect(deriveInterpretationReadiness(config, true)).toBe('ready');
+    expect(deriveInterpretationReadiness(config, true)).toEqual({ kind: 'ready' });
   });
 });

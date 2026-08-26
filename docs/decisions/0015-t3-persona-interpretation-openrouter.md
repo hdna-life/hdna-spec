@@ -292,6 +292,94 @@ inherently shared across all extension execution contexts by the browser
 platform, not by anything this codebase controls. The settings-form
 hydration bug above remains the identified, fixed root cause.
 
+## Post-hydration-fix investigation: deterministic eligibility path against real data
+
+A second manual retest, after the hydration fix above, still saw zero
+OpenRouter requests, with the popup showing "No traits/beliefs interpreted
+yet (patterns may still be below threshold)." The operator's real
+persisted corpus (`docs/validation/manual-mvp-validation.md`, Phase 4)
+compiled exactly two Patterns: `compressionRatio/unscoped` (value 0.84,
+sampleCount 5) and `lexicalOverlap/unscoped` (value 0.09, sampleCount 5).
+The operator asked for the deterministic eligibility path to be inspected
+against this exact data before assuming any other cause, and explicitly
+asked not to weaken the threshold just to make a request fire.
+
+**Finding: this exact pair is eligible under the current implementation
+and the current default policy — no bug found in the eligibility path.**
+`isEligibleForInterpretation(patterns, policy)` is `patterns.length >=
+policy.minPatternCount` — nothing else. It does not re-check per-pattern
+`sampleCount`/`confidenceWeight` (already enforced one layer down by
+`PatternCompilerPolicy` before a `Pattern` ever reaches `PatternStore`),
+does not require specific dimensions, and does not filter by `context`
+beyond whatever `Pattern.context` already is. Two Patterns with two
+distinct dimensions (`compressionRatio`, `lexicalOverlap`), both real,
+both already persisted, evaluate `2 >= 2` — `true` — exactly matching this
+policy's stated intent ("gates on having enough *distinct* patterns to
+interpret"). Verified three ways:
+1. A direct unit-test fixture using the operator's exact real values
+   (`extension/tests/persona/persona-interpreter.test.ts`, "is eligible
+   for the operator's real persisted corpus") confirms
+   `isEligibleForInterpretation` returns `true`.
+2. Confirmed by direct code inspection that `entrypoints/popup/App.svelte`
+   (the UI's `eligible` computation) and
+   `extension/src/persona/persona-interpreter-service.ts` (the actual gate
+   before any network call) both import and call the identical
+   `isEligibleForInterpretation` function from
+   `extension/src/persona/persona-interpreter.ts` against the identical
+   `DEFAULT_PERSONA_INTERPRETER_POLICY` from
+   `spec/schema/persona-interpreter-policy.ts` — `entrypoints/background.ts`
+   constructs `PersonaInterpreterService` without overriding the policy.
+   There is no second copy of this logic anywhere to have drifted out of
+   sync.
+3. A full end-to-end integration test seeding `PatternStore` with these
+   exact two records and running the real job pipeline —
+   `extension/tests/persona/persona-interpretation-integration.test.ts`,
+   "reaches fetch() exactly once for the operator's exact real persisted
+   corpus" — confirms `PatternStore.list()` → `isEligibleForInterpretation`
+   (`true`) → the P3 processor → `PersonaInterpreterService` → the
+   provider factory → `fetch()`, called exactly once, with no mocking of
+   the eligibility/gating logic itself.
+
+**No policy change was made** — the operator explicitly asked not to
+weaken the threshold to force a request, and no weakening was needed:
+the exact real data already clears `DEFAULT_PERSONA_INTERPRETER_POLICY`
+as originally intended.
+
+**Most likely actual explanation for the observed zero requests: P3/`DEEP_IDLE`
+dispatch latency, not an eligibility bug.** `interpret_traits_beliefs` is
+enqueued at `P3`, and `ALLOWED_PRIORITIES_BY_MODE` (`extension/src/governor/mode-priorities.ts`)
+only allows `P3` jobs to dispatch in `DEEP_IDLE` mode — reached only after
+`DEEP_IDLE_AFTER_INACTIVE_MS` (90s) of continuous foreground inactivity
+with the popup closed (`docs/decisions/0013`, `0014`). This is identical,
+intentional behavior to every other rebuild-style button in this popup
+(`Rebuild T2 Profile`, `Rebuild index`, `Compile patterns`), and is exactly
+the same class of "job stays PENDING with zero visible effect until
+DEEP_IDLE is reached" behavior manually found and documented for this
+codebase before (`docs/validation/manual-mvp-validation.md`). If the
+operator checked OpenRouter's dashboard shortly after clicking "Interpret
+traits/beliefs" without leaving the popup closed and the browser idle for
+90+ seconds, a `PENDING` `interpret_traits_beliefs` job making zero
+requests is the expected, correct state — not a bug. This is not confirmed
+as *the* explanation (it wasn't directly observed in this investigation),
+but it is the most likely one once the eligibility path itself is ruled
+out, and it is now easier to rule in or out directly: the Queue panel's
+`P3` count reflects whether the job is still pending, and the new "Ready —
+… may not fire immediately if the popup stays open — see the Queue panel's
+P3 count" copy (see UI diagnostics below) surfaces this in the panel
+itself rather than requiring a read of this document.
+
+**UI diagnostics made more specific.** `deriveInterpretationReadiness()`
+(`extension/src/persona/persona-interpreter-form-state.ts`) now returns a
+structured result instead of a bare string: `{ kind: 'not-configured',
+missing: [...] }` names exactly which of `enabled`/`apiKey`/`modelId` is
+missing (previously a single generic "not configured" message covered all
+three); `{ kind: 'below-threshold' }` is rendered with the actual counts
+("Not eligible: 2 pattern(s) found; requires at least 2" — deliberately
+worded as the operator requested, so a below-threshold state that somehow
+disagreed with the real numbers would be immediately visible as a bug
+rather than hidden behind vague wording); `{ kind: 'ready' }` now also
+notes the P3/background-job caveat above.
+
 ## Current validation status
 
 Implemented and tested across `spec/schema/trait-belief.ts`,
@@ -310,7 +398,8 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
 
 - `extension/tests/persona/persona-interpreter.test.ts` — pure functions:
   `toPatternCandidate` minimization, `isEligibleForInterpretation`
-  threshold behavior, `validateClaimDraft` (valid draft, out-of-range
+  threshold behavior (including the operator's exact real persisted
+  corpus fixture), `validateClaimDraft` (valid draft, out-of-range
   confidence, empty claim, no supporting keys, hallucinated supporting
   key).
 - `extension/tests/persona/trait-belief-store.test.ts` — CRUD, `DERIVED`
@@ -339,8 +428,9 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
   API key is never re-inserted into the input, `dirty` blocks hydration
   including across a legitimate save round-trip), `resolveSavedConfig` (new
   key wins, blank/whitespace-only field preserves the existing key, no key
-  ever saved stays `undefined`), `deriveInterpretationReadiness` (all three
-  states).
+  ever saved stays `undefined`), `deriveInterpretationReadiness` (each
+  individually-named missing field, multiple missing fields at once,
+  below-threshold, ready).
 - `extension/tests/persona/persona-interpretation-integration.test.ts`
   (new) — full pipeline with a shared fake `chrome.storage.local` and
   `fake-indexeddb`: a "popup"-saved config is read by an independently
@@ -350,8 +440,11 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
   not-configured run fails observably (`FAILED`, clear `lastError`, zero
   provider/fetch calls) instead of looking like a silent no-op; a
   below-threshold run completes with zero provider/fetch calls, provably
-  distinguishing "correctly did nothing" from "silently succeeded."
-- 291/291 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
+  distinguishing "correctly did nothing" from "silently succeeded"; and the
+  operator's exact real persisted corpus (`compressionRatio/unscoped`
+  value 0.84/sampleCount 5, `lexicalOverlap/unscoped` value 0.09/sampleCount 5)
+  reaches an actual `fetch()` call exactly once end to end.
+- 294/294 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
   `host_permissions: ["https://openrouter.ai/*"]` present in the generated
   manifest).
 - Not yet exercised: an actual OpenRouter API key against a real model —
