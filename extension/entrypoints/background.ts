@@ -90,6 +90,7 @@ export default defineBackground(() => {
 
   let batchSize = 4;
   let mode: RuntimeMode = 'BACKGROUND'; // conservative default before the first measurement
+  let idleTicks = 0;
 
   chrome.alarms.create(DISPATCH_ALARM, { periodInMinutes: 0.5 });
 
@@ -105,8 +106,9 @@ export default defineBackground(() => {
 
     // Only priorities the current mode allows are dispatched; the rest stay
     // PENDING and are picked up once the mode relaxes (e.g. foreground goes
-    // idle). queueBacklog still reflects the *total* backlog so the governor
-    // can see pressure building even in classes it isn't currently running.
+    // idle for long enough to reach DEEP_IDLE). Mode is driven purely by
+    // foreground activity/idleness, never by backlog — see
+    // docs/decisions/0013 for why gating on an empty queue was a bug.
     const allowedPriorities = ALLOWED_PRIORITIES_BY_MODE[mode];
     const start = performance.now();
     let ran = 0;
@@ -126,9 +128,10 @@ export default defineBackground(() => {
       expectedJobLatencyMs: EXPECTED_JOB_LATENCY_MS,
       foregroundActive: foregroundTracker.isActive,
     };
-    const decision = decide(signals, batchSize);
+    const decision = decide(signals, batchSize, idleTicks);
     batchSize = decision.nextBatchSize;
     mode = decision.mode;
+    idleTicks = decision.nextIdleTicks;
 
     // Eviction is deferred while the user is actively interacting —
     // "Foreground interaction always wins."

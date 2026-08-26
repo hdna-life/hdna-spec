@@ -74,7 +74,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       processors/pattern-compilation-job.ts - P3 compile_patterns (full rebuild, manually triggered) (see docs/decisions/0011)
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
-      resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
+      resource-governor.ts        - pure decide(signals, prevBatchSize, prevIdleTicks) -> {mode, nextBatchSize, nextIdleTicks}; mode from foreground idleness only, never backlog (see docs/decisions/0013)
       mode-priorities.ts          - ALLOWED_PRIORITIES_BY_MODE: which job priorities each mode may dispatch (see docs/decisions/0008)
     runtime/
       controls.ts                 - RuntimeControls: pause processing vs pause learning (persisted)

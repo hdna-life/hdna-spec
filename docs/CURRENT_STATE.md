@@ -10,7 +10,10 @@ of Phase 3 (3A/3B/3C) are complete. Phase 4's TRAITS/BELIEFS step (requires
 an actual LLM call) is explicitly not started — its own future decision.
 Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
 English-only, saturating/biasing on non-English (Turkish) evidence — see
-`docs/decisions/0012`.
+`docs/decisions/0012`. And a post-3A fix: the resource governor's
+`DEEP_IDLE` mode selection was gated on an empty queue, which made any
+pending `P3` job self-blocking (its own presence in the backlog prevented
+the only mode that could dispatch it) — see `docs/decisions/0013`.
 
 ## Active MVP scope
 
@@ -25,7 +28,7 @@ Phase 4's deterministic PATTERNS layer:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 219 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 223 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   storage policy, embeddings, T2 dimensions/trait scores/profile, patterns,
@@ -83,7 +86,11 @@ Phase 4's deterministic PATTERNS layer:
   retried, so a job interrupted mid-execution by MV3 service-worker
   termination is not lost — see `docs/decisions/0007`.
 - `resource-governor.decide()`: pure function, INTERACTIVE/BACKGROUND/DEEP_IDLE
-  mode selection, batch-size halving/doubling on latency ratio.
+  mode selection driven by foreground activity + sustained idleness
+  (`idleTicks`, threaded across calls like `batchSize`) — never by queue
+  backlog, which previously made pending `P3` jobs self-blocking; see
+  `docs/decisions/0013`. Batch-size halving/doubling on latency ratio
+  unchanged.
 - `RuntimeControls`: persisted `processingPaused`/`learningPaused` state.
 - `stylometry.ts`: deterministic T0 extractors — sentence/word splitting,
   sentence-length distribution, punctuation-per-100-sentences, lowercase-start
@@ -163,6 +170,9 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Known limitations
 
+- `DEEP_IDLE_AFTER_IDLE_TICKS = 3` (roughly 90s at the current ~30s dispatch
+  cadence) is a placeholder tuning value, not derived from measurement —
+  see `docs/decisions/0013`.
 - No retry cap on stale-RUNNING reclaim: a job that reliably crashes the
   service worker every time it runs would be retried indefinitely rather
   than eventually marked `FAILED`. Not implemented — see `docs/decisions/0007`.
@@ -236,7 +246,7 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Twelve operator decisions to date are recorded in `docs/decisions/`.
+None open. Thirteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider
