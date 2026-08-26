@@ -1,11 +1,15 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte';
   import type { T2Profile } from '@spec/schema/t2-profile';
 
   export let profile: T2Profile | undefined;
+
+  const dispatch = createEventDispatcher<{ rebuild: void }>();
 </script>
 
 <section>
   <h2>Behavioral Estimates (T2)</h2>
+  <button on:click={() => dispatch('rebuild')}>Rebuild T2 Profile</button>
   {#if !profile || (!profile.formality && !profile.directness)}
     <p>No evidence classified yet.</p>
   {:else}
@@ -36,6 +40,10 @@
     text-transform: uppercase;
     color: #666;
     margin: 0 0 4px;
+  }
+  button {
+    font-size: 12px;
+    margin-bottom: 4px;
   }
   p,
   ul {

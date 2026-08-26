@@ -147,7 +147,9 @@ Phase 4's deterministic PATTERNS layer:
   reusing the exact `embedding-sources.ts` adapters from Phase 3B).
 - Popup UI: Behavioral Estimates (T2) panel — formality/directness as
   percentages with sample counts, explicit "heuristic estimates, not
-  established traits" note.
+  established traits" note, "Rebuild T2 Profile" button (enqueues the
+  existing `rebuild_t2_profile` P3 job — same rebuild UX as the Vector
+  Index panel's button).
 - `aggregateObservations()`: pure, threshold-gated confidence-weighted
   aggregation by (dimension, context) — same weighting principle as
   `applyTraitScore()`.
