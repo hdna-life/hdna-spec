@@ -69,7 +69,13 @@ export class OpenRouterPersonaInterpreter implements PersonaInterpreterProvider 
   constructor(
     private apiKey: string,
     readonly modelId: string,
-    private fetchImpl: typeof fetch = fetch,
+    // Bound to globalThis, not a bare reference to `fetch`: native fetch is
+    // brand-checked against its receiver, and `this.fetchImpl(...)` below
+    // calls it with `this` (the OpenRouterPersonaInterpreter instance) as
+    // the receiver, not globalThis — an unbound default throws "Failed to
+    // execute 'fetch' on 'WorkerGlobalScope': Illegal invocation" in the
+    // real MV3 service worker. Found via manual dogfood; see docs/decisions/0015.
+    private fetchImpl: typeof fetch = fetch.bind(globalThis),
   ) {}
 
   async interpret(candidates: PatternCandidate[]): Promise<TraitBeliefClaimDraft[]> {

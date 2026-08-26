@@ -380,6 +380,70 @@ disagreed with the real numbers would be immediately visible as a bug
 rather than hidden behind vague wording); `{ kind: 'ready' }` now also
 notes the P3/background-job caveat above.
 
+## Post-eligibility-verification fix: `fetch` "Illegal invocation" (the actual root cause)
+
+The P3/`DEEP_IDLE` latency theory above was not it. A further manual
+dogfood pass — this time actually waiting long enough for the job to
+dispatch — found every `interpret_traits_beliefs` job reaching the
+processor and failing with `status: FAILED`, `lastError: "Failed to
+execute 'fetch' on 'WorkerGlobalScope': Illegal invocation"`. OpenRouter
+received zero requests because the failure happens before any HTTP leaves
+the extension — consistent with every earlier observation of "zero
+requests," but for a reason unrelated to eligibility, config hydration, or
+scheduling.
+
+**Root cause.** `OpenRouterPersonaInterpreter`'s constructor defaulted
+`fetchImpl` to a bare reference to the global `fetch` function:
+```ts
+constructor(
+  private apiKey: string,
+  readonly modelId: string,
+  private fetchImpl: typeof fetch = fetch,
+) {}
+```
+`interpret()` then calls it as `this.fetchImpl(...)`. Native `fetch` is a
+brand-checked WebIDL method — internally it requires its receiver (`this`
+at the call site) to be the global object (`Window`/`WorkerGlobalScope`)
+it was defined on. `obj.method(...)` call syntax sets the receiver to
+`obj`; here `this.fetchImpl(...)` sets the receiver to the
+`OpenRouterPersonaInterpreter` instance, not `globalThis` — so the
+brand check fails and the native implementation throws exactly the
+observed `TypeError`. This reproduces in a real MV3 service worker (where
+`fetchImpl` was never overridden — see `entrypoints/background.ts`'s
+provider factory, `(apiKey, modelId) => new OpenRouterPersonaInterpreter(apiKey, modelId)`,
+which always uses the default) but not in any of this decision's existing
+unit tests, since every one of them explicitly passes its own fake
+`fetchImpl` — a plain function with no brand check to trip.
+
+**Fix.** Bind the default to `globalThis` explicitly:
+```ts
+private fetchImpl: typeof fetch = fetch.bind(globalThis),
+```
+A bound function ignores the call-site receiver entirely, so
+`this.fetchImpl(...)` now always invokes native `fetch` with the receiver
+it was bound to (`globalThis`), regardless of how the bound reference is
+later called.
+
+**Regression coverage.** `extension/tests/persona/openrouter-persona-interpreter.test.ts`
+adds a fake global `fetch` (`installBrandCheckedGlobalFetch()`) that
+throws the exact same `TypeError` unless invoked with `globalThis` as
+`this` — genuinely reproducing the brand-check behavior responsible for
+the bug, not just asserting on a call count. A new test constructs
+`OpenRouterPersonaInterpreter` with **no** `fetchImpl` argument (exercising
+the real default path background.ts actually uses) and confirms
+`interpret()` resolves instead of throwing. Confirmed this test fails
+with the exact reported error message against the pre-fix code (`private
+fetchImpl: typeof fetch = fetch`) and passes against the fix.
+
+This is the confirmed root cause of the "zero OpenRouter requests" symptom
+across all three manual dogfood rounds on this feature — not the
+config-hydration bug (real, fixed, but not the reason fetch itself never
+fired once the job did dispatch and run), not the eligibility path
+(verified correct against the operator's real data), and not (as far as
+manual testing has shown) P3/`DEEP_IDLE` scheduling latency, though that
+remains real, intentional, pre-existing behavior worth keeping in mind
+separately.
+
 ## Current validation status
 
 Implemented and tested across `spec/schema/trait-belief.ts`,
@@ -412,7 +476,12 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
   injected fake `fetch`: request URL/model/auth-header/structured-output
   schema shape, confirms no raw evidence text in the outbound payload,
   valid-response parsing, and error paths (non-ok HTTP, non-JSON content,
-  schema-mismatched claims).
+  schema-mismatched claims); plus a regression test using a brand-checked
+  fake global `fetch` (throws unless called with `globalThis` as `this`,
+  mirroring the real native implementation) against the *default*
+  `fetchImpl` (no argument passed) — confirmed failing with the exact
+  reported `TypeError` before the `fetch.bind(globalThis)` fix, passing
+  after it.
 - `extension/tests/persona/persona-interpreter-service.test.ts` — fake
   provider: throws when not configured; no-op with zero provider calls
   below threshold; happy path writes only validated claims and drops an
@@ -444,7 +513,7 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
   operator's exact real persisted corpus (`compressionRatio/unscoped`
   value 0.84/sampleCount 5, `lexicalOverlap/unscoped` value 0.09/sampleCount 5)
   reaches an actual `fetch()` call exactly once end to end.
-- 294/294 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
+- 295/295 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
   `host_permissions: ["https://openrouter.ai/*"]` present in the generated
   manifest).
 - Not yet exercised: an actual OpenRouter API key against a real model —

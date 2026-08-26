@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenRouterPersonaInterpreter } from '../../src/persona/openrouter-persona-interpreter';
 import type { PatternCandidate } from '@spec/protocol/persona-interpreter';
 
@@ -15,7 +15,48 @@ function fakeFetchReturning(content: string, ok = true, status = 200) {
   })) as unknown as typeof fetch;
 }
 
+/**
+ * Mirrors the real browser/MV3-service-worker brand check on native
+ * `fetch`: it throws "Illegal invocation" unless called with `globalThis`
+ * (or the exact object it was captured from) as the receiver. A plain
+ * `private fetchImpl: typeof fetch = fetch` default, later invoked as
+ * `this.fetchImpl(...)`, calls it with the interpreter instance as the
+ * receiver instead — reproducing the real bug found via manual dogfood.
+ */
+function installBrandCheckedGlobalFetch(responseContent: string): { calls: number } {
+  const state = { calls: 0 };
+  function brandCheckedFetch(this: unknown) {
+    if (this !== globalThis) {
+      throw new TypeError("Failed to execute 'fetch' on 'WorkerGlobalScope': Illegal invocation");
+    }
+    state.calls += 1;
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ choices: [{ message: { content: responseContent } }] }),
+    });
+  }
+  vi.stubGlobal('fetch', brandCheckedFetch);
+  return state;
+}
+
 describe('OpenRouterPersonaInterpreter', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not throw "Illegal invocation" when using the default fetch binding — regression for this.fetchImpl(...) calling fetch with the interpreter instance as receiver', async () => {
+    const globalFetch = installBrandCheckedGlobalFetch(JSON.stringify({ claims: [] }));
+    // No third constructor argument — exercises the default `fetchImpl`,
+    // which is what a real background.ts-constructed provider actually
+    // uses (see the provider factory in entrypoints/background.ts).
+    const interpreter = new OpenRouterPersonaInterpreter('sk-or-test', 'openai/gpt-4o-mini');
+
+    await expect(interpreter.interpret(candidates)).resolves.toEqual([]);
+    expect(globalFetch.calls).toBe(1);
+  });
+
   it('requests the OpenRouter chat completions endpoint with the configured model, auth header, and structured-output schema', async () => {
     const fetchImpl = fakeFetchReturning(JSON.stringify({ claims: [] }));
     const interpreter = new OpenRouterPersonaInterpreter('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
