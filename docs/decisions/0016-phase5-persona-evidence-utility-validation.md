@@ -766,12 +766,11 @@ decision/PR.
 
 ## Trial 1 — transformation-grounding extraction instruction (controlled experiment)
 
-**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN.** This section records
-a single controlled follow-up to the baseline result above. **Do not read
-this as a new baseline result** — no real Trial 1 run has been performed as
-of this section being written; the baseline/Trial 0 numbers above remain
-the only real result on record until an operator run of Trial 1 is graded
-and recorded here.
+**Status: REAL RESULT RECORDED — ITERATE (no aggregate groundedness
+improvement over Trial 0).** This section records a single controlled
+follow-up to the baseline result above. The baseline/Trial 0 numbers above
+are preserved unchanged; see "Real Trial 1 result (operator-graded)" below
+for what actually happened when the operator ran it.
 
 ### Hypothesis
 
@@ -916,6 +915,498 @@ the real constant rather than drifting from it. 392/392 tests pass, clean
    `docs/validation/manual-mvp-validation.md`'s Trial 1 subsection,
    preserving the baseline/Trial 0 result above rather than overwriting it.
 
-**No real Trial 1 result is recorded as of this section.** The human
-operator performs the real run; this decision does not claim, predict, or
-fabricate its outcome.
+### Real Trial 1 result (operator-graded)
+
+The operator ran Trial 1 against the real 5-source corpus. Receipts
+confirmed all 5 sources were reprocessed under the new extractor identity
+(`extractorId: "openrouter/transformation-grounded-v1"`,
+`extractorVersion: "openai/gpt-4o-mini"`, `outcome: "extracted"` for all
+5) — not skipped by stale baseline receipts.
+
+```text
+Candidates               15
+
+SUPPORTED                10 / 15 = 66.7%
+PARTIALLY_SUPPORTED       4 / 15 = 26.7%
+UNSUPPORTED               1 / 15 = 6.7%
+
+TRIAL 0 GROUNDEDNESS      66.7%
+TRIAL 1 GROUNDEDNESS      66.7%
+PRE-DECLARED THRESHOLD    >=80%
+
+PHASE 5A                  ITERATE
+```
+
+**The aggregate groundedness metric did not improve.** Trial 1 does not
+clear the pre-declared ≥80% `SUPPORTED` threshold, exactly as Trial 0
+didn't. This is recorded plainly, not softened: **Trial 1 did not pass.**
+
+**Qualitative finding (not reflected in the aggregate number).** Manual
+inspection found Trial 1 more often expressed observations as directional
+ORIGINAL → FINAL transformations rather than merely describing properties
+of the final text — e.g. identifying transformations such as
+process-oriented validation → explicit core-value validation, an existing
+explanation being removed/replaced by a different explanation, a generic
+rest recommendation gaining a concrete consequence/personal observation,
+and testing language being transformed into explicit shipping-plus-
+feedback-collection. This suggests the transformation-grounding
+instruction did measurably affect extractor behavior — but it was **not
+sufficient to move the aggregate `SUPPORTED` rate**. Recorded as:
+
+```text
+Trial 1 targeted failure class:  QUALITATIVELY REDUCED / NOT ELIMINATED
+Aggregate groundedness:          NO IMPROVEMENT
+```
+
+This finding should not be overstated — the corpus is only 5 edit pairs,
+and a qualitative behavioral shift without a corresponding aggregate-score
+shift is a weak, not strong, signal on its own.
+
+**Remaining failure classes identified from manual grading**, which
+directly motivate Trial 2 below:
+
+1. **Preserved and changed meaning can still be mixed within one
+   candidate.** A candidate may combine one genuinely human-introduced
+   semantic change with another claim already substantially present in
+   ORIGINAL, dragging the whole candidate down to `PARTIALLY_SUPPORTED`
+   even though part of it is fully grounded. The extractor needs better
+   localization of exactly which source material actually changed.
+2. **Overlapping/redundant semantic candidates.** A single underlying edit
+   can generate several highly-overlapping observations (e.g. separate
+   candidates about avoiding expansion, validating core value, testing
+   users, and demand-driven development from what is substantially one
+   transformation), even when some of that meaning was already present in
+   ORIGINAL and the genuinely new information is narrower. This inflates
+   the evidence set and blurs the atomic unit of observation.
+3. **Removal can be over-interpreted.** The removal of text is directly
+   observable; a psychological or motivational explanation for *why* the
+   human removed it usually is not. Trial 1's instruction did not
+   specifically discipline this distinction.
+
+See Trial 2 below, which targets these three classes directly (evidence
+localization for #1, an explicit atomicity rule for #1 and #2, an explicit
+local redundancy-avoidance rule for #2, and an explicit removal-discipline
+rule for #3) — without changing the pre-declared acceptance criteria that
+Trial 1 was, and Trial 2 will be, graded against.
+
+## Trial 2 — deterministic evidence localization + atomic semantic deltas
+
+**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN. No real Trial 2 result
+is recorded in this section.** The human operator performs the real run;
+this decision does not claim, predict, or fabricate its outcome. Trial 0
+and Trial 1's real results above are preserved unchanged.
+
+### Research question
+
+Trial 1 still asked the model to locate semantic change by comparing two
+complete raw texts end to end, in one reasoning pass. Trial 2 asks a
+narrower question:
+
+> Can HDNA improve extraction precision by deterministically localizing
+> the human's textual intervention *before* semantic interpretation, while
+> leaving semantic interpretation itself to the existing LLM extractor?
+
+New architecture for this experiment:
+
+```text
+ORIGINAL + FINAL
+        |
+        v
+deterministic textual alignment / diff
+        |
+        v
+observed intervention regions
+        |
+        v
+LLM semantic interpretation
+        |
+        v
+atomic SemanticDeltaCandidates
+```
+
+This is the first Phase 5A iteration where HDNA itself provides explicit
+evidence localization, rather than asking the LLM to discover all change
+boundaries from two raw strings unaided.
+
+### Conceptual boundary: the deterministic layer never determines meaning
+
+The deterministic layer identifies *where* textual intervention occurred
+(preserved / removed / added / replaced spans) — it never determines *what*
+that intervention means semantically.
+
+```text
+TEXTUAL DIFF != SEMANTIC DELTA
+```
+
+A tiny textual edit may carry a major semantic effect; a large rewrite may
+preserve essentially the same meaning. The LLM remains solely responsible
+for semantic interpretation — this is stated explicitly to the model in the
+prompt (see "Prompt contract" below), not just enforced by code structure.
+
+### Language-general requirement
+
+No rule introduced by Trial 2 is specific to Turkish, English, or any
+other language. The localization utility (`extension/src/persona/
+revision-diff.ts`) operates on generic whitespace-token boundaries only —
+it has no notion of any language's words, morphemes, suffixes, or grammar.
+The same alignment algorithm runs identically regardless of input
+language; nothing in it was derived from, or tuned against, the 5 real
+Turkish corpus `EditEvent`s.
+
+### Deterministic diff/alignment algorithm chosen
+
+**Algorithm: restricted Damerau-Levenshtein (optimal string alignment,
+OSA) token alignment**, implemented from scratch in
+`extension/src/persona/revision-diff.ts` (`computeRevisionDiff`) — no new
+dependency added, consistent with this codebase's existing discipline of
+not adding ML/HTTP/NLP libraries (see `docs/decisions/0015`'s
+"Research/evidence used").
+
+**This is a direct, word/whitespace-token-level adaptation of the
+automatic revision-classification method in Conijn, Kleinberg & van den
+Bosch, "A Product- and Process-Oriented Tagset for Revisions in Writing"
+(2022):** they classify revisions into insertion, deletion, substitution,
+and (adjacent) reordering by computing restricted Damerau-Levenshtein
+distance *below word level*. `computeRevisionDiff` runs the equivalent
+computation *at* the word/token level for HDNA's `EditEvent` pairs:
+standard Levenshtein insert/delete/substitute costs (1 each, 0 for an
+exact match), plus one additional case — a transposition of two
+immediately adjacent tokens, also at cost 1. "Restricted" (equivalently,
+OSA distance) means a transposed pair is never itself subsequently edited
+again; this is exactly the constraint Conijn et al.'s method also imposes,
+not a simplification introduced for this experiment. The DP and backtrack
+(`alignTokens` in `revision-diff.ts`) implement this directly: this is not
+an approximation of, or loosely "inspired by," the published method — it
+is the same distance function, applied at the word/token granularity
+suited to a single sentence-or-short-paragraph `EditEvent` pair rather
+than Conijn et al.'s below-word-level granularity (full-document human
+revision histories).
+
+**Spangher et al.'s NewsEdits** (multilingual document-revision alignment
+across full news-article version histories) was reviewed as directly
+relevant related work — see "Academic connection" below — but its
+alignment method was **not** adapted here: NewsEdits solves cross-version
+alignment at article/sentence granularity across a full revision history,
+with document-level structure (headlines, paragraphs, publication
+timestamps) that a single AI-draft/human-final `EditEvent` pair does not
+have. For HDNA's short, two-version `EditEvent` pairs, Conijn et al.'s
+word-level restricted-Damerau-Levenshtein classification is the smaller,
+better-fitting method, and is what this implementation actually follows —
+this is not an ad-hoc diff heuristic invented to fit the current 5
+examples; it is a direct application of the algorithm and constraint
+already established by that published method.
+
+**Why this specific, published method (not a hand-invented heuristic):**
+
+- **Correct fit for the task's actual operation classes.** Conijn et al.'s
+  scheme already names exactly the structural categories this experiment
+  needs — insertion, deletion, substitution, and reordering — at the right
+  granularity once applied at the token level, with no extra machinery
+  invented on top.
+- **Genuinely language-general.** The only "knowledge" the tokenizer has
+  is whitespace-run segmentation — a generic structural split, not a
+  word/morpheme boundary decision specific to any language. Restricted
+  Damerau-Levenshtein itself is a string-edit-distance function with no
+  linguistic content; it operates identically over any token alphabet.
+- **No heavy dependency.** A from-scratch DP implementation (still O(n·m),
+  with O(1) extra work per cell for the transposition case) avoids adding
+  a diff/NLP library merely to satisfy an experimental, deliberately small
+  utility — consistent with the task's explicit instruction to avoid a
+  heavy dependency unless clearly justified, and with this being "an
+  experimental extractor-support representation, not canonical persona
+  evidence," which does not warrant new architectural surface area.
+- **Bounded cost with an explicit fallback.** A `MAX_DP_CELLS` guard
+  (250,000 token-pairs) makes unusually large inputs fall back to a single
+  whole-text `'replaced'` operation rather than pay unbounded DP cost — a
+  size-based safety net, not a content- or language-specific rule.
+
+**Tradeoffs, documented rather than hidden:**
+
+- Whitespace tokenization is not meaningful for languages that do not use
+  whitespace to delimit words (e.g. Chinese, Japanese). This is an honest
+  limitation of the generic approach, not a language-specific rule *for*
+  any language — the algorithm behaves identically (word-boundary-blind)
+  everywhere; it simply degrades toward character-adjacent behavior for
+  non-whitespace-delimited scripts rather than failing outright. Not
+  addressed in Trial 2; a genuinely universal segmentation strategy is
+  future work if this direction proves worth pursuing further.
+- The "restricted" transposition case only ever catches two *immediately
+  adjacent* array tokens — tokens are defined as "optional leading
+  whitespace + one whitespace-free run" specifically so that two
+  neighboring words are adjacent array elements despite the whitespace
+  between them in the source text, letting a genuine two-word swap be
+  detected. A transposition spanning more than two tokens, or two swapped
+  words separated by additional unchanged words, is not detected as a
+  single `'reordered'` operation — it falls back to being represented as
+  ordinary substitution/removal/addition, which is still a structurally
+  correct (if less specific) account, per the same "restricted" constraint
+  Conijn et al.'s method itself imposes.
+- Adjacent delete+insert runs are merged into a single `'replaced'`
+  operation via simple positional adjacency, not any semantic-similarity
+  judgment that the two spans are "the same idea reworded" — documented in
+  `revision-diff.ts`'s docstring so this heuristic is not mistaken for a
+  semantic claim.
+- Token alignment can legitimately match short, incidental shared tokens
+  (e.g. a common short word appearing in both an unrelated ORIGINAL and
+  FINAL) as small `'preserved'` spans even under an otherwise substantial
+  rewrite — a correct property of the algorithm, not a bug, and not
+  evidence of semantic equivalence (see the conceptual boundary above,
+  restated explicitly to the model in the prompt).
+
+### Output representation
+
+```ts
+export type RevisionOperationKind = 'preserved' | 'removed' | 'added' | 'replaced' | 'reordered';
+
+export interface RevisionOperation {
+  kind: RevisionOperationKind;
+  originalText: string;
+  finalText: string;
+}
+
+export interface RevisionDiff {
+  operations: RevisionOperation[];
+}
+```
+
+`'reordered'` is an addition beyond the task brief's illustrative
+4-operation shape (explicitly "illustrative, not mandatory") — added
+specifically because Conijn et al.'s classification scheme, which this
+implementation follows, names reordering as a distinct structural category
+from substitution; collapsing an adjacent word swap into two unrelated
+substitutions would misrepresent the very method being adapted.
+
+No new persistence schema and no `spec/schema`/`spec/protocol` addition —
+`RevisionDiff` is computed fresh, in-memory, on every `extract()` call
+(`openrouter-semantic-delta-extractor.ts`) and is never persisted;
+`SemanticDeltaExtractionService` has no knowledge of it at all. This is
+consistent with the task's explicit instruction not to create a large new
+protocol/schema and to treat this as an experimental extractor-support
+representation, not canonical persona evidence.
+
+### How ORIGINAL + FINAL + localization are presented to the extractor
+
+The full ORIGINAL and FINAL texts are **not** replaced by the diff — both
+are still sent in full, exactly as in Trial 0/1, with the localization
+appended as additional context:
+
+```text
+Original AI draft:
+<full ORIGINAL text>
+
+Human final text:
+<full FINAL text>
+
+OBSERVED TEXTUAL TRANSFORMATION (deterministic, structural only — not itself semantic evidence):
+[PRESERVED] "..."
+[REMOVED] "..."
+[ADDED] "..."
+[REPLACED] "..." -> "..."
+[REORDERED] "..." -> "..."
+```
+
+(`formatRevisionDiff()` in `openrouter-semantic-delta-extractor.ts` — the
+only place `RevisionDiff` is turned into prompt text; `revision-diff.ts`
+itself has no notion of prompts or models.)
+
+### Prompt contract
+
+Every Trial 1 rule is retained **unchanged** (same exact wording, verified
+by tests that were not modified): the CORE RULE (PRESERVED/ADDED/REMOVED/
+TRANSFORMED), the MANDATORY CHECK counterfactual, the textual-diff-is-not-
+proof-of-semantic-change warning, the observation-first boundary, and the
+abstention-is-valid rule. Trial 2 adds four new instruction blocks:
+
+1. **Localization boundary statement** — tells the model the OBSERVED
+   TEXTUAL TRANSFORMATION section is deterministic and structural, marks
+   *where* text was PRESERVED/REMOVED/ADDED/REPLACED/REORDERED (two
+   adjacent spans swapped), does **not** determine *what* it means, and is
+   "not itself evidence of anything"; a REPLACED or REORDERED span is not
+   asserted to be semantically equivalent or insignificant, and a
+   PRESERVED span does not mean nothing relevant happened elsewhere. The
+   model is explicitly told to interpret every localized span "in the full
+   context of the complete ORIGINAL and FINAL text," using the CORE
+   RULE/MANDATORY CHECK above — the localization is context, not a
+   substitute for that reasoning.
+2. **ATOMICITY** — each candidate must represent exactly one independently
+   supportable semantic transformation; a component that passes the
+   MANDATORY CHECK must not be bundled with one that does not — emit only
+   the genuinely new, narrowly-worded component rather than a broader
+   combined claim. Directly targets remaining-failure-class #1 above
+   (preserved+changed meaning mixed in one candidate).
+3. **AVOID REDUNDANCY** — before returning candidates, check whether each
+   one adds independently supported information beyond every *other*
+   candidate for the same edit; do not emit multiple candidates restating
+   the same underlying transformation in different words; candidate count
+   is explicitly not a goal. Directly targets remaining-failure-class #2
+   (overlapping/redundant candidates). This is **local, per-`EditEvent`
+   deduplication only** — no cross-user or global semantic deduplication,
+   and no embeddings, are introduced.
+4. **REMOVAL DISCIPLINE** — that text was removed (or replaced) is itself
+   directly observable and may be recorded; a motivation, reason, belief,
+   or psychological explanation for *why* it was removed/replaced must
+   **not** be inferred unless the FINAL text itself directly states that
+   reason. Directly targets remaining-failure-class #3 (over-interpreted
+   removals).
+
+**No language-specific rule was introduced** in any of the four new
+blocks — verified by the same class of regression test used for Trial 1
+(scans the real outbound prompt for named languages/morphology
+terminology). **No semantic or persona inference was added to the
+deterministic layer itself** — `revision-diff.ts` contains no prompt text,
+no model call, and no semantic vocabulary anywhere in its implementation;
+all of the above instruction blocks live exclusively in
+`openrouter-semantic-delta-extractor.ts`'s `buildPrompt()`.
+
+### Trial 2 versioning
+
+`EXTRACTION_PROMPT_VERSION` is bumped from `'transformation-grounded-v1'`
+(Trial 1) to **`'evidence-localized-v2'`** (Trial 2), so `providerId`
+becomes `openrouter/evidence-localized-v2` — distinct from both Trial 0's
+bare `openrouter` and Trial 1's `openrouter/transformation-grounded-v1`.
+Same minimal mechanism as Trial 1's versioning fix (no redesign of the
+receipt schema or idempotency logic): the 5 sources' Trial 0 *and* Trial 1
+receipts will not match Trial 2's `providerId`, so `runExperiment()`
+reprocesses all 5 again automatically; `modelId` remains untouched,
+still sent verbatim as `openai/gpt-4o-mini`. Because every receipt records
+its own `extractorId`, all three trials' receipts/candidates remain
+distinguishable from each other after the fact by inspecting that one
+field — no separate trial-tracking mechanism was added.
+
+### Tests
+
+`extension/tests/persona/revision-diff.test.ts` (new) — generic,
+language-independent unit tests for `computeRevisionDiff`: no-change
+input produces only `'preserved'` operations; pure addition localizes the
+added span with `originalText: ''`; pure removal localizes the removed
+span with `finalText: ''`; replacement localizes the changed span while
+preserving surrounding context as `'preserved'`; **an adjacent word-level
+transposition localizes as a single `'reordered'` operation** (the direct
+test of Conijn et al.'s restricted-Damerau-Levenshtein reordering class —
+`'A X Y B'` → `'A Y X B'`); a large, substantially different rewrite is
+represented without throwing and without falsely claiming whole-text
+equivalence; a very small (single-character) edit is not discarded; a
+reconstruction-invariant test (concatenating `originalText`/`finalText`
+across all operations, in order, always reproduces the exact input) across
+eight varied fixtures including empty-string ORIGINAL/FINAL and the
+transposition case; every operation's `kind` is one of the five defined
+values. No fixture uses Turkish suffixes, morphology, or any of the 5 real
+corpus `EditEvent`s.
+
+`extension/tests/persona/openrouter-semantic-delta-extractor.test.ts`
+gained a `Trial 2: deterministic evidence localization + atomic/
+redundancy/removal discipline` block verifying, on the real outbound
+prompt text: `providerId` bumps to a distinct `evidence-localized-v2`
+identity (not reusing Trial 1's); the OBSERVED TEXTUAL TRANSFORMATION
+section is present and genuinely reflects the real input (asserts the
+fixture's FINAL-only substring "MVP" surfaces under an `[ADDED]`/
+`[REPLACED]` tag, not just anywhere in the prompt); the localization
+boundary statement (identifies WHERE, not WHAT, "not itself evidence of
+anything"); the full-context interpretation instruction; the ATOMICITY
+rule; the AVOID REDUNDANCY rule; the REMOVAL DISCIPLINE rule; that every
+Trial 1 rule is still present verbatim; and that the four new blocks
+introduce no language-specific rule. These are prompt-contract assertions
+over the real generated text, not tests of an external LLM's semantic
+reasoning. 412/412 tests pass across the full suite, clean `tsc --noEmit`,
+clean `wxt build`.
+
+### How to rerun Trial 2 against the same 5 real EditEvents
+
+1. In the popup's "Semantic delta extraction settings," confirm the model
+   id is still `openai/gpt-4o-mini` and the OpenRouter API key is present;
+   re-save if needed. No UI change was made for Trial 2.
+2. Click "Extract semantic deltas (Phase 5A)". Trial 2's `providerId`
+   (`openrouter/evidence-localized-v2`) does not match any Trial 0 or
+   Trial 1 receipt, so all 5 sources are automatically reprocessed — no
+   manual receipt-store clearing needed or expected.
+3. Once the `P3` job runs (same `DEEP_IDLE` scheduling caveat as prior
+   trials), the panel shows the newly-processed sources and candidates.
+4. **Verifying the results belong to Trial 2, not Trial 0 or Trial 1:**
+   each new `SemanticDeltaCandidate`'s per-candidate line shows
+   `extractorId`/`extractorVersion` — confirm it reads
+   `openrouter/evidence-localized-v2` / `openai/gpt-4o-mini`, distinct from
+   Trial 0's plain `openrouter` and Trial 1's
+   `openrouter/transformation-grounded-v1`. The extraction receipts
+   (`semantic_delta_extraction_receipts` in IndexedDB, or the panel's
+   processed-count line) carry the same field and can be cross-checked the
+   same way.
+5. Grade the resulting candidates with the exact same rubric and the exact
+   same ≥80% `SUPPORTED` / ≤1 `MISSED_SIGNAL` thresholds used for Trial 0
+   and Trial 1 — do not adjust them based on outcome.
+6. Evaluate two separate questions, per the task's explicit framing — do
+   not conflate them: **(a) trial-level** — did evidence localization +
+   atomicity reduce preserved/changed-meaning mixtures, redundant
+   candidates, and over-interpreted removals, relative to Trial 1?
+   **(b) phase-level** — did aggregate groundedness reach ≥80% `SUPPORTED`?
+   Trial 2 may show real qualitative improvement on (a) without yet
+   passing (b); both should be recorded honestly, independent of each
+   other.
+7. Record the real result in this section and in
+   `docs/validation/manual-mvp-validation.md`'s Trial 2 subsection,
+   preserving the Trial 0 and Trial 1 results above rather than
+   overwriting them.
+
+### Academic connection
+
+Trial 2's deterministic localization layer is grounded directly in the
+revision literature already introduced for Trial 1
+(`docs/research/references.md`'s "Phase 5A Trial 1/2 additions") — not
+merely thematically adjacent to it, but the actual algorithm this
+implementation runs:
+
+- **Conijn, Kleinberg & van den Bosch (2022), "A Product- and
+  Process-Oriented Tagset for Revisions in Writing"** is the source this
+  implementation directly follows, not just a loose precedent. Its
+  automatic-classification method — restricted Damerau-Levenshtein
+  distance below word level, distinguishing insertion, deletion,
+  substitution, and (adjacent) reordering — is what `computeRevisionDiff`
+  implements at the word/whitespace-token level (see "Deterministic
+  diff/alignment algorithm chosen" above for the exact correspondence).
+  `RevisionOperation`'s five kinds (`preserved`/`removed`/`added`/
+  `replaced`/`reordered`) map directly onto that classification.
+  **Not claimed to establish:** that this exact operation vocabulary or
+  granularity is optimal for persona-relevant evidence localization
+  specifically — Conijn et al.'s own work is about classifying revisions
+  in writing generally, not about persona construction or AI-output/
+  human-edit pairs.
+- **Spangher et al., NewsEdits** (multilingual document-revision alignment
+  across full news-article version histories) was reviewed as directly
+  relevant related work on human-edit data as a first-class alignment
+  problem, and is cited here as the reason a *different*, article/
+  history-scale alignment approach was considered and set aside — see
+  "Deterministic diff/alignment algorithm chosen" above for exactly why it
+  does not fit HDNA's single, two-version, sentence/short-paragraph
+  `EditEvent` pairs. **Not claimed to establish:** that NewsEdits' own
+  alignment method would perform better or worse here — it was not
+  adapted, so no comparative claim is made.
+- **The surface/meaning-preserving vs. meaning-changing revision
+  distinction** (Conijn et al.; also implicit in Lan, Zhang & Dragut's
+  "revision intention" framing, and in WikiAtomicEdits' framing of edits
+  as a first-class data source) is the direct conceptual precedent for
+  this decision's `TEXTUAL DIFF != SEMANTIC DELTA` rule and for
+  instructing the model that the deterministic layer does not itself
+  determine meaning.
+- **Does NOT establish:** that deterministic localization improves
+  groundedness on HDNA's real corpus (an open, to-be-measured question —
+  see "How to rerun" above); that restricted Damerau-Levenshtein/OSA is
+  the right or optimal alignment strategy for *this* problem as opposed to
+  Conijn et al.'s original one; or any claim about persona reconstruction,
+  stable traits, or downstream persona fidelity — Phase 5A remains
+  observation-only, and Trial 2 adds no promotion/aggregation/persona
+  inference of any kind. The algorithm's role in this architecture is
+  evidence localization only — it does not, and is not claimed to,
+  "discover persona information."
+
+### Trial 2 explicitly does not change
+
+Per the task's explicit scope: no trait/persona promotion, no stable-
+preference inference, no psychological inference, no cross-`EditEvent`
+aggregation, no embedding similarity or clustering, no language-specific
+NLP or morphology analysis, no new persona schema, no new candidate
+`kind`, no confidence-calibration change, no different external model. The
+controlled-experiment constants (5 real `EditEvent`s, OpenRouter,
+`openai/gpt-4o-mini`, candidate schema, candidate kinds, confidence
+semantics, grading rubric, ≥80% `SUPPORTED` threshold, coverage criterion)
+are all held fixed — the only experimental change relative to Trial 1 is:
+deterministic intervention localization + the atomic/redundancy/removal-
+discipline instruction blocks above.

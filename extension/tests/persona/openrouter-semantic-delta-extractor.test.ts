@@ -297,7 +297,7 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
       expect(prompt).toMatch(/illustrative, not\s*\n?\s*exhaustive/);
     });
 
-    it('bumps the extractor identity (providerId) relative to a bare "openrouter" so Trial 1 is distinguishable from the baseline extractor for receipt/idempotency purposes', () => {
+    it('bumps the extractor identity (providerId) relative to a bare "openrouter" so this trial is distinguishable from the baseline extractor for receipt/idempotency purposes', () => {
       const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini');
       expect(extractor.providerId).toBe(`openrouter/${EXTRACTION_PROMPT_VERSION}`);
       expect(extractor.providerId).not.toBe('openrouter');
@@ -305,6 +305,82 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
       // field — must remain untouched by the prompt-version bump; only
       // providerId (extractorId) carries the versioning signal.
       expect(extractor.modelId).toBe('openai/gpt-4o-mini');
+    });
+  });
+
+  describe('Trial 2: deterministic evidence localization + atomic/redundancy/removal discipline (docs/decisions/0016 Trial 2)', () => {
+    async function capturedPromptContent(): Promise<string> {
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ candidates: [] }));
+      const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
+      await extractor.extract(input);
+      const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse(init.body);
+      return body.messages[0].content as string;
+    }
+
+    it('bumps providerId to a distinct v2 identity, not reusing Trial 1\'s "transformation-grounded-v1"', () => {
+      const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini');
+      expect(EXTRACTION_PROMPT_VERSION).not.toBe('transformation-grounded-v1');
+      expect(extractor.providerId).toBe(`openrouter/${EXTRACTION_PROMPT_VERSION}`);
+      expect(extractor.modelId).toBe('openai/gpt-4o-mini');
+    });
+
+    it("includes the deterministic OBSERVED TEXTUAL TRANSFORMATION section, computed from the real input's ORIGINAL/FINAL", async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toContain('OBSERVED TEXTUAL TRANSFORMATION');
+      // Sanity: it actually reflects this input, not a placeholder — the
+      // fixture's finalText contains "MVP", which does not appear at all
+      // in originalText, so it must surface as an added/replaced span.
+      expect(prompt).toMatch(/\[(ADDED|REPLACED)\][^\n]*MVP/);
+    });
+
+    it('states that the localization identifies WHERE change occurred, not WHAT it means (textual diff != semantic delta, restated for the localization layer specifically)', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/does NOT determine WHAT that change means semantically/);
+      expect(prompt).toMatch(/not itself evidence of anything/);
+    });
+
+    it('still requires interpreting localized spans against the full ORIGINAL/FINAL context, not the localization alone', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/Interpret every[\s\S]*?localized span in the full context/);
+    });
+
+    it('states the atomic-candidate requirement', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/ATOMICITY/);
+      expect(prompt).toMatch(/exactly one independently supportable semantic transformation/);
+      expect(prompt).toMatch(/Do not bundle a component that passes the MANDATORY CHECK together with a component that does not/);
+    });
+
+    it('states the redundancy-avoidance requirement (local, per-EditEvent only)', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/AVOID REDUNDANCY/);
+      expect(prompt).toMatch(/independently supported information beyond every other candidate/);
+      expect(prompt).toMatch(/Candidate count is not a goal/);
+    });
+
+    it('states removal/replacement discipline: removal is observable, but motivation for it is not automatically evidenced', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/REMOVAL DISCIPLINE/);
+      expect(prompt).toMatch(/that text was removed is itself directly.*observable/i);
+      expect(prompt).toMatch(/Do NOT infer a motivation, reason, belief, or psychological explanation/);
+    });
+
+    it('still retains every Trial 1 rule unchanged: preserved-meaning rejection, counterfactual check, diff-magnitude warning, observation-first boundary, abstention', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/PRESERVED meaning[\s\S]*?NOT new evidence/);
+      expect(prompt).toMatch(/MANDATORY CHECK/);
+      expect(prompt).toMatch(/not proof of semantic difference/);
+      expect(prompt).toMatch(/Do not infer stable personality, psychology, motivation/);
+      expect(prompt).toMatch(/Abstain when no meaningful/);
+      expect(prompt).toMatch(/empty candidates array/);
+    });
+
+    it('introduces no language-specific rule in the new Trial 2 sections either', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt.toLowerCase()).not.toContain('turkish');
+      expect(prompt.toLowerCase()).not.toContain('english');
+      expect(prompt).not.toMatch(/\bmorpholog/i);
     });
   });
 });

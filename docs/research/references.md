@@ -47,34 +47,44 @@ individual persona. See `docs/decisions/0016` for the full framing and the
 pre-declared, human-graded acceptance criteria this hypothesis will actually
 be judged against.
 
-## Phase 5A Trial 1 additions (`docs/decisions/0016`, transformation-grounding)
+## Phase 5A Trial 1/2 additions (`docs/decisions/0016`)
 
-Added for Trial 1 — the baseline extractor's groundedness shortfall
-(66.7% vs. required ≥80%) was traced to the extractor sometimes attributing
-to the human edit meaning already present in the AI-drafted source. Trial 1
-grounds extraction explicitly in the ORIGINAL → FINAL transformation
-(preserved meaning is not evidence; only added/removed/materially
-transformed meaning is). Same discipline as above: each entry separates
-what the paper actually supports from HDNA's own hypothesis; none of these
-are claimed to prove HDNA's Trial 1 change works, only that it has adjacent
-research motivation.
+Added for Trial 1 (transformation-grounding) and Trial 2 (deterministic
+evidence localization). The baseline extractor's groundedness shortfall
+(66.7% vs. required ≥80%, confirmed unchanged by Trial 1's real result —
+see `docs/decisions/0016`) was traced to two related problems: the
+extractor attributing to the human edit meaning already present in the
+AI-drafted source, and insufficient localization of exactly which source
+material changed. Trial 1 grounds extraction explicitly in the ORIGINAL →
+FINAL transformation; Trial 2 adds a deterministic, published-method-based
+localization layer ahead of semantic interpretation. Same discipline as
+above: each entry separates what the paper actually supports from HDNA's
+own hypothesis; none of these are claimed to prove HDNA's Trial 1/2
+changes work, only that they have real (and, for Conijn et al., direct
+algorithmic) research grounding.
 
 | Claim | Status | Source(s) |
 |---|---|---|
-| Surface/meaning-preserving revisions can be distinguished from meaning-changing revisions; revision operations (insertion, deletion, substitution, reordering, etc.) are not the same concept as their semantic effect | SUPPORTED | Conijn et al., "A Product- and Process-Oriented Tagset for Revisions in Writing" |
+| Surface/meaning-preserving revisions can be distinguished from meaning-changing revisions; revision operations (insertion, deletion, substitution, reordering) can be automatically classified via restricted Damerau-Levenshtein distance below word level | SUPPORTED — **directly implemented** (not just thematic motivation): Trial 2's `computeRevisionDiff` (`extension/src/persona/revision-diff.ts`) is a word/token-level adaptation of this exact method, including the reordering class | Conijn, Kleinberg & van den Bosch, "A Product- and Process-Oriented Tagset for Revisions in Writing" (2022) |
+| Human-edit/document-revision alignment across versions is a real, tractable alignment problem worth solving explicitly, at multilingual/document scale | SUPPORTED (as a related-work data point) — **reviewed, not adopted**: NewsEdits' article/history-scale alignment does not fit HDNA's single two-version, sentence/short-paragraph `EditEvent` pairs; see `docs/decisions/0016`'s Trial 2 "Deterministic diff/alignment algorithm chosen" for why Conijn et al.'s smaller, word-level method was chosen instead | Spangher et al., NewsEdits |
 | Research on text revision increasingly studies not only *what* changed but the semantic purpose/intention of the change | PROMISING / neighboring motivation | Lan, Zhang & Dragut, "Making Revisions Understandable," ACL Findings 2026 |
 | Human edits can themselves form a meaningful linguistic/discourse data source, rather than being treated merely as noise around a final text | SUPPORTED (as general motivation for treating edits as evidence-bearing) | WikiAtomicEdits (large-scale human-edit data) |
 | Linguistic form can encode semantic/pragmatic properties such as modality, factuality, speaker commitment, and conditionality, and these properties may change even when the surface edit is small | SUPPORTED | Cross-linguistic/formal-semantics and NLP literature on modality, factuality, speaker commitment, and conditionality (reviewed generally; no language-specific extraction rule adopted from it — see `docs/decisions/0016`'s Trial 1 section) |
 
 **What these do NOT establish:** none of the above validates HDNA's
-specific counterfactual-grounding instruction, proves Trial 1 will clear
-the groundedness threshold, or supports any claim of the form "a modality/
-commitment/conditionality change constitutes a personality change" — the
-supported claim is narrower and purely linguistic (form can encode these
-properties, and they can shift under a small surface edit), not
-psychological. Whether Trial 1's prompt revision actually improves
-groundedness on HDNA's real corpus remains an open, to-be-measured
-question — see `docs/decisions/0016`'s Trial 1 section for status.
+specific counterfactual-grounding instruction, proves Trial 1 or Trial 2
+will clear the groundedness threshold, or supports any claim of the form
+"a modality/commitment/conditionality change constitutes a personality
+change" — the supported claim is narrower and purely linguistic (form can
+encode these properties, and they can shift under a small surface edit),
+not psychological. Conijn et al. classifying revisions in writing
+generally does not establish that this classification is the right or
+optimal basis for *persona-relevant evidence localization* specifically —
+that connection is HDNA's own hypothesis, not the cited paper's claim.
+Whether Trial 1's prompt revision, or Trial 2's added localization layer,
+actually improves groundedness on HDNA's real corpus remains an open,
+to-be-measured question — see `docs/decisions/0016`'s Trial 1 and Trial 2
+sections for status.
 
 ## Rule this notebook must be maintained under
 

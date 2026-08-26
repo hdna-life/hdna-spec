@@ -3,6 +3,7 @@ import type {
   SemanticDeltaExtractionInput,
   SemanticDeltaExtractorProvider,
 } from '@spec/protocol/semantic-delta-extractor';
+import { computeRevisionDiff, type RevisionDiff } from './revision-diff';
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -17,14 +18,24 @@ const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/compl
  * already produced a receipt for, without weakening same-version
  * idempotency. See docs/decisions/0016's Trial 1 section.
  *
- * v1: baseline (docs/decisions/0016's first real dogfood run — 66.7%
- * SUPPORTED, groundedness FAIL).
- * v2 (`transformation-grounded`): Trial 1 — grounds every candidate in the
- * ORIGINAL -> FINAL transformation specifically (PRESERVED meaning is not
- * evidence; only ADDED/REMOVED/TRANSFORMED meaning is), via a mandatory
- * counterfactual check. No schema/candidate-kind/architecture change.
+ * v1 (`transformation-grounded`, Trial 0 baseline had no suffix — bare
+ * `openrouter`): docs/decisions/0016's first real dogfood run — 66.7%
+ * SUPPORTED, groundedness FAIL.
+ * v2 (`transformation-grounded-v1`): Trial 1 — grounds every candidate in
+ * the ORIGINAL -> FINAL transformation specifically (PRESERVED meaning is
+ * not evidence; only ADDED/REMOVED/TRANSFORMED meaning is), via a
+ * mandatory counterfactual check. Real result: 66.7% SUPPORTED — no
+ * aggregate groundedness improvement over Trial 0, though a qualitative
+ * behavioral shift was observed. See docs/decisions/0016's Trial 1
+ * section.
+ * v3 (`evidence-localized-v2`): Trial 2 — adds a deterministic,
+ * language-general textual revision-localization layer
+ * (`./revision-diff.ts`) ahead of semantic interpretation, plus atomic-
+ * candidate and local redundancy-avoidance rules, and restates the
+ * removal-is-not-motivation discipline. No schema/candidate-kind/
+ * architecture change. See docs/decisions/0016's Trial 2 section.
  */
-export const EXTRACTION_PROMPT_VERSION = 'transformation-grounded-v1';
+export const EXTRACTION_PROMPT_VERSION = 'evidence-localized-v2';
 
 // Strict OpenAI/Azure-compatible structured outputs require every
 // `properties` key to also appear in `required` — a property cannot be
@@ -61,7 +72,33 @@ const CANDIDATE_DRAFT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function buildPrompt(input: SemanticDeltaExtractionInput): string {
+/**
+ * Renders a `RevisionDiff` as a labeled, ordered list of operations for
+ * inclusion in the prompt — the only place this deterministic structure is
+ * turned into text the model sees. Purely a presentation choice specific
+ * to this OpenRouter provider; `revision-diff.ts` itself has no notion of
+ * prompts or models.
+ */
+function formatRevisionDiff(diff: RevisionDiff): string {
+  return diff.operations
+    .map((op) => {
+      switch (op.kind) {
+        case 'preserved':
+          return `[PRESERVED] "${op.originalText}"`;
+        case 'removed':
+          return `[REMOVED] "${op.originalText}"`;
+        case 'added':
+          return `[ADDED] "${op.finalText}"`;
+        case 'replaced':
+          return `[REPLACED] "${op.originalText}" -> "${op.finalText}"`;
+        case 'reordered':
+          return `[REORDERED] "${op.originalText}" -> "${op.finalText}"`;
+      }
+    })
+    .join('\n');
+}
+
+function buildPrompt(input: SemanticDeltaExtractionInput, diff: RevisionDiff): string {
   return [
     'You extract grounded semantic preference/behavioral differences from a ',
     'single transformation of an AI-generated draft into a human’s final ',
@@ -104,6 +141,51 @@ function buildPrompt(input: SemanticDeltaExtractionInput): string {
     'underlying meaning shift itself (e.g. unconditional -> conditional), ',
     'however it happens to be expressed in this particular text.\n\n',
 
+    // --- Trial 2: deterministic evidence localization --------------------
+    'Below, an OBSERVED TEXTUAL TRANSFORMATION section lists a ',
+    'deterministic, purely structural comparison of ORIGINAL and FINAL: it ',
+    'marks which spans were PRESERVED, REMOVED, ADDED, REPLACED, or ',
+    'REORDERED (two adjacent spans swapped) at the textual level. This ',
+    'localization identifies WHERE the text changed — it does NOT ',
+    'determine WHAT that change means semantically, and it is not itself ',
+    'evidence of anything. A REPLACED or REORDERED span does not mean the ',
+    'change is semantically equivalent or insignificant, and a PRESERVED ',
+    'span does not mean nothing relevant happened elsewhere in the text. ',
+    'Interpret every ',
+    'localized span in the full context of the complete ORIGINAL and FINAL ',
+    'text below, using the CORE RULE and MANDATORY CHECK above — do not ',
+    'treat the localization as a shortcut that replaces that reasoning.\n\n',
+
+    // --- Trial 2: atomic candidate rule -----------------------------------
+    'ATOMICITY: each candidate must represent exactly one independently ',
+    'supportable semantic transformation. Do not bundle a component that ',
+    'passes the MANDATORY CHECK together with a component that does not — ',
+    'if an observation mixes genuinely new meaning with meaning that was ',
+    'already present in the ORIGINAL, emit only the genuinely new ',
+    'component, worded narrowly, rather than a broader combined claim. ',
+    'Prefer a narrow, fully-supported observation over a broader one that ',
+    'is only partly supported.\n\n',
+
+    // --- Trial 2: redundancy rule ------------------------------------------
+    'AVOID REDUNDANCY: before including a candidate, check whether it adds ',
+    'independently supported information beyond every other candidate you ',
+    'are about to return for this same edit. Do not emit multiple ',
+    'candidates that restate substantially the same underlying semantic ',
+    'transformation in different words — keep only the clearest, most ',
+    'directly grounded phrasing of it. Candidate count is not a goal; a ',
+    'smaller set of precise, non-overlapping candidates is preferred over ',
+    'a larger set of overlapping ones.\n\n',
+
+    // --- Trial 2: removal discipline ---------------------------------------
+    'REMOVAL DISCIPLINE: that text was removed is itself directly ',
+    'observable and may be recorded (e.g. "the human removed the explicit ',
+    'statement that X"). A replacement (X -> Y) may likewise be recorded ',
+    'when the comparison directly supports it. Do NOT infer a motivation, ',
+    'reason, belief, or psychological explanation for *why* the human ',
+    'removed or replaced something unless the FINAL text itself directly ',
+    'states that reason — the removal or replacement alone is not evidence ',
+    'of the reason behind it.\n\n',
+
     // --- Observation-first boundary (unchanged from baseline) -----------
     'Do not infer stable personality, psychology, motivation, ',
     'demographics, identity, or unrelated beliefs from a single edit. ',
@@ -135,7 +217,8 @@ function buildPrompt(input: SemanticDeltaExtractionInput): string {
 
     `Context: ${input.context}\n\n`,
     `Original AI draft:\n${input.originalText}\n\n`,
-    `Human final text:\n${input.finalText}`,
+    `Human final text:\n${input.finalText}\n\n`,
+    `OBSERVED TEXTUAL TRANSFORMATION (deterministic, structural only — not itself semantic evidence):\n${formatRevisionDiff(diff)}`,
   ].join('');
 }
 
@@ -224,6 +307,11 @@ export class OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorP
   ) {}
 
   async extract(input: SemanticDeltaExtractionInput): Promise<SemanticDeltaCandidateDraft[]> {
+    // Deterministic, language-general localization computed fresh per call
+    // — never persisted (see revision-diff.ts). ORIGINAL/FINAL themselves
+    // are still sent in full below; this is additional context, not a
+    // replacement for them.
+    const diff = computeRevisionDiff(input.originalText, input.finalText);
     const response = await this.fetchImpl(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
@@ -232,7 +320,7 @@ export class OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorP
       },
       body: JSON.stringify({
         model: this.modelId,
-        messages: [{ role: 'user', content: buildPrompt(input) }],
+        messages: [{ role: 'user', content: buildPrompt(input, diff) }],
         response_format: {
           type: 'json_schema',
           json_schema: { name: 'semantic_delta_candidates', strict: true, schema: CANDIDATE_DRAFT_JSON_SCHEMA },

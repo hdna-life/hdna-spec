@@ -443,13 +443,12 @@ part of recording these results.
 
 ### Trial 1 — transformation-grounding extraction instruction
 
-**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN. The baseline/Trial 0
-result above is preserved unchanged and remains the only real result on
-record** until Trial 1 is actually run and graded. This subsection does
-not report a new result — it records what changed and how to run it. Full
-rationale, exact instruction wording changes, and versioning detail are in
-`docs/decisions/0016`'s "Trial 1 — transformation-grounding extraction
-instruction" section; this is the short operator-facing version.
+**Status: REAL RESULT RECORDED — ITERATE. Aggregate groundedness did NOT
+improve over baseline/Trial 0.** The baseline/Trial 0 result above is
+preserved unchanged. Full rationale, exact instruction wording changes,
+versioning detail, and the full real-result writeup are in
+`docs/decisions/0016`'s "Trial 1" section; this is the short
+operator-facing summary.
 
 **What changed (one controlled variable only).** The baseline's
 groundedness shortfall (66.7% vs. required ≥80%) traced to the extractor
@@ -490,17 +489,100 @@ English, or any other language was introduced.
    `SUPPORTED` required, ≤1 `MISSED_SIGNAL` allowed) — do not adjust the
    threshold based on the outcome.
 
-### Trial 1 results — TODO, pending the operator's actual run
+### Trial 1 real result (operator-graded)
+
+Receipts confirmed all 5 sources were reprocessed under
+`extractorId: "openrouter/transformation-grounded-v1"`,
+`extractorVersion: "openai/gpt-4o-mini"`, `outcome: "extracted"` for all 5
+— not skipped by stale baseline receipts.
+
+| | Trial 0 (baseline) | Trial 1 |
+|---|---|---|
+| Candidates | 15 | 15 |
+| SUPPORTED | 10 (66.7%) | 10 (66.7%) |
+| PARTIALLY_SUPPORTED | 4 (26.7%) | 4 (26.7%) |
+| UNSUPPORTED | 1 (6.7%) | 1 (6.7%) |
+| Groundedness vs. ≥80% threshold | FAIL | FAIL |
+
+**Aggregate groundedness did not improve.** Trial 1 does not clear the
+pre-declared ≥80% `SUPPORTED` threshold, same as Trial 0 — recorded
+plainly: Trial 1 did not pass.
+
+**Qualitative finding.** Manual inspection found Trial 1 more often
+expressed observations as directional ORIGINAL → FINAL transformations
+rather than merely describing properties of the final text (e.g.
+process-oriented validation → explicit core-value validation; an existing
+explanation being removed/replaced by a different explanation; a generic
+rest recommendation gaining a concrete consequence/personal observation;
+testing language transformed into explicit shipping-plus-feedback
+language) — evidence the instruction did affect behavior — but this was
+**not sufficient to move the aggregate score**. Do not overstate this on a
+5-pair corpus.
+
+**Remaining failure classes** (full detail in `docs/decisions/0016`'s
+Trial 1 section) that directly motivated Trial 2: (1) preserved and
+changed meaning still mixed within one candidate, dragging it down to
+`PARTIALLY_SUPPORTED`; (2) overlapping/redundant candidates describing
+substantially the same underlying edit; (3) removal sometimes
+over-interpreted as motivation rather than recorded as plain removal.
+
+### Trial 2 — deterministic evidence localization + atomic semantic deltas
+
+**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN.** No real Trial 2
+result is recorded here or in `docs/decisions/0016` as of this writing —
+do not fabricate one. Full design, algorithm choice (a word/token-level
+adaptation of Conijn et al.'s restricted-Damerau-Levenshtein revision
+classification), and academic grounding are in `docs/decisions/0016`'s
+"Trial 2" section; this is the short operator-facing summary.
+
+**What changed.** Ahead of semantic interpretation, a new deterministic,
+language-general localization step (`computeRevisionDiff`) compares
+ORIGINAL and FINAL and marks which spans were preserved, removed, added,
+replaced, or reordered — purely structural, never a semantic judgment. The
+full ORIGINAL and FINAL texts are still sent in full, unchanged; the
+localization is added context, not a replacement. The extraction
+instruction retains every Trial 1 rule unchanged and adds: the
+localization is WHERE-only, not WHAT (must still be interpreted against
+full context); each candidate must be **atomic** (one independently
+supportable transformation, not a bundle of supported + unsupported
+meaning); **redundant** candidates describing the same underlying
+transformation should be collapsed to the clearest one (local,
+per-`EditEvent` only — no cross-user/global dedup, no embeddings); and
+**removal/replacement discipline** — removal/replacement itself is
+observable, but a motivation for it is not, unless the FINAL text states
+it directly.
+
+**How to rerun the same 5 EditEvents under Trial 2:**
+
+1. Confirm the popup's settings still have `openai/gpt-4o-mini` and a
+   valid OpenRouter API key. No UI change was made for Trial 2.
+2. Click "Extract semantic deltas (Phase 5A)" again.
+3. Trial 2's extractor identity differs from both Trial 0's and Trial 1's,
+   so all 5 sources are automatically reprocessed — no manual receipt
+   clearing needed.
+4. **Verifying the results belong to Trial 2:** each candidate's
+   `extractorId`/`extractorVersion` line should read
+   `openrouter/evidence-localized-v2` / `openai/gpt-4o-mini` — distinct
+   from Trial 0's `openrouter` and Trial 1's
+   `openrouter/transformation-grounded-v1`.
+5. Grade with the exact same rubric/thresholds as Trial 0 and Trial 1.
+6. Record two separate results, per `docs/decisions/0016`'s explicit
+   framing — do not conflate them: **(a)** did evidence localization +
+   atomicity qualitatively reduce the three remaining failure classes
+   above, relative to Trial 1? **(b)** did aggregate groundedness reach
+   ≥80% `SUPPORTED`? Trial 2 may show real improvement on (a) without
+   passing (b).
+
+### Trial 2 results — TODO, pending the operator's actual run
 
 | Source EditEvent | Candidate(s) | Grade | Notes |
 |---|---|---|---|
 | _(not yet run)_ | | | |
 
 Groundedness (% SUPPORTED): _(pending)_. MISSED_SIGNAL count: _(pending)_.
-Information-gain judgment (vs. baseline Trial 0, not vs.
-`compressionRatio`/`lexicalOverlap`): _(pending)_. Do not fabricate this
-table — see `docs/decisions/0016`'s Trial 1 section for the same
-not-yet-run status recorded there. Once the operator runs Trial 1, fill in
-this table and `docs/decisions/0016`'s Trial 1 section together, and
-compare directly against the baseline/Trial 0 table above (which must
-remain visible, not be overwritten).
+Qualitative assessment of the three targeted failure classes (mixed
+preserved+changed meaning, redundant candidates, over-interpreted
+removals) vs. Trial 1: _(pending)_. Do not fabricate this table — once the
+operator runs Trial 2, fill in this table and `docs/decisions/0016`'s
+Trial 2 section together, and compare directly against the Trial 0 and
+Trial 1 results above (which must remain visible, not be overwritten).

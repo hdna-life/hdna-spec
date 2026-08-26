@@ -24,8 +24,14 @@ against the 5-pair corpus is complete and human-graded: INFORMATION GAIN —
 PASS (the central question), GROUNDEDNESS — FAIL (66.7% vs. required
 ≥80%), overall status ITERATE** — see "Current experiments / pending
 decisions" below and `docs/decisions/0016` for the full result. This is
-promising evidence, not proof the hypothesis is fully validated. The prior
-immediate roadmap (retrieval runtime → WebGPU expression engine) is
+promising evidence, not proof the hypothesis is fully validated. Two
+controlled follow-up trials have since targeted the groundedness shortfall
+specifically: **Trial 1** (transformation-grounding instruction) has a
+real result — groundedness unchanged (66.7%), still ITERATE; **Trial 2**
+(deterministic evidence localization + atomic/redundancy/removal
+discipline) is implemented, awaiting the real operator run — see "Current
+experiments / pending decisions" below for both. The prior immediate
+roadmap (retrieval runtime → WebGPU expression engine) is
 **deferred/reordered, not cancelled**, pending this evidence-utility
 question — see `docs/decisions/0016`.
 
@@ -397,20 +403,38 @@ fix has been implemented yet. See `docs/decisions/0016`'s "First real
 experiment result" section and `docs/validation/manual-mvp-validation.md`'s
 Phase 5A results table for full grading detail.
 
-**That fix is now Trial 1 (`docs/decisions/0016`'s "Trial 1" section):
-IMPLEMENTED / AWAITING REAL OPERATOR RUN, not yet a result.** A single
-controlled change to the extraction instruction — grounding every
+**That fix was Trial 1 (`docs/decisions/0016`'s "Trial 1" section):
+REAL RESULT RECORDED — ITERATE, aggregate groundedness unchanged.** A
+single controlled change to the extraction instruction — grounding every
 candidate in the ORIGINAL→FINAL transformation via a mandatory
-counterfactual check, so meaning already present in the AI draft can no
-longer produce a candidate — targets exactly the failure mode above. Same
-5 real `EditEvent`s, same OpenRouter model (`openai/gpt-4o-mini`), same
-schema/candidate kinds/receipt mechanism/acceptance thresholds; the
-extractor identity (`providerId`) was bumped to
-`openrouter/transformation-grounded-v1` so the same 5 sources are
-intentionally reprocessed rather than skipped by baseline's receipts. **No
-real Trial 1 result exists yet** — the baseline/Trial 0 result above
-remains the only recorded real outcome until a human operator runs Trial 1
-and grades it against the same rubric/thresholds.
+counterfactual check — targeted the failure mode above. Same 5 real
+`EditEvent`s, same OpenRouter model (`openai/gpt-4o-mini`), same
+schema/candidate kinds/receipt mechanism/acceptance thresholds;
+`providerId` bumped to `openrouter/transformation-grounded-v1`, confirmed
+by receipts to have reprocessed all 5 sources. **Real result: still 15
+candidates, still 10/15 (66.7%) `SUPPORTED` — identical to baseline,
+below the required ≥80% threshold.** A qualitative behavioral shift was
+observed (more directional ORIGINAL→FINAL framing) but did not move the
+aggregate score. Manual grading identified three remaining failure
+classes: preserved+changed meaning mixed within one candidate, overlapping/
+redundant candidates, and over-interpreted removals.
+
+**Trial 2 (`docs/decisions/0016`'s "Trial 2" section): IMPLEMENTED /
+AWAITING REAL OPERATOR RUN, not yet a result.** Targets the three Trial 1
+failure classes directly by adding a deterministic, language-general
+evidence-localization layer (`extension/src/persona/revision-diff.ts`,
+`computeRevisionDiff`) ahead of semantic interpretation — a word/token-
+level adaptation of Conijn et al. (2022)'s restricted-Damerau-Levenshtein
+revision classification (insertion/deletion/substitution/reordering) —
+plus explicit atomic-candidate, local redundancy-avoidance, and removal-
+discipline instruction rules. `providerId` bumped again to
+`openrouter/evidence-localized-v2`, distinct from both prior trials. Same
+5 real `EditEvent`s/model/schema/candidate-kinds/thresholds held fixed;
+no trait/persona promotion, cross-event aggregation, embeddings, or
+language-specific NLP added. **No real Trial 2 result exists yet** — the
+Trial 0 and Trial 1 results above remain the only recorded real outcomes
+until a human operator runs Trial 2 and grades it against the same
+rubric/thresholds.
 
 Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
