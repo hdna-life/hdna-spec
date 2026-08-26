@@ -10,7 +10,18 @@ of Phase 3 (3A/3B/3C) are complete. Phase 4's TRAITS/BELIEFS step (requires
 an actual LLM call) is explicitly not started — its own future decision.
 Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
 English-only, saturating/biasing on non-English (Turkish) evidence — see
-`docs/decisions/0012`.
+`docs/decisions/0012`. And two post-3A governor fixes on the same branch: `DEEP_IDLE` mode
+selection was gated on an empty queue, which made any pending `P3` job
+self-blocking (its own presence in the backlog prevented the only mode
+that could dispatch it) — see `docs/decisions/0013`; then a follow-up
+correction after manual testing on the real unpacked extension found that
+fix's in-memory `idleTicks` counter could never accumulate across MV3
+service-worker restarts, making `DEEP_IDLE` unreachable in real Chrome —
+replaced with a persisted wall-clock timestamp
+(`RuntimeStatus.foregroundInactiveSince`), alongside a generic
+`JobQueue.enqueueSingleton()` fix for a separate bug where repeated clicks
+on a rebuild button queued unbounded duplicate jobs — see
+`docs/decisions/0014`.
 
 ## Active MVP scope
 
@@ -25,7 +36,7 @@ Phase 4's deterministic PATTERNS layer:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 219 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 223 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   storage policy, embeddings, T2 dimensions/trait scores/profile, patterns,
@@ -82,8 +93,20 @@ Phase 4's deterministic PATTERNS layer:
   (`startedAt`) expires (default 5 min) are reclaimed back to `PENDING` and
   retried, so a job interrupted mid-execution by MV3 service-worker
   termination is not lost — see `docs/decisions/0007`.
-- `resource-governor.decide()`: pure function, INTERACTIVE/BACKGROUND/DEEP_IDLE
-  mode selection, batch-size halving/doubling on latency ratio.
+- `decideMode()` / `resource-governor.decide()`: `decideMode()` is a pure
+  function of `(foregroundActive, inactiveDurationMs)` —
+  INTERACTIVE/BACKGROUND/DEEP_IDLE, never queue backlog (`docs/decisions/0013`).
+  `inactiveDurationMs` is computed at the runtime boundary
+  (`entrypoints/background.ts`) by `computeForegroundInactivity()`
+  (`extension/src/runtime/foreground-inactivity.ts`) from a *persisted*
+  timestamp (`RuntimeStatus.foregroundInactiveSince`), not an in-memory
+  tick counter — the latter could never accumulate across MV3
+  service-worker restarts, making `DEEP_IDLE` structurally unreachable in
+  real Chrome; see `docs/decisions/0014`. `decideMode()` is exported
+  separately from `decide()` so mode is recomputed fresh, from storage,
+  before each tick's dispatch. `decide()`'s batch-size halving/doubling on
+  latency ratio is unchanged, still carried in memory across ticks (a
+  self-correcting adaptation value, not a correctness-sensitive one).
 - `RuntimeControls`: persisted `processingPaused`/`learningPaused` state.
 - `stylometry.ts`: deterministic T0 extractors — sentence/word splitting,
   sentence-length distribution, punctuation-per-100-sentences, lowercase-start
@@ -160,9 +183,18 @@ Phase 4's deterministic PATTERNS layer:
   evidence. Mirrors `VectorIndexService`'s rebuild contract.
 - Popup UI: Patterns panel — dimension/context/value/sample-count list,
   "Compile patterns" button.
+- `JobQueue.enqueueSingleton(type, priority, payload)`: enqueues only if no
+  `PENDING`/`RUNNING` job of that `type` already exists, otherwise returns
+  the existing one — generic coalescing, keyed by type alone. Used by all
+  three full-rebuild job wrappers (`enqueueT2ProfileRebuild`,
+  `enqueueVectorIndexRebuild`, `enqueuePatternCompilation`) so repeated
+  clicks on a rebuild button can't accumulate duplicate `P3` jobs; see
+  `docs/decisions/0014`.
 
 ## Known limitations
 
+- `DEEP_IDLE_AFTER_INACTIVE_MS = 90_000` is a placeholder tuning value, not
+  derived from measurement — see `docs/decisions/0013` and `0014`.
 - No retry cap on stale-RUNNING reclaim: a job that reliably crashes the
   service worker every time it runs would be retried indefinitely rather
   than eventually marked `FAILED`. Not implemented — see `docs/decisions/0007`.
@@ -236,7 +268,7 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Twelve operator decisions to date are recorded in `docs/decisions/`.
+None open. Thirteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider

@@ -5,6 +5,7 @@ import { PROCESS_EDIT_EVENT_JOB, createEditEventProcessor } from '../src/queue/p
 import { RuntimeControls } from '../src/runtime/controls';
 import { RuntimeStatusStore } from '../src/runtime/status';
 import { ForegroundTracker } from '../src/runtime/foreground-tracker';
+import { computeForegroundInactivity } from '../src/runtime/foreground-inactivity';
 import { EditEventStore } from '../src/persona/edit-event-store';
 import { EditMetricsStore } from '../src/persona/edit-metrics-store';
 import { EditProfileStore } from '../src/persona/edit-profile-store';
@@ -35,9 +36,9 @@ import {
   COMPILE_PATTERNS_JOB,
   createCompilePatternsProcessor,
 } from '../src/queue/processors/pattern-compilation-job';
-import { decide } from '../src/governor/resource-governor';
+import { decide, decideMode } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
-import type { GovernorSignals, RuntimeMode } from '../src/governor/types';
+import type { GovernorSignals } from '../src/governor/types';
 import { evictIfNeeded } from '../src/storage/eviction';
 import { DEFAULT_STORAGE_POLICY } from '@spec/schema/storage-policy';
 
@@ -88,8 +89,12 @@ export default defineBackground(() => {
   const foregroundTracker = new ForegroundTracker();
   chrome.runtime.onConnect.addListener((port) => foregroundTracker.handleConnect(port));
 
+  // Batch size is the only thing still carried in service-worker memory
+  // across ticks — a restart resetting it to this safe default is a minor,
+  // self-correcting adaptation blip, not a correctness bug (unlike mode/
+  // idleness, which used to be carried the same way — see
+  // docs/decisions/0014 for why that was wrong).
   let batchSize = 4;
-  let mode: RuntimeMode = 'BACKGROUND'; // conservative default before the first measurement
 
   chrome.alarms.create(DISPATCH_ALARM, { periodInMinutes: 0.5 });
 
@@ -103,10 +108,26 @@ export default defineBackground(() => {
     const totalBacklog = Object.values(counts).reduce((a, b) => a + b, 0);
     if (totalBacklog === 0) return;
 
+    // Mode for THIS tick's dispatch is computed fresh from a *persisted*
+    // inactivity timestamp plus the current foreground signal — never from
+    // an in-memory value carried from the previous tick, which resets on
+    // every MV3 service-worker restart and previously made DEEP_IDLE
+    // unreachable whenever the worker didn't survive between dispatch
+    // alarms. See docs/decisions/0014.
+    const previousStatus = await runtimeStatus.get();
+    const foregroundActive = foregroundTracker.isActive;
+    const { foregroundInactiveSince, inactiveDurationMs } = computeForegroundInactivity(
+      previousStatus?.foregroundInactiveSince,
+      foregroundActive,
+      Date.now(),
+    );
+    const mode = decideMode(foregroundActive, inactiveDurationMs);
+
     // Only priorities the current mode allows are dispatched; the rest stay
     // PENDING and are picked up once the mode relaxes (e.g. foreground goes
-    // idle). queueBacklog still reflects the *total* backlog so the governor
-    // can see pressure building even in classes it isn't currently running.
+    // idle for long enough to reach DEEP_IDLE). Mode is driven purely by
+    // foreground activity/idleness, never by backlog — see
+    // docs/decisions/0013 for why gating on an empty queue was a bug.
     const allowedPriorities = ALLOWED_PRIORITIES_BY_MODE[mode];
     const start = performance.now();
     let ran = 0;
@@ -124,11 +145,14 @@ export default defineBackground(() => {
       // doesn't drift on a measurement that never happened.
       lastJobLatencyMs: ran > 0 ? elapsed / ran : EXPECTED_JOB_LATENCY_MS,
       expectedJobLatencyMs: EXPECTED_JOB_LATENCY_MS,
-      foregroundActive: foregroundTracker.isActive,
+      foregroundActive,
+      foregroundInactiveDurationMs: inactiveDurationMs,
     };
+    // decision.mode is always decideMode(foregroundActive, inactiveDurationMs)
+    // again — the same value as `mode` above, since neither signal changed
+    // mid-tick. Only the batch-size half of the decision is new here.
     const decision = decide(signals, batchSize);
     batchSize = decision.nextBatchSize;
-    mode = decision.mode;
 
     // Eviction is deferred while the user is actively interacting —
     // "Foreground interaction always wins."
@@ -138,13 +162,13 @@ export default defineBackground(() => {
       if (plan.bytesFreed > 0) lastEviction = { at: new Date().toISOString(), bytesFreed: plan.bytesFreed };
     }
 
-    const previousStatus = await runtimeStatus.get();
     await runtimeStatus.set({
       mode,
       batchSize,
       updatedAt: new Date().toISOString(),
       lastEvictionAt: lastEviction?.at ?? previousStatus?.lastEvictionAt,
       lastEvictionBytesFreed: lastEviction?.bytesFreed ?? previousStatus?.lastEvictionBytesFreed,
+      foregroundInactiveSince,
     });
   });
 });
