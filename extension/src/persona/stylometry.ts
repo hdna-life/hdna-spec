@@ -65,15 +65,25 @@ export function computePunctuationPer100Sentences(samples: string[]): Record<str
   return counts;
 }
 
-/** Fraction of sentences whose first alphabetic character is lowercase. */
+/**
+ * Fraction of sentences whose first alphabetic character is lowercase.
+ *
+ * Uses a Unicode letter class (not `[a-zA-Z]`) so the first letter of a
+ * sentence is found correctly even when it's a Turkish-specific character
+ * (ç, ğ, ı, ö, ş, ü and their uppercase forms) — `[a-zA-Z]` would skip past
+ * them and match the wrong, later letter instead. Case comparison uses the
+ * `tr` locale so the dotted/dotless I distinction (İ/I vs i/ı) folds
+ * correctly; this also folds plain ASCII text correctly since `tr` locale
+ * casing only differs from the default for the I/İ/i/ı family.
+ */
 export function computeLowercaseStartProbability(samples: string[]): number | undefined {
   const sentences = samples.flatMap(splitSentences);
   if (sentences.length === 0) return undefined;
 
   let lowercaseStarts = 0;
   for (const sentence of sentences) {
-    const firstLetter = sentence.match(/[a-zA-Z]/);
-    if (firstLetter && firstLetter[0] === firstLetter[0].toLowerCase()) {
+    const firstLetter = sentence.match(/\p{L}/u)?.[0];
+    if (firstLetter && firstLetter === firstLetter.toLocaleLowerCase('tr')) {
       lowercaseStarts += 1;
     }
   }

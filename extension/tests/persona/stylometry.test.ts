@@ -75,6 +75,32 @@ describe('computeLowercaseStartProbability', () => {
   it('treats all-lowercase text as probability 1', () => {
     expect(computeLowercaseStartProbability(['hello world.'])).toBe(1);
   });
+
+  it('finds the true first letter of a sentence starting with a Turkish-specific character, not the first ASCII letter', () => {
+    // "Şimdi geldi." starts with uppercase Ş; [a-zA-Z] would wrongly skip to
+    // the lowercase "i" in "imdi" and misclassify this as a lowercase start.
+    expect(computeLowercaseStartProbability(['Şimdi geldi.'])).toBe(0);
+  });
+
+  it('recognizes lowercase Turkish-specific starting letters', () => {
+    expect(computeLowercaseStartProbability(['şimdi gitti.'])).toBe(1);
+  });
+
+  it('applies Turkish-locale casing so dotted/dotless I folds correctly', () => {
+    // "İstanbul" (dotted capital İ) is uppercase; under default-locale
+    // toLowerCase() it folds to plain "i", which happens to equal the
+    // ASCII "i" — a trap that could hide this bug. Under the tr locale it
+    // folds to "i" as well, but the *comparison* against the actual first
+    // character "İ" correctly stays unequal, so this is still detected as
+    // an uppercase start.
+    expect(computeLowercaseStartProbability(['İstanbul güzel.'])).toBe(0);
+    expect(computeLowercaseStartProbability(['ıstanbul güzel.'])).toBe(1);
+  });
+
+  it('computes a mixed Turkish/ASCII distribution correctly', () => {
+    // "Şimdi geldi." uppercase start, "şimdi gitti." lowercase start -> 0.5
+    expect(computeLowercaseStartProbability(['Şimdi geldi. şimdi gitti.'])).toBe(0.5);
+  });
 });
 
 describe('computeEmojiUsageRate', () => {
