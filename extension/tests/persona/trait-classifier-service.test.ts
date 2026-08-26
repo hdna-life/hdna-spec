@@ -98,4 +98,27 @@ describe('TraitClassifierService.rebuild', () => {
     const all = await traitScoreStore.list();
     expect(all.map((r) => r.sourceId)).toEqual(['s1']);
   });
+
+  it('does not saturate the T2 profile at 1.0 directness for a batch of real non-English (Turkish) samples (end-to-end regression)', async () => {
+    // Reproduces the reported bug at profile-aggregate scale: 35 real
+    // Turkish samples through the full queue-free pipeline (classifyOne is
+    // what the P2 job processor calls) previously left directness pinned at
+    // exactly 1.0 with high confidence. It must now never be created at all
+    // — no evidence, no claim — since every observation abstains.
+    const turkishSamples = [
+      'Bugün hava çok güzeldi ve dışarıda uzun bir yürüyüş yaptım.',
+      'Bu ürünü çok beğendim, gerçekten harika bir deneyimdi.',
+      'Yarın toplantıya geç kalmamak için erken çıkmam lazım.',
+      'Sanırım bu proje için email göndermem lazım, ok mu?',
+      'Kitabı bitirdim ve çok etkilendim, herkese tavsiye ederim.',
+    ];
+    const sources = [fakeSource('writing_sample', turkishSamples.map((text, i) => ({ id: `s${i}`, text })))];
+    const { profileStore, service } = setup(sources);
+
+    await service.rebuild();
+
+    const profile = await profileStore.get();
+    expect(profile?.directness).toBeUndefined();
+    expect(profile?.formality).toBeUndefined();
+  });
 });

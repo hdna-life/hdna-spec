@@ -21,7 +21,7 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 176 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 189 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   storage policy, embeddings, T2 dimensions/trait scores/profile, `.hdna`
@@ -50,6 +50,12 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   `VectorIndexService`). Confidence-weighted incremental aggregation in
   `T2Profile`. `classify_evidence` is `P2`, `rebuild_t2_profile` is `P3`
   (see `docs/decisions/0010`).
+- Post-3C fix: `HeuristicTinyClassifier` was silently English-only —
+  non-English text (reported with real Turkish samples) drove `directness`
+  to a saturated, confidently-wrong 1.0 and biased `formality` upward. Both
+  dimensions now abstain (omit entirely, not a fabricated neutral value) for
+  text that fails a non-ASCII-letter-ratio `isLikelyEnglish` gate — see
+  `docs/decisions/0012`.
 
 ## Implemented capabilities
 
@@ -115,7 +121,10 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
   contraction/emoji/exclamation rate) and directness (hedge-phrase
   frequency) scoring, 0-confidence for empty text, confidence saturating at
   20 words. Non-validated heuristics, explicitly documented as such — see
-  `docs/decisions/0010`.
+  `docs/decisions/0010`. Both dimensions gated by `isLikelyEnglish()`
+  (non-ASCII-letter ratio ≤ 2%) — abstains entirely for non-English text
+  rather than applying its English-lexicon/calibration-dependent heuristics
+  and producing a saturated or biased score — see `docs/decisions/0012`.
 - `applyTraitScore()`: confidence-weighted incremental mean per T2 dimension
   — same "no history rescan" principle as `applyEditMetrics()`.
 - `TraitScoreStore` / `T2ProfileStore` (`DERIVED`).
@@ -151,8 +160,13 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 - `HeuristicTinyClassifier`'s formality/directness scores are crude,
   non-validated heuristics — explicit, accepted tradeoff, not a bug — see
   `docs/decisions/0010`.
-- T2 confidence only reflects word count, not genre/language/other factors
-  that would affect heuristic reliability.
+- T2 confidence only reflects word count within the English-gated path — see
+  `docs/decisions/0012` for the language-gate fix; genre and other factors
+  beyond language-applicability still aren't modeled.
+- `isLikelyEnglish()` doesn't detect every non-English language — romanized/
+  ASCII-only text in another language still passes and would receive the
+  same misapplied-heuristic treatment. Intentional, documented scope
+  boundary — see `docs/decisions/0012`.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -184,7 +198,7 @@ collection, a first Phase 2 passive-collection slice, and Phase 3
 
 ## Current experiments / pending decisions
 
-None open. Ten operator decisions to date are recorded in `docs/decisions/`.
+None open. Twelve operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Phase 3 is now
 fully complete (3A/3B/3C). Future work, each `PLANNED` pending its own

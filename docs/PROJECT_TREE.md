@@ -51,7 +51,7 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       embedding-store.ts           - EmbeddingStore: persists Embedding records (DERIVED)
       embedding-sources.ts         - writingSampleSource/editEventSource: canonical evidence -> {id,text} for indexing
       vector-index-service.ts      - VectorIndexService: indexOne/rebuild()/query(), the rebuildable-index contract
-      t2-classifier.ts              - HeuristicTinyClassifier: deterministic formality/directness heuristics (see docs/decisions/0010)
+      t2-classifier.ts              - HeuristicTinyClassifier: deterministic formality/directness heuristics, English-only gated via isLikelyEnglish (see docs/decisions/0010, 0012)
       t2-profile.ts                 - applyTraitScore: confidence-weighted T1-style incremental aggregation
       trait-score-store.ts          - TraitScoreStore: persists per-evidence TraitScoreRecord (DERIVED)
       t2-profile-store.ts           - T2ProfileStore: persists T2Profile aggregate (DERIVED)
