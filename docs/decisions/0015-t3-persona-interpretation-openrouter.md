@@ -212,6 +212,86 @@ and incorporated before implementation began — see "Why" above.
   click "Save" for the key/model/enabled state to take effect on the next
   job run.
 
+## Post-implementation fix: settings-form hydration bug (found via manual testing)
+
+Manual testing on the real unpacked extension found that `TraitsBeliefsSummary.svelte`
+lost its displayed settings on popup close/reopen: after saving an API key,
+model id, and `Enabled`, closing the popup, and reopening it, the form
+rendered `Enabled` unchecked and the API-key field empty, even though
+`chrome.storage.local` still held the correct config.
+
+**Root cause.** The form hydrated its input fields from the `config` prop
+inside `$: if (!initialized) { ...; initialized = true; }` — a one-shot
+latch. `App.svelte` passes a placeholder default (`{ enabled: false }`)
+synchronously on mount, then updates the prop asynchronously once
+`refresh()`'s `chrome.storage.local` read resolves a tick later. The latch
+fired on the *first* (placeholder) value and never accepted the second
+(real) one, so the form always displayed the placeholder default after a
+fresh mount — which happens on every popup open, since the popup page is
+torn down on close and rebuilt from scratch on reopen. Separately, this
+made an actual data-loss path reachable: if a user clicked "Save" while the
+form displayed this stale blank/disabled state, it would overwrite the
+real, working config with an empty/disabled one — a plausible explanation,
+independent of any queue/scheduling issue, for a subsequent interpretation
+attempt making zero OpenRouter requests.
+
+**Fix.** `extension/src/persona/persona-interpreter-form-state.ts` (new)
+extracts the hydration decision into a pure `computeFormHydration(dirty, config)`
+function with no one-shot latch — it recomputes fresh from `config` on
+every call, gated only by whether the user has an in-progress edit
+(`dirty`, set on first keystroke/checkbox toggle in the form, never reset
+mid-session). This fixes the close/reopen bug (a second, later `config`
+value is no longer ignored) while still satisfying the requirement that
+the parent's 2s `refresh()` poll must never clobber an unsaved edit (`dirty`
+short-circuits hydration entirely). A second function,
+`resolveSavedConfig(fields, currentConfig)`, is an independent safeguard
+against the data-loss path above: it preserves the existing saved API key
+when the input is left blank rather than persisting an empty string, since
+the field is deliberately never pre-filled with the real secret (see
+below). Both are unit-tested directly (`extension/tests/persona/persona-interpreter-form-state.test.ts`),
+since no Svelte component-test infrastructure exists in this repo — the
+same "extract the derivation into a pure, testable function" pattern used
+for the T2 panel's abstention-state fix on the sibling branch.
+
+**Also added while investigating**, per explicit operator request to make
+the service's existing pre-network exits observable rather than only
+inferable after the fact from an empty OpenRouter dashboard: a third pure
+function, `deriveInterpretationReadiness(config, eligible)`, mirrors the
+exact two checks `PersonaInterpreterService.interpret()` itself performs
+(`not-configured` when disabled/missing key/missing model id,
+`below-threshold` when `isEligibleForInterpretation()` fails, `ready`
+otherwise) and drives a status line in the panel shown *before* the user
+clicks "Interpret." `App.svelte` computes the `eligible` flag with the
+same `isEligibleForInterpretation()`/`DEFAULT_PERSONA_INTERPRETER_POLICY`
+the service uses, so the UI and the service can never disagree about
+whether a given state will make a network call.
+
+**Full-pipeline verification.** Per explicit operator request to rule out
+(rather than assume away) a `chrome.storage.local` context-sharing or
+service-worker-restart issue as the actual root cause, and to make sure a
+pre-network exit is distinguishable from a real successful run at the job
+level too, `extension/tests/persona/persona-interpretation-integration.test.ts`
+(new) exercises the full path with no mocking of `chrome.storage.local`'s
+sharing behavior beyond a single shared in-memory fake standing in for the
+browser's real (genuinely global) storage: a config saved through one
+`PersonaInterpreterConfigStore` instance ("popup") is read by a completely
+independent set of instances ("background") all the way through to an
+actual `fetch()` call; the same holds across a simulated service-worker
+restart (a second "background" instance, sharing no in-memory state with
+the first, still sees what was persisted); and the two pre-network exits
+are confirmed at the job-queue level — `not-configured` surfaces as a
+`FAILED` job with a clear `lastError` (not a silent no-op), and
+`below-threshold` surfaces as `COMPLETE` with the provider factory and
+`fetch` both provably never invoked, distinguishing "correctly did
+nothing" from "silently succeeded."
+
+No bug was found in `chrome.storage.local` sharing or restart survival
+itself — `PersonaInterpreterConfigStore` has no in-memory state at all,
+so there was nothing for a restart to lose, and `chrome.storage.local` is
+inherently shared across all extension execution contexts by the browser
+platform, not by anything this codebase controls. The settings-form
+hydration bug above remains the identified, fixed root cause.
+
 ## Current validation status
 
 Implemented and tested across `spec/schema/trait-belief.ts`,
@@ -223,6 +303,7 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
 `extension/src/persona/openrouter-persona-interpreter.ts`,
 `extension/src/persona/persona-interpreter-service.ts`,
 `extension/src/queue/processors/persona-interpretation-job.ts`,
+`extension/src/persona/persona-interpreter-form-state.ts`,
 `entrypoints/background.ts`, `extension/wxt.config.ts`,
 `extension/src/ui/TraitsBeliefsSummary.svelte`,
 `entrypoints/popup/App.svelte`:
@@ -252,7 +333,25 @@ Implemented and tested across `spec/schema/trait-belief.ts`,
 - `extension/tests/queue/persona-interpretation-job.test.ts` — mirrors
   `pattern-compilation-job.test.ts`: P3 priority, `enqueueSingleton`
   coalescing, processor invokes `service.interpret()`.
-- 273/273 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
+- `extension/tests/persona/persona-interpreter-form-state.test.ts` (new) —
+  `computeFormHydration` (initial placeholder-default hydration, the
+  close/reopen regression: a later real config is no longer ignored, the
+  API key is never re-inserted into the input, `dirty` blocks hydration
+  including across a legitimate save round-trip), `resolveSavedConfig` (new
+  key wins, blank/whitespace-only field preserves the existing key, no key
+  ever saved stays `undefined`), `deriveInterpretationReadiness` (all three
+  states).
+- `extension/tests/persona/persona-interpretation-integration.test.ts`
+  (new) — full pipeline with a shared fake `chrome.storage.local` and
+  `fake-indexeddb`: a "popup"-saved config is read by an independently
+  constructed "background" instance through to an actual `fetch()` call;
+  the same survives a simulated service-worker restart (a second
+  "background" instance sharing no in-memory state with the first); a
+  not-configured run fails observably (`FAILED`, clear `lastError`, zero
+  provider/fetch calls) instead of looking like a silent no-op; a
+  below-threshold run completes with zero provider/fetch calls, provably
+  distinguishing "correctly did nothing" from "silently succeeded."
+- 291/291 tests pass, clean `tsc --noEmit`, clean `wxt build` (confirmed
   `host_permissions: ["https://openrouter.ai/*"]` present in the generated
   manifest).
 - Not yet exercised: an actual OpenRouter API key against a real model —

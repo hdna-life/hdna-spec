@@ -31,6 +31,8 @@
     type PersonaInterpreterConfig,
   } from '../../src/persona/persona-interpreter-config-store';
   import { enqueuePersonaInterpretation } from '../../src/queue/processors/persona-interpretation-job';
+  import { isEligibleForInterpretation } from '../../src/persona/persona-interpreter';
+  import { DEFAULT_PERSONA_INTERPRETER_POLICY } from '@spec/schema/persona-interpreter-policy';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -82,6 +84,12 @@
   let patterns: Pattern[] = [];
   let traitBeliefs: TraitBeliefClaim[] = [];
   let personaInterpreterConfig: PersonaInterpreterConfig = { enabled: false };
+  // Same pure gate PersonaInterpreterService.interpret() itself checks
+  // before ever calling the provider — computed here so the panel can show
+  // *before* the user clicks "Interpret" whether this run will make any
+  // network request at all, rather than that only being inferable after
+  // the fact from an empty OpenRouter dashboard.
+  $: personaInterpreterEligible = isEligibleForInterpretation(patterns, DEFAULT_PERSONA_INTERPRETER_POLICY);
 
   async function refresh() {
     counts = await queue.countsByPriority();
@@ -188,6 +196,8 @@
   <TraitsBeliefsSummary
     claims={traitBeliefs}
     patternCount={patterns.length}
+    minPatternCount={DEFAULT_PERSONA_INTERPRETER_POLICY.minPatternCount}
+    eligible={personaInterpreterEligible}
     config={personaInterpreterConfig}
     on:interpret={interpretTraitsBeliefs}
     on:saveConfig={saveInterpreterConfig}
