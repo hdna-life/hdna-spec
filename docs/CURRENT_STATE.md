@@ -397,6 +397,21 @@ fix has been implemented yet. See `docs/decisions/0016`'s "First real
 experiment result" section and `docs/validation/manual-mvp-validation.md`'s
 Phase 5A results table for full grading detail.
 
+**That fix is now Trial 1 (`docs/decisions/0016`'s "Trial 1" section):
+IMPLEMENTED / AWAITING REAL OPERATOR RUN, not yet a result.** A single
+controlled change to the extraction instruction — grounding every
+candidate in the ORIGINAL→FINAL transformation via a mandatory
+counterfactual check, so meaning already present in the AI draft can no
+longer produce a candidate — targets exactly the failure mode above. Same
+5 real `EditEvent`s, same OpenRouter model (`openai/gpt-4o-mini`), same
+schema/candidate kinds/receipt mechanism/acceptance thresholds; the
+extractor identity (`providerId`) was bumped to
+`openrouter/transformation-grounded-v1` so the same 5 sources are
+intentionally reprocessed rather than skipped by baseline's receipts. **No
+real Trial 1 result exists yet** — the baseline/Trial 0 result above
+remains the only recorded real outcome until a human operator runs Trial 1
+and grades it against the same rubric/thresholds.
+
 Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each

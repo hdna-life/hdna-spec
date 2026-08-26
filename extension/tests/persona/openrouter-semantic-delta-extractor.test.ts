@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OpenRouterSemanticDeltaExtractor } from '../../src/persona/openrouter-semantic-delta-extractor';
+import {
+  OpenRouterSemanticDeltaExtractor,
+  EXTRACTION_PROMPT_VERSION,
+} from '../../src/persona/openrouter-semantic-delta-extractor';
 import type { SemanticDeltaExtractionInput } from '@spec/protocol/semantic-delta-extractor';
 
 const input: SemanticDeltaExtractionInput = {
@@ -205,5 +208,103 @@ describe('OpenRouterSemanticDeltaExtractor', () => {
     const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
 
     await expect(extractor.extract(input)).rejects.toThrow(/expected candidates schema/);
+  });
+
+  describe('Trial 1: transformation-grounding instruction contract (docs/decisions/0016 Trial 1)', () => {
+    /**
+     * Asserts on the actual outbound prompt text sent to OpenRouter — the
+     * real, load-bearing artifact, not a copy of it — rather than testing
+     * an external LLM's semantic reasoning (which is not deterministic and
+     * not something this suite can meaningfully unit-test). These checks
+     * are generic prompt-contract assertions, not tests over any of the 5
+     * real corpus EditEvents, and contain no language-specific content.
+     */
+    async function capturedPromptContent(): Promise<string> {
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ candidates: [] }));
+      const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini', fetchImpl);
+      await extractor.extract(input);
+      const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse(init.body);
+      return body.messages[0].content as string;
+    }
+
+    it('states that preserved meaning is not new evidence', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/PRESERVED meaning[\s\S]*?NOT new evidence/);
+    });
+
+    it('states that added meaning may be evidence', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toContain('ADDED');
+      expect(prompt).toMatch(/ADDED, REMOVED, or materially TRANSFORMED[\s\S]*?may become a candidate/);
+    });
+
+    it('states that removed meaning may be evidence', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toContain('REMOVED');
+    });
+
+    it('states that materially transformed meaning may be evidence', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toContain('TRANSFORMED');
+    });
+
+    it('includes the mandatory ORIGINAL-only counterfactual check', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/MANDATORY CHECK/);
+      expect(prompt).toMatch(/only ever seen the ORIGINAL AI draft, and never saw the human.s final text/);
+      expect(prompt).toMatch(/do NOT emit it/);
+    });
+
+    it('states that paraphrase/textual-diff magnitude alone is not sufficient evidence of semantic change', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/not proof of semantic difference/);
+      expect(prompt).toMatch(/edit distance, word-count difference, or the presence of paraphrasing/);
+    });
+
+    it('states that a small textual change may still represent a large semantic change', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/small wording change can express a large change in meaning/);
+    });
+
+    it('still prohibits stable personality/psychological inference from a single edit', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/Do not infer stable personality, psychology, motivation/);
+    });
+
+    it('still documents abstention (an empty candidates array) as valid', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/Abstain when no meaningful/);
+      expect(prompt).toMatch(/empty candidates array/);
+    });
+
+    it('contains no hardcoded language-specific rule (no named language, no enumerated word/suffix list)', async () => {
+      const prompt = await capturedPromptContent();
+      // Guards against reintroducing e.g. a Turkish suffix list or an
+      // English modal-word list into the instruction text itself — the
+      // instruction may *warn against* relying on such things (that
+      // sentence itself is not a language-specific rule), but must never
+      // name a specific language or enumerate language-specific forms.
+      expect(prompt.toLowerCase()).not.toContain('turkish');
+      expect(prompt.toLowerCase()).not.toContain('english');
+      expect(prompt).not.toMatch(/\bmorpholog/i);
+      expect(prompt).not.toMatch(/-m[ıi]ş|-d[ıi]r|would\/could\/should|regex/i);
+      expect(prompt).toMatch(/regardless of language/);
+    });
+
+    it('does not turn the illustrative semantic-property list into a closed taxonomy requirement', async () => {
+      const prompt = await capturedPromptContent();
+      expect(prompt).toMatch(/illustrative, not\s*\n?\s*exhaustive/);
+    });
+
+    it('bumps the extractor identity (providerId) relative to a bare "openrouter" so Trial 1 is distinguishable from the baseline extractor for receipt/idempotency purposes', () => {
+      const extractor = new OpenRouterSemanticDeltaExtractor('sk-or-test', 'openai/gpt-4o-mini');
+      expect(extractor.providerId).toBe(`openrouter/${EXTRACTION_PROMPT_VERSION}`);
+      expect(extractor.providerId).not.toBe('openrouter');
+      // modelId itself — the literal value sent to OpenRouter's `model`
+      // field — must remain untouched by the prompt-version bump; only
+      // providerId (extractorId) carries the versioning signal.
+      expect(extractor.modelId).toBe('openai/gpt-4o-mini');
+    });
   });
 });

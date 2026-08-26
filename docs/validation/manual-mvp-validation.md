@@ -440,3 +440,67 @@ claiming groundedness is solved. Phase 5A status: **ITERATE** — a
 follow-up task will address the extraction-precision failure mode
 separately; no extractor/prompt/schema/architecture change was made as
 part of recording these results.
+
+### Trial 1 — transformation-grounding extraction instruction
+
+**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN. The baseline/Trial 0
+result above is preserved unchanged and remains the only real result on
+record** until Trial 1 is actually run and graded. This subsection does
+not report a new result — it records what changed and how to run it. Full
+rationale, exact instruction wording changes, and versioning detail are in
+`docs/decisions/0016`'s "Trial 1 — transformation-grounding extraction
+instruction" section; this is the short operator-facing version.
+
+**What changed (one controlled variable only).** The baseline's
+groundedness shortfall (66.7% vs. required ≥80%) traced to the extractor
+sometimes attributing to the human's edit meaning already present in the
+AI-drafted original. Trial 1 changes only the extraction instruction sent
+to `openai/gpt-4o-mini` (same model, same 5 real `EditEvent`s, same
+OpenRouter provider, same schema, same candidate kinds, same receipt
+mechanism, same acceptance thresholds): it grounds every candidate in the
+ORIGINAL → FINAL transformation specifically — meaning already true of the
+ORIGINAL ("preserved") is explicitly disqualified from producing a
+candidate; only meaning added, removed, or materially transformed by the
+edit may. A mandatory counterfactual check ("would this still be true
+having seen only the ORIGINAL?") is applied before every candidate. The
+instruction is fully language-general — no rule specific to Turkish,
+English, or any other language was introduced.
+
+**How to rerun the same 5 EditEvents under Trial 1:**
+
+1. Confirm the popup's semantic-delta-extraction settings still have
+   `openai/gpt-4o-mini` configured and a valid OpenRouter API key saved.
+2. Click "Extract semantic deltas (Phase 5A)" again — no other UI change
+   is needed.
+3. Trial 1's extractor identity (`providerId`) differs from baseline's, so
+   none of the 5 sources' baseline receipts match it; all 5 are
+   automatically reprocessed under the new instruction. **You do not need
+   to, and should not, manually clear the receipt store.**
+4. **Verifying Trial 1 actually reprocessed the 5 sources (rather than
+   being silently skipped by stale baseline receipts):** in the results
+   panel, each newly-produced `SemanticDeltaCandidate`'s per-candidate
+   `extractorId`/`extractorVersion` line will read
+   `openrouter/transformation-grounded-v1` / `openai/gpt-4o-mini` —
+   visibly different from baseline's plain `openrouter` /
+   `openai/gpt-4o-mini`. Seeing the new `extractorId` string confirms Trial
+   1's instruction (not a skipped baseline receipt) produced the result.
+5. Grade the resulting candidates with the **exact same rubric and the
+   exact same thresholds** as baseline (`SUPPORTED`/`PARTIALLY_SUPPORTED`/
+   `UNSUPPORTED` per candidate, `MISSED_SIGNAL` per source, ≥80%
+   `SUPPORTED` required, ≤1 `MISSED_SIGNAL` allowed) — do not adjust the
+   threshold based on the outcome.
+
+### Trial 1 results — TODO, pending the operator's actual run
+
+| Source EditEvent | Candidate(s) | Grade | Notes |
+|---|---|---|---|
+| _(not yet run)_ | | | |
+
+Groundedness (% SUPPORTED): _(pending)_. MISSED_SIGNAL count: _(pending)_.
+Information-gain judgment (vs. baseline Trial 0, not vs.
+`compressionRatio`/`lexicalOverlap`): _(pending)_. Do not fabricate this
+table — see `docs/decisions/0016`'s Trial 1 section for the same
+not-yet-run status recorded there. Once the operator runs Trial 1, fill in
+this table and `docs/decisions/0016`'s Trial 1 section together, and
+compare directly against the baseline/Trial 0 table above (which must
+remain visible, not be overwritten).

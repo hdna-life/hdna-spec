@@ -7,7 +7,10 @@ import { SemanticDeltaCandidateStore } from '../../src/persona/semantic-delta-ca
 import { SemanticDeltaExtractionReceiptStore } from '../../src/persona/semantic-delta-extraction-receipt-store';
 import { SemanticDeltaExtractorConfigStore } from '../../src/persona/semantic-delta-extractor-config-store';
 import { SemanticDeltaExtractionService } from '../../src/persona/semantic-delta-extraction-service';
-import { OpenRouterSemanticDeltaExtractor } from '../../src/persona/openrouter-semantic-delta-extractor';
+import {
+  OpenRouterSemanticDeltaExtractor,
+  EXTRACTION_PROMPT_VERSION,
+} from '../../src/persona/openrouter-semantic-delta-extractor';
 import {
   EXTRACT_SEMANTIC_DELTAS_JOB,
   createExtractSemanticDeltasProcessor,
@@ -164,7 +167,7 @@ describe('Phase 5A pipeline: popup save -> background reads persisted config -> 
     // in SemanticDeltaExtractionService applies.
     await background.receiptStore.put({
       sourceEvidenceId: `edit_event:${event.id}`,
-      extractorId: 'openrouter',
+      extractorId: `openrouter/${EXTRACTION_PROMPT_VERSION}`,
       extractorVersion: 'openai/gpt-4o-mini',
       outcome: 'abstained',
       processedAt: '2026-01-01T00:00:00.000Z',
@@ -245,7 +248,7 @@ describe('Phase 5A pipeline: popup save -> background reads persisted config -> 
     expect(receipt).toMatchObject({
       sourceEvidenceId: `edit_event:${event.id}`,
       outcome: 'abstained',
-      extractorId: 'openrouter',
+      extractorId: `openrouter/${EXTRACTION_PROMPT_VERSION}`,
       extractorVersion: 'openai/gpt-4o-mini',
     });
   });

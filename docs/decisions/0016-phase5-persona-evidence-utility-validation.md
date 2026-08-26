@@ -763,3 +763,159 @@ Per this task's explicit scope, no extractor, prompt, schema, or
 architecture change was made as part of recording this result; the
 extraction-precision failure mode above is left for a dedicated follow-up
 decision/PR.
+
+## Trial 1 — transformation-grounding extraction instruction (controlled experiment)
+
+**Status: IMPLEMENTED / AWAITING REAL OPERATOR RUN.** This section records
+a single controlled follow-up to the baseline result above. **Do not read
+this as a new baseline result** — no real Trial 1 run has been performed as
+of this section being written; the baseline/Trial 0 numbers above remain
+the only real result on record until an operator run of Trial 1 is graded
+and recorded here.
+
+### Hypothesis
+
+The baseline's groundedness shortfall (66.7% `SUPPORTED` vs. required
+≥80%) was traced to a specific failure mode: the extractor sometimes
+attributed to the human's edit meaning that was already substantially
+present in the AI-drafted original and merely retained or rephrased in the
+final text (see the "Important failure mode identified" subsection of the
+first real experiment result above). Trial 1 tests:
+
+> Can explicitly grounding extraction in the semantic transformation
+> between ORIGINAL and FINAL — rather than in properties of FINAL alone —
+> improve the `SUPPORTED` rate from 66.7% toward the pre-declared ≥80%
+> threshold, without destroying the positive information-gain result?
+
+This is the only experimental variable changed in Trial 1.
+
+### What changed
+
+**Only `buildPrompt()`'s extraction instruction, in
+`extension/src/persona/openrouter-semantic-delta-extractor.ts`.** No
+change to: `SemanticDeltaCandidate`/`SemanticDeltaExtractionReceipt`
+schemas, candidate `kind` values, the extraction receipt's idempotency
+*mechanism*, storage, queue behavior, UI behavior, promotion behavior (Phase
+5A still stops at OBSERVATION), confidence semantics, the human-grading
+rubric, or any of the pre-declared acceptance criteria/thresholds. The 5
+real corpus `EditEvent`s, OpenRouter, and `openai/gpt-4o-mini` are all held
+fixed, per the controlled-experiment design.
+
+The new instruction adopts one core rule, stated in fully language-general
+terms (no wording, suffix, morphology, or lexicon specific to Turkish,
+English, or any other language):
+
+> Semantic delta is not the meaning of the final text. Semantic delta is a
+> directional change in meaning attributable to the human transformation
+> from ORIGINAL to FINAL.
+
+Meaning across that transformation is framed as PRESERVED, ADDED, REMOVED,
+or (materially) TRANSFORMED; only ADDED/REMOVED/TRANSFORMED meaning may
+produce a candidate — PRESERVED meaning is explicitly *not* new evidence.
+Before every candidate, the model is instructed to apply a **mandatory
+counterfactual grounding check**: "would this observation still be
+supported having only ever seen the ORIGINAL, never the FINAL?" — if yes,
+do not emit it. The instruction also explicitly warns that textual-diff
+magnitude (edit distance, word count, presence of paraphrasing) is not a
+proxy for semantic-change magnitude in either direction, and lists
+illustrative (not exhaustive, not enum-like) categories of semantic/
+pragmatic property that can shift under a small surface edit — stance,
+modality, commitment, certainty, conditionality, intensity, framing,
+specificity, directness, formality, interpersonal stance — without turning
+that list into a closed taxonomy the model is limited to. The pre-existing
+observation-first boundary (no stable personality/psychology/motivation
+inference from one edit) and abstention-is-valid rule are both restated
+unchanged; abstention explicitly favors fewer, better-grounded candidates
+over candidate count. The `kind`/`preferred`/`rejected` contract from the
+baseline (including the null-normalization fix) is unchanged.
+
+**No language-specific rule was introduced.** The instruction never names
+a language, and its one explicit self-referential warning ("do not rely on
+any language-specific wording, suffix, or construction") is a warning
+*against* such rules, not an instance of one — verified by a dedicated
+regression test (see "Tests" below) that scans the actual outbound prompt
+text for named languages, morphology terminology, and enumerated
+language-specific forms.
+
+### Extractor versioning
+
+`SemanticDeltaExtractionService.runExperiment()`'s idempotency check keys
+off `extractorId`+`extractorVersion` matching the *current* provider's
+`providerId`+`modelId` (§"`SemanticDeltaExtractionReceipt` design" above).
+Baseline's `providerId` was the bare string `'openrouter'`, and
+`extractorVersion` is `provider.modelId` — which, per the controlled-
+experiment constraint, must remain the literal string sent to OpenRouter's
+`model` field (`openai/gpt-4o-mini`) and therefore cannot itself carry a
+prompt-revision marker. Since Trial 1 changes only the prompt, not the
+model, versioning by `modelId` alone cannot distinguish it from baseline —
+exactly the gap this task's own instructions anticipated and permitted a
+minimal fix for.
+
+**Minimum necessary change:** a new exported constant,
+`EXTRACTION_PROMPT_VERSION = 'transformation-grounded-v1'`, and
+`providerId` is now `` `openrouter/${EXTRACTION_PROMPT_VERSION}` `` instead
+of the bare `'openrouter'`. This is the only versioning change made — no
+redesign of the receipt schema, the idempotency mechanism, or the
+key-matching logic itself. Effect: the 5 sources already receipted under
+baseline's `providerId: 'openrouter'` will **not** match Trial 1's
+`providerId: 'openrouter/transformation-grounded-v1'`, so
+`runExperiment()` will process all 5 again under Trial 1 — an intentional
+re-extraction, not an idempotency bug — while a second Trial 1 run (same
+`providerId`+`modelId`) would still correctly skip already-receipted
+sources, preserving normal same-version idempotency. `modelId` itself is
+untouched and still sent verbatim as `model: "openai/gpt-4o-mini"` in the
+actual OpenRouter request body.
+
+### Tests
+
+`extension/tests/persona/openrouter-semantic-delta-extractor.test.ts`
+gained a `Trial 1: transformation-grounding instruction contract` block
+asserting on the real outbound prompt text (captured via the same fake-
+fetch pattern the rest of the suite uses, not a copy of the prompt string)
+for: preserved-meaning-is-not-evidence; added/removed/materially-
+transformed meaning may be evidence; the mandatory ORIGINAL-only
+counterfactual check; textual-diff-magnitude is not proof of semantic
+change (both directions); the illustrative (non-exhaustive) semantic-
+property list; the unchanged personality/psychology-inference prohibition;
+the unchanged abstention-is-valid rule; absence of any named language or
+enumerated language-specific form; and `providerId` correctly bumping to
+`` `openrouter/${EXTRACTION_PROMPT_VERSION}` `` while `modelId` stays
+exactly `openai/gpt-4o-mini`. These are prompt-contract assertions, not
+tests of an external LLM's semantic reasoning (not deterministic, not
+unit-testable), and hardcode none of the 5 real corpus `EditEvent`s.
+`extension/tests/persona/semantic-delta-extraction-integration.test.ts`'s
+two fixtures that hardcoded the baseline `extractorId: 'openrouter'`
+(the already-processed-evidence skip test, and the cosmetic-edit-fixture
+abstained-receipt assertion) were updated to reference
+`EXTRACTION_PROMPT_VERSION` instead of a hardcoded string, so they track
+the real constant rather than drifting from it. 392/392 tests pass, clean
+`tsc --noEmit`, clean `wxt build`.
+
+### How to rerun Trial 1 against the same 5 real EditEvents
+
+1. In the popup's "Semantic delta extraction settings," confirm the model
+   id is still `openai/gpt-4o-mini` (unchanged) and the OpenRouter API key
+   is present; re-save if needed.
+2. Click "Extract semantic deltas (Phase 5A)" as before. Because Trial 1's
+   `providerId` differs from baseline's, none of the 5 sources' existing
+   baseline receipts will match, so all 5 are reprocessed under the new
+   instruction automatically — no manual receipt-store clearing is needed
+   or should be performed.
+3. Once the `P3` job runs (same `DEEP_IDLE` scheduling caveat as before),
+   the panel will show up to 5 newly-processed sources and their new
+   `SemanticDeltaCandidate`s, each carrying
+   `extractorId: "openrouter/transformation-grounded-v1"` — visually
+   distinguishable from baseline's `"openrouter"` in the panel's per-
+   candidate `extractorId`/`extractorVersion` line, confirming Trial 1 (not
+   a skipped/stale baseline receipt) actually produced them.
+4. Grade the resulting candidates with the exact same rubric and the exact
+   same ≥80% `SUPPORTED` / ≤1 `MISSED_SIGNAL` acceptance thresholds used
+   for baseline (§"Pre-declared MVP experiment acceptance criteria" above)
+   — do not adjust the thresholds based on Trial 1's outcome.
+5. Record the real result in this section and in
+   `docs/validation/manual-mvp-validation.md`'s Trial 1 subsection,
+   preserving the baseline/Trial 0 result above rather than overwriting it.
+
+**No real Trial 1 result is recorded as of this section.** The human
+operator performs the real run; this decision does not claim, predict, or
+fabricate its outcome.
