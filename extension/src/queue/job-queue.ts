@@ -2,21 +2,43 @@ import type { Job, JobPriority } from '@spec/protocol/job';
 import { JOB_PRIORITY_ORDER } from '@spec/protocol/job';
 import type { StorageAdapter } from '../storage/types';
 
-const JOB_STORE = 'jobs';
+export const JOB_STORE = 'jobs';
+
+/** RUNNING longer than this with no completion is assumed to mean the service worker died mid-job, not that it's still working. */
+export const DEFAULT_STALE_RUNNING_TIMEOUT_MS = 5 * 60 * 1000;
 
 export type JobProcessor<TPayload = unknown> = (payload: TPayload) => Promise<void>;
 
 /**
- * Persistent job queue. Persists every job through the StorageAdapter so
- * queued work survives MV3 service-worker termination.
+ * Persistent, at-least-once job queue. Persists every job through the
+ * StorageAdapter so queued work survives MV3 service-worker termination —
+ * including a job caught mid-execution: a RUNNING job whose lease
+ * (`startedAt`) has expired is reclaimed back to PENDING and retried. Because
+ * this is at-least-once (not exactly-once), processors must be idempotent —
+ * a reclaimed job may run its side effects more than once.
  */
 export class JobQueue {
   private processors = new Map<string, JobProcessor>();
+  /** Lazily initialized from persisted jobs so ordering stays correct across service-worker restarts. */
+  private nextSequence: number | undefined;
 
-  constructor(private storage: StorageAdapter) {}
+  constructor(
+    private storage: StorageAdapter,
+    private staleRunningTimeoutMs = DEFAULT_STALE_RUNNING_TIMEOUT_MS,
+    private now: () => string = () => new Date().toISOString(),
+  ) {}
 
   registerProcessor<TPayload>(type: string, processor: JobProcessor<TPayload>): void {
     this.processors.set(type, processor as JobProcessor);
+  }
+
+  private async allocateSequence(): Promise<number> {
+    if (this.nextSequence === undefined) {
+      const jobs = await this.storage.query<Job>(JOB_STORE);
+      const maxSequence = jobs.reduce((max, j) => Math.max(max, j.sequence ?? -1), -1);
+      this.nextSequence = maxSequence + 1;
+    }
+    return this.nextSequence++;
   }
 
   async enqueue<TPayload>(type: string, priority: JobPriority, payload: TPayload): Promise<Job<TPayload>> {
@@ -26,21 +48,38 @@ export class JobQueue {
       type,
       payload,
       status: 'PENDING',
-      createdAt: new Date().toISOString(),
+      createdAt: this.now(),
+      sequence: await this.allocateSequence(),
       attempts: 0,
     };
     await this.storage.put(JOB_STORE, job.id, job, 'CANONICAL');
     return job;
   }
 
-  /** Returns the highest-priority pending job (P0 first), FIFO within a priority class. */
+  /** Flips any RUNNING job whose lease has expired back to PENDING, clearing startedAt. */
+  private async reclaimStaleJobs(): Promise<void> {
+    const jobs = await this.storage.query<Job>(JOB_STORE);
+    const nowMs = Date.parse(this.now());
+
+    for (const job of jobs) {
+      if (job.status !== 'RUNNING' || !job.startedAt) continue;
+      if (nowMs - Date.parse(job.startedAt) <= this.staleRunningTimeoutMs) continue;
+
+      const reclaimed: Job = { ...job, status: 'PENDING', startedAt: undefined };
+      await this.storage.put(JOB_STORE, reclaimed.id, reclaimed, 'CANONICAL');
+    }
+  }
+
+  /** Returns the highest-priority pending job (P0 first), FIFO within a priority class. Reclaims stale RUNNING jobs first. */
   async next(): Promise<Job | undefined> {
+    await this.reclaimStaleJobs();
+
     const jobs = await this.storage.query<Job>(JOB_STORE);
     const pending = jobs.filter((j) => j.status === 'PENDING');
     pending.sort((a, b) => {
       const priorityDiff = JOB_PRIORITY_ORDER.indexOf(a.priority) - JOB_PRIORITY_ORDER.indexOf(b.priority);
       if (priorityDiff !== 0) return priorityDiff;
-      return a.createdAt.localeCompare(b.createdAt);
+      return a.sequence - b.sequence;
     });
     return pending[0];
   }
@@ -60,6 +99,7 @@ export class JobQueue {
     if (!job) return undefined;
 
     job.status = 'RUNNING';
+    job.startedAt = this.now();
     job.attempts += 1;
     await this.storage.put(JOB_STORE, job.id, job, 'CANONICAL');
 

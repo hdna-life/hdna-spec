@@ -19,6 +19,7 @@ export default defineBackground(() => {
   queue.registerProcessor(
     PROCESS_EDIT_EVENT_JOB,
     createEditEventProcessor(
+      storage,
       new EditEventStore(storage),
       new EditMetricsStore(storage),
       new EditProfileStore(storage),

@@ -1,6 +1,6 @@
 import type { StorageClass } from '@spec/schema/storage-classes';
 import { STORAGE_CLASS_DELETION_ORDER } from '@spec/schema/storage-classes';
-import type { StorageAdapter } from './types';
+import type { StorageAdapter, StorageEntry } from './types';
 
 interface Record_ {
   compositeKey: string;
@@ -75,6 +75,45 @@ export class IndexedDbStorageAdapter implements StorageAdapter {
       size: estimateSize(value),
     };
     await this.withStore('readwrite', (s) => s.put(record));
+  }
+
+  /**
+   * All records share one physical IndexedDB object store, so a single
+   * IDBTransaction covering every entry gives genuine all-or-nothing
+   * atomicity — IndexedDB commits a transaction only if every request in it
+   * succeeds, and aborts (rolling back everything) otherwise.
+   */
+  async putMany(entries: StorageEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const db = await this.dbPromise;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(RECORD_STORE, 'readwrite');
+      const store = tx.objectStore(RECORD_STORE);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+
+      try {
+        for (const entry of entries) {
+          const record: Record_ = {
+            compositeKey: `${entry.store}:${entry.key}`,
+            store: entry.store,
+            key: entry.key,
+            value: entry.value,
+            storageClass: entry.storageClass,
+            size: estimateSize(entry.value),
+          };
+          store.put(record);
+        }
+      } catch (err) {
+        // e.g. a value that fails structured clone — thrown synchronously by
+        // put(), not delivered as a request error event. Abort explicitly so
+        // any earlier puts already queued in this transaction are rolled
+        // back too, preserving all-or-nothing semantics.
+        tx.abort();
+        reject(err);
+      }
+    });
   }
 
   async delete(store: string, key: string): Promise<void> {

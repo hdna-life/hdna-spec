@@ -19,7 +19,7 @@ data collection, and a first Phase 2 passive-collection slice:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 76 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 86 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   `.hdna` manifest shape.
@@ -31,9 +31,13 @@ data collection, and a first Phase 2 passive-collection slice:
 
 ## Implemented capabilities
 
-- `IndexedDbStorageAdapter`: get/put/delete/query, per-storage-class byte usage.
+- `IndexedDbStorageAdapter`: get/put/delete/query, per-storage-class byte usage,
+  `putMany` (atomic multi-key write via one IDBTransaction).
 - `JobQueue`: enqueue, priority+FIFO ordering, `runNext`, `countsByPriority`,
-  persists through `StorageAdapter`.
+  persists through `StorageAdapter`. At-least-once: `RUNNING` jobs whose lease
+  (`startedAt`) expires (default 5 min) are reclaimed back to `PENDING` and
+  retried, so a job interrupted mid-execution by MV3 service-worker
+  termination is not lost — see `docs/decisions/0007`.
 - `resource-governor.decide()`: pure function, INTERACTIVE/BACKGROUND/DEEP_IDLE
   mode selection, batch-size halving/doubling on latency ratio.
 - `RuntimeControls`: persisted `processingPaused`/`learningPaused` state.
@@ -52,11 +56,26 @@ data collection, and a first Phase 2 passive-collection slice:
   `EditProfileStore` (DERIVED, running aggregate).
 - `captureEditEvent()`: persist + enqueue P1 job, returns immediately — the
   actual T0/T1 computation runs later in the background dispatch loop.
+- `process_edit_event` processor is idempotent: `EditMetrics.profileAppliedAt`
+  is the receipt that stops a reclaimed/replayed job from double-counting
+  `EditProfile`; the metrics write and profile write land atomically via
+  `putMany()` so no crash window can leave the receipt and the profile
+  update out of sync (`docs/decisions/0007`).
 - Popup UI: onboarding textarea + Expression Sheet summary + edit-capture form
   + Edit Profile summary, wired to live queue/storage/controls state, polls
   every 2s.
 - `chrome.alarms`-driven background dispatch loop running the `noop` and
   `process_edit_event` processors.
+
+## Known limitations
+
+- No retry cap on stale-RUNNING reclaim: a job that reliably crashes the
+  service worker every time it runs would be retried indefinitely rather
+  than eventually marked `FAILED`. Not implemented — see `docs/decisions/0007`.
+- `putMany()`'s atomicity currently relies on `IndexedDbStorageAdapter`
+  keeping all records in one physical object store. A future SQLite/OPFS
+  adapter would need its own transaction mechanism to preserve this
+  guarantee behind the same `StorageAdapter` interface.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -83,9 +102,11 @@ data collection, and a first Phase 2 passive-collection slice:
 
 ## Current experiments / pending decisions
 
-None open. Six operator decisions to date are recorded in `docs/decisions/`.
+None open. Seven operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
-call: whether/how to add content-script-based live capture.
+call: whether/how to add content-script-based live capture. Phase 3 (local
+embeddings/vector index, tiny classifiers, adaptive batching) has not yet
+been scoped — those capabilities are `PLANNED`, not started.
 
 ## Current benchmark status
 

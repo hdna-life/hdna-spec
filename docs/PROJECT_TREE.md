@@ -40,12 +40,12 @@ extension/                        - MV3 + Svelte runtime (WXT-built)
       edit-profile-store.ts        - EditProfileStore: persists running T1 aggregate (DERIVED)
       capture.ts                   - captureEditEvent: persist + enqueue P1 job, returns immediately (see docs/decisions/0005)
     storage/
-      types.ts                    - StorageAdapter interface
-      indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001)
+      types.ts                    - StorageAdapter interface incl. putMany (atomic multi-key write)
+      indexeddb-adapter.ts        - IndexedDB-backed StorageAdapter (see docs/decisions/0001, 0007)
     queue/
-      job-queue.ts                - persistent priority queue over StorageAdapter
+      job-queue.ts                - at-least-once persistent priority queue; stale-RUNNING lease reclaim (see docs/decisions/0007)
       processors/noop-processor.ts - synthetic processor for pipeline tests only
-      processors/edit-event-processor.ts - P1: computes EditMetrics, folds into EditProfile
+      processors/edit-event-processor.ts - P1: idempotent EditMetrics compute + atomic EditProfile fold-in (see docs/decisions/0007)
     governor/
       types.ts                    - RuntimeMode, GovernorSignals (some fields SPEC_RESERVED/unwired)
       resource-governor.ts        - pure decide(signals, prevBatchSize) -> {mode, nextBatchSize}
