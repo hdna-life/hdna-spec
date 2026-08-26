@@ -15,6 +15,20 @@ describe('WritingSampleStore', () => {
     expect(samples.map((s) => s.text).sort()).toEqual(['first sample', 'second sample']);
   });
 
+  it('gets a sample by id', async () => {
+    const storage = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const store = new WritingSampleStore(storage);
+    const sample = await store.addSample('find me', { surface: 'chat' });
+
+    await expect(store.get(sample.id)).resolves.toEqual(sample);
+  });
+
+  it('returns undefined for an unknown id', async () => {
+    const storage = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const store = new WritingSampleStore(storage);
+    await expect(store.get('missing')).resolves.toBeUndefined();
+  });
+
   it('persists samples across store instances backed by the same storage', async () => {
     const storage = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
     const storeA = new WritingSampleStore(storage);
