@@ -19,7 +19,10 @@
     enqueueVectorIndexRebuild,
   } from '../../src/queue/processors/embedding-jobs';
   import { T2ProfileStore } from '../../src/persona/t2-profile-store';
-  import { enqueueEvidenceClassification } from '../../src/queue/processors/trait-classification-jobs';
+  import {
+    enqueueEvidenceClassification,
+    enqueueT2ProfileRebuild,
+  } from '../../src/queue/processors/trait-classification-jobs';
   import { PatternStore } from '../../src/persona/pattern-store';
   import { enqueuePatternCompilation } from '../../src/queue/processors/pattern-compilation-job';
   import type { JobPriority } from '@spec/protocol/job';
@@ -104,6 +107,11 @@
     await refresh();
   }
 
+  async function rebuildT2Profile() {
+    await enqueueT2ProfileRebuild(queue);
+    await refresh();
+  }
+
   async function searchVectors(event: CustomEvent<string>) {
     searchResults = await vectorIndex.query(event.detail, 5);
   }
@@ -151,7 +159,7 @@
   <ExpressionSheetSummary sheet={expressionSheet} />
   <EditCapture on:capture={captureEdit} />
   <EditProfileSummary profile={editProfile} />
-  <T2ProfileSummary profile={t2Profile} />
+  <T2ProfileSummary profile={t2Profile} on:rebuild={rebuildT2Profile} />
   <PatternsSummary {patterns} on:compile={compilePatterns} />
   <VectorIndex
     {embeddingCount}
