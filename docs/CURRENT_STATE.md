@@ -8,6 +8,9 @@ Phase 4 — deterministic PATTERNS layer of the persona compiler, no model call
 (see `docs/decisions/0011`). Phase 0, Phase 1, Phase 2's first slice, and all
 of Phase 3 (3A/3B/3C) are complete. Phase 4's TRAITS/BELIEFS step (requires
 an actual LLM call) is explicitly not started — its own future decision.
+Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
+English-only, saturating/biasing on non-English (Turkish) evidence — see
+`docs/decisions/0012`.
 
 ## Active MVP scope
 
@@ -22,7 +25,7 @@ Phase 4's deterministic PATTERNS layer:
 - Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
 - Runtime controls: pause processing vs. pause learning (distinct, persisted).
 - Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 200 tests.
+- Deterministic test infrastructure (vitest + fake-indexeddb), 219 tests.
 - `spec/` protocol/schema types for storage classes, evidence metadata, identity
   facts, Expression Sheet, writing samples, edit events/metrics/profile,
   storage policy, embeddings, T2 dimensions/trait scores/profile, patterns,
@@ -58,6 +61,17 @@ Phase 4's deterministic PATTERNS layer:
   (`PatternCompilerPolicy`) — no `Pattern` is emitted below threshold.
   `compile_patterns` is `P3`, manually triggered. TRAITS/BELIEFS (requires an
   LLM call) is not implemented — see `docs/decisions/0011`.
+- Post-3C fix: real-world Turkish evidence (35 samples) exposed that
+  `HeuristicTinyClassifier` was silently English-only — `directness`
+  saturated at a confidently-wrong 100%, `formality` was biased upward.
+  Fixed with `isLikelyEnglish()`, which requires BOTH a non-ASCII-letter
+  ratio ≤ 2% AND English function-word density ≥ 5%. The first version used
+  only the non-ASCII signal; the operator rejected it and requested an
+  ASCII-only-Turkish regression test, which exposed that diacritic-free
+  non-English text (common in real typing) passes a character-only check —
+  the function-word signal closes that gap. Both dimensions abstain (omit
+  entirely) rather than emit a fabricated value when the gate fails — see
+  `docs/decisions/0012`.
 
 ## Implemented capabilities
 
@@ -169,8 +183,14 @@ Phase 4's deterministic PATTERNS layer:
 - `HeuristicTinyClassifier`'s formality/directness scores are crude,
   non-validated heuristics — explicit, accepted tradeoff, not a bug — see
   `docs/decisions/0010`.
-- T2 confidence only reflects word count, not genre/language/other factors
-  that would affect heuristic reliability.
+- T2 confidence only reflects word count within the English-gated path —
+  genre and other factors beyond language-applicability still aren't
+  modeled. See `docs/decisions/0012` for the language-gate fix.
+- `isLikelyEnglish()` doesn't attempt general language identification —
+  non-English text that is both ASCII-only *and* happens to reuse enough
+  English function words (rare, but conceivable for heavily code-mixed
+  text) could still pass. Intentional, documented scope boundary — see
+  `docs/decisions/0012`.
 - No UI currently sets `context.surface` on writing samples or edit events,
   so in practice all pattern observations fall into the `"unscoped"` bucket
   today — the context-scoping architecture is correct and tested, just not
@@ -214,7 +234,7 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Eleven operator decisions to date are recorded in `docs/decisions/`.
+None open. Twelve operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider

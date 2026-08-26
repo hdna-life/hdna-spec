@@ -98,4 +98,49 @@ describe('TraitClassifierService.rebuild', () => {
     const all = await traitScoreStore.list();
     expect(all.map((r) => r.sourceId)).toEqual(['s1']);
   });
+
+  it('does not saturate the T2 profile at 1.0 directness for a batch of real non-English (Turkish) samples (end-to-end regression)', async () => {
+    // Reproduces the reported bug at profile-aggregate scale: 35 real
+    // Turkish samples through the full queue-free pipeline (classifyOne is
+    // what the P2 job processor calls) previously left directness pinned at
+    // exactly 1.0 with high confidence. It must now never be created at all
+    // — no evidence, no claim — since every observation abstains.
+    const turkishSamples = [
+      'Bugün hava çok güzeldi ve dışarıda uzun bir yürüyüş yaptım.',
+      'Bu ürünü çok beğendim, gerçekten harika bir deneyimdi.',
+      'Yarın toplantıya geç kalmamak için erken çıkmam lazım.',
+      'Sanırım bu proje için email göndermem lazım, ok mu?',
+      'Kitabı bitirdim ve çok etkilendim, herkese tavsiye ederim.',
+    ];
+    const sources = [fakeSource('writing_sample', turkishSamples.map((text, i) => ({ id: `s${i}`, text })))];
+    const { profileStore, service } = setup(sources);
+
+    await service.rebuild();
+
+    const profile = await profileStore.get();
+    expect(profile?.directness).toBeUndefined();
+    expect(profile?.formality).toBeUndefined();
+  });
+
+  it('does not saturate the T2 profile for Turkish samples typed without diacritics (ASCII-only, end-to-end regression)', async () => {
+    // The same regression as above, but with diacritics stripped to plain
+    // ASCII — the realistic case of Turkish typed on a non-Turkish keyboard.
+    // This is the exact gap a non-ASCII-character-only detection gate misses:
+    // stripped of diacritics, this text is indistinguishable from English by
+    // character content alone.
+    const asciiTurkishSamples = [
+      'Bugun hava cok guzeldi ve disarida uzun bir yuruyus yaptim.',
+      'Bu urunu cok begendim, gercekten harika bir deneyimdi.',
+      'Yarin toplantiya gec kalmamak icin erken cikmam lazim.',
+      'Kitabi bitirdim ve cok etkilendim, herkese tavsiye ederim.',
+    ];
+    const sources = [fakeSource('writing_sample', asciiTurkishSamples.map((text, i) => ({ id: `s${i}`, text })))];
+    const { profileStore, service } = setup(sources);
+
+    await service.rebuild();
+
+    const profile = await profileStore.get();
+    expect(profile?.directness).toBeUndefined();
+    expect(profile?.formality).toBeUndefined();
+  });
 });

@@ -62,6 +62,13 @@ stands after this PR.
   triggered) mirrors `VectorIndexService`'s rebuild contract. The
   TRAITS/BELIEFS step (requires an LLM call) is explicitly not implemented —
   see PLANNED below.
+- Post-3C fix (`docs/decisions/0012`): `HeuristicTinyClassifier`'s formality/
+  directness heuristics are gated by `isLikelyEnglish()` — requires BOTH a
+  non-ASCII-letter ratio ≤ 2% AND English function-word density ≥ 5% — and
+  abstain (omit the dimension) for non-English text. Fixed after real
+  Turkish evidence exposed a saturation/bias bug, then revised after an
+  operator-requested ASCII-only-Turkish regression test exposed a gap in
+  the first (non-ASCII-only) version of the gate.
 
 ## SPEC_RESERVED — typed, not implemented
 
