@@ -1,17 +1,32 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { T2Profile } from '@spec/schema/t2-profile';
+  import { deriveT2PanelState } from '../persona/t2-panel-state';
 
   export let profile: T2Profile | undefined;
+  export let evidenceCount = 0;
+  export let classifiedCount = 0;
 
   const dispatch = createEventDispatcher<{ rebuild: void }>();
+
+  $: panelState = deriveT2PanelState({ evidenceCount, classifiedCount, profile });
 </script>
 
 <section>
   <h2>Behavioral Estimates (T2)</h2>
   <button on:click={() => dispatch('rebuild')}>Rebuild T2 Profile</button>
-  {#if !profile || (!profile.formality && !profile.directness)}
-    <p>No evidence classified yet.</p>
+  {#if panelState.kind === 'no-evidence'}
+    <p>No evidence available yet.</p>
+  {:else if panelState.kind === 'abstained'}
+    <p>No supported evidence classified yet.</p>
+    <p class="note">
+      The current heuristic baseline only classifies supported English evidence; other evidence is
+      preserved but skipped.
+    </p>
+    <p class="note">
+      {panelState.evidenceCount} evidence items preserved; {panelState.classifiedCount} classified by
+      the current T2 heuristic.
+    </p>
   {:else}
     <ul>
       {#if profile.formality}
