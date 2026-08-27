@@ -1,0 +1,13 @@
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "kind": "replaced",
+    "originalText": "The system should prioritize avoiding feature expansion during this phase.",
+    "finalText": "Avoid feature expansion for now; ship MVP and test with users instead.",
+    "beforeContext": "According to the requirements,",
+    "afterContext": "We can iterate based on feedback.",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDescription": "Reframes avoidance as an explicit action with a concrete alternative (MVP + user testing).",
+    "decision": "pending"
+  }
+]
