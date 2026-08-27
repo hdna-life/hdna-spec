@@ -44,6 +44,22 @@ import {
   INTERPRET_TRAITS_BELIEFS_JOB,
   createInterpretTraitsBeliefsProcessor,
 } from '../src/queue/processors/persona-interpretation-job';
+import { SemanticDeltaCandidateStore } from '../src/persona/semantic-delta-candidate-store';
+import { SemanticDeltaExtractionReceiptStore } from '../src/persona/semantic-delta-extraction-receipt-store';
+import { SemanticDeltaExtractorConfigStore } from '../src/persona/semantic-delta-extractor-config-store';
+import { OpenRouterSemanticDeltaExtractor } from '../src/persona/openrouter-semantic-delta-extractor';
+import { SemanticDeltaExtractionService } from '../src/persona/semantic-delta-extraction-service';
+import {
+  EXTRACT_SEMANTIC_DELTAS_JOB,
+  createExtractSemanticDeltasProcessor,
+} from '../src/queue/processors/semantic-delta-extraction-job';
+import { LocalMlxSemanticRevisionJudge } from '../src/persona/local-mlx-semantic-revision-judge';
+import { SemanticRevisionJudgeConfigStore } from '../src/persona/semantic-revision-judge-config-store';
+import { SemanticRevisionJudgeExtractionService } from '../src/persona/semantic-revision-judge-extraction-service';
+import {
+  JUDGE_SEMANTIC_REVISIONS_JOB,
+  createJudgeSemanticRevisionsProcessor,
+} from '../src/queue/processors/semantic-revision-judge-job';
 import { decide, decideMode } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals } from '../src/governor/types';
@@ -99,6 +115,39 @@ export default defineBackground(() => {
     new PersonaInterpreterConfigStore(),
   );
   queue.registerProcessor(INTERPRET_TRAITS_BELIEFS_JOB, createInterpretTraitsBeliefsProcessor(personaInterpreter));
+
+  const semanticDeltaExtraction = new SemanticDeltaExtractionService(
+    storage,
+    (apiKey, modelId) => new OpenRouterSemanticDeltaExtractor(apiKey, modelId),
+    editEventStore,
+    new SemanticDeltaCandidateStore(storage),
+    new SemanticDeltaExtractionReceiptStore(storage),
+    new SemanticDeltaExtractorConfigStore(),
+  );
+  queue.registerProcessor(EXTRACT_SEMANTIC_DELTAS_JOB, createExtractSemanticDeltasProcessor(semanticDeltaExtraction));
+
+  // Trial 3 (docs/decisions/0016's Trial 3 section) — a structurally
+  // separate service from semanticDeltaExtraction above, not a
+  // replacement for it. Real transport is now a local MLX-LM server
+  // (docs/decisions/0016's Trial 3 "local MLX transport" addendum), not
+  // OpenRouter: SemanticRevisionJudgeConfigStore holds baseUrl/modelId
+  // only — no API key, no cloud request. The operator points baseUrl at
+  // their running `mlx_lm.server` instance (default
+  // http://127.0.0.1:8080) and modelId at `Qwen/Qwen3-0.6B` in the popup
+  // before running this job. There is no fallback to OpenRouter or any
+  // stronger/different model anywhere in this wiring.
+  const semanticRevisionJudge = new SemanticRevisionJudgeExtractionService(
+    storage,
+    (baseUrl, modelId) => new LocalMlxSemanticRevisionJudge(baseUrl, modelId),
+    editEventStore,
+    new SemanticDeltaCandidateStore(storage),
+    new SemanticDeltaExtractionReceiptStore(storage),
+    new SemanticRevisionJudgeConfigStore(),
+  );
+  queue.registerProcessor(
+    JUDGE_SEMANTIC_REVISIONS_JOB,
+    createJudgeSemanticRevisionsProcessor(semanticRevisionJudge),
+  );
 
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);

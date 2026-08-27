@@ -4,6 +4,45 @@ Last reviewed commit: (initial commit — this PR)
 
 ## Current phase
 
+**Phase 5A — persona evidence utility validation — is now the immediate
+priority, per an explicit operator-driven roadmap change (see
+`docs/decisions/0016`).** Following the first real Phase 4/T3 human dogfood
+test (`docs/decisions/0015`): **PIPELINE EXECUTION is VALIDATED** (canonical
+evidence → deterministic metrics → patterns → minimized aggregates →
+OpenRouter → persisted claims worked end to end against the real extension
+and a real external API); **PERSONA INFORMATION RICHNESS is NOT VALIDATED**
+— the two deterministic dimensions PATTERNS currently produces
+(`compressionRatio`, `lexicalOverlap`) don't carry enough semantic
+information for T3 to construct a meaningful persona, an
+information-representation bottleneck, not a sample-count problem. T3 itself
+is not a failed implementation. Phase 5A (`SemanticDeltaExtractionService`,
+OpenRouter-based, observation-only, per-source idempotent via receipts)
+implements a new experimental evidence layer — AI-output/human-edit pairs →
+grounded `SemanticDeltaCandidate` observations — to test whether richer
+semantic evidence can be derived upstream of PATTERNS. **The first real run
+against the 5-pair corpus is complete and human-graded: INFORMATION GAIN —
+PASS (the central question), GROUNDEDNESS — FAIL (66.7% vs. required
+≥80%), overall status ITERATE** — see "Current experiments / pending
+decisions" below and `docs/decisions/0016` for the full result. This is
+promising evidence, not proof the hypothesis is fully validated. Two
+controlled follow-up trials have since targeted the groundedness shortfall
+specifically: **Trial 1** (transformation-grounding instruction) —
+groundedness unchanged (66.7%), still ITERATE; **Trial 2** (deterministic
+evidence localization + atomic/redundancy/removal discipline) — the first
+quantitative groundedness improvement (66.7% → 70.6%), still below the
+≥80% threshold, still ITERATE. **Trial 3** (local semantic-revision-judge
+feasibility — an architecture change, not a prompt tweak: deterministic
+per-intervention judging via a tiny local `Qwen3-0.6B` model over MLX,
+zero-shot, no fine-tuning) — **local runtime/MLX execution PASS, but
+zero-shot semantic capability FAIL** (broad semantic matrix 52.9%, A/B
+discrimination 51% — chance level, coarse feature classification 14.9%);
+COMPLETE, recorded as the official zero-shot tiny-model baseline; **still
+ITERATE overall** — see "Current experiments / pending decisions" below
+for all three. **Phase 5A overall status remains ITERATE — not complete,
+not validated.** The prior immediate roadmap (retrieval runtime → WebGPU
+expression engine) is **deferred/reordered, not cancelled**, pending this
+evidence-utility question — see `docs/decisions/0016`.
+
 Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
 PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
 using OpenRouter as the concrete MVP provider behind a provider-agnostic
@@ -87,6 +126,19 @@ Phase 4's deterministic PATTERNS layer:
   evidence or prior claims. `interpret_traits_beliefs` is `P3`, manually
   triggered. API key/model/enabled config lives in `chrome.storage.local`,
   outside the persona storage taxonomy — see `docs/decisions/0015`.
+- Phase 5A (persona evidence utility validation): `SemanticDeltaExtractionService`
+  extracts observation-centered `SemanticDeltaCandidate`s from `EditEvent`
+  AI-output/human-edit pairs via a provider-agnostic
+  `SemanticDeltaExtractorProvider` interface, concretely implemented by
+  `OpenRouterSemanticDeltaExtractor`. Deliberately sends raw edit-pair text
+  (unlike T3's minimized aggregates) — an explicit, disclosed
+  privacy-boundary difference, opt-in via its own independent
+  `SemanticDeltaExtractorConfigStore`. Per-source idempotent via
+  `SemanticDeltaExtractionReceipt` (candidate existence alone can't signal
+  "already processed," since a correct abstention produces zero
+  candidates). `extract_semantic_deltas` is `P3`, manually triggered. Stops
+  at OBSERVATION — no semantic aggregation/promotion into patterns or
+  traits in this phase — see `docs/decisions/0016`.
 - Post-3C fix: real-world Turkish evidence (35 samples) exposed that
   `HeuristicTinyClassifier` was silently English-only — `directness`
   saturated at a confidently-wrong 100%, `formality` was biased upward.
@@ -232,6 +284,27 @@ Phase 4's deterministic PATTERNS layer:
   settings form (API key, model id, enabled).
 - `extension/wxt.config.ts`: `host_permissions: ['https://openrouter.ai/*']`
   — scoped to exactly the one provider origin in use.
+- `SemanticDeltaCandidateStore` / `SemanticDeltaExtractionReceiptStore`
+  (both `DERIVED`) — observation-centered evidence candidates and their
+  per-source processing provenance, see `docs/decisions/0016`.
+- `SemanticDeltaExtractorConfigStore` — independent `chrome.storage.local`-
+  backed config (OpenRouter API key, model id, its own `enabled` flag),
+  deliberately separate from `PersonaInterpreterConfigStore`.
+- `OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorProvider`
+  — sends raw `originalText`/`finalText` (Phase 5A's documented,
+  intentional privacy-boundary difference from T3), structured/schema-
+  validated request+response, `validateCandidateDraft()` as the real
+  enforcement point.
+- `SemanticDeltaExtractionService.runExperiment()`: per-source idempotent
+  (not full-rebuild) — skips a source only when an existing receipt's
+  extractor identity matches the currently configured provider, so an
+  intentional model/version change can still reprocess it, while an
+  accidental repeat run never resends raw text for an already-processed
+  source.
+- Popup UI: Semantic Delta Extraction (Phase 5A — experimental) panel —
+  readiness status, explicit raw-text-upload warning next to the trigger
+  button, extracted/abstained receipt counts, candidate list, inline
+  settings form.
 
 ## Known limitations
 
@@ -282,6 +355,11 @@ Phase 4's deterministic PATTERNS layer:
 - No per-request cost/rate limiting or spend cap on T3 interpretation —
   bounded only by `enqueueSingleton`'s existing one-outstanding-job
   coalescing, not by any cost-awareness logic.
+- `SemanticDeltaExtractorConfigStore`'s API key has the same no-encryption-
+  beyond-Chrome tradeoff as `PersonaInterpreterConfigStore`; no per-request
+  cost/rate limiting either — see `docs/decisions/0016`.
+- Phase 5A's optional (A) human-final-text-alone vs. (B) contrastive
+  original+final control is documented but not implemented.
 
 ## Known gaps (intentionally deferred, not bugs)
 
@@ -311,7 +389,107 @@ Phase 4's deterministic PATTERNS layer:
 
 ## Current experiments / pending decisions
 
-None open. Fifteen operator decisions to date are recorded in `docs/decisions/`.
+**Open: Phase 5A's ITERATE result.** `docs/decisions/0016` implements the
+experiment (schema/protocol/provider/service/job/store/UI, fully tested)
+and it has now been run once against the real 5-pair edit corpus and
+human-graded. Result: **PIPELINE EXECUTION — PASS**, **INFORMATION GAIN —
+PASS** (semantic candidates preserve materially more persona-relevant
+information than `compressionRatio`/`lexicalOverlap` alone — the central
+question Phase 5A exists to answer), **COVERAGE — PASS/BORDERLINE** (~1
+`MISSED_SIGNAL` in 5 sources), **GROUNDEDNESS — FAIL** (66.7% `SUPPORTED`
+vs. the required ≥80% — the extractor sometimes attributes to the human
+edit meaning that was already present in the AI-drafted source),
+**SMALL-MODEL VIABILITY — PROMISING / NOT YET VALIDATED** (`gpt-4o-mini`
+extracted meaningful Turkish semantic differences, but the groundedness
+shortfall leaves this open). Overall status: **Phase 5A: ITERATE** — not
+abandoned, not declared validated. The persona-evidence-utility hypothesis
+is not rejected by this result, but is not fully validated either; a
+separate follow-up task is expected to address the identified
+extraction-precision failure mode (confusing human-introduced
+information with information already present in the AI source) — no such
+fix has been implemented yet. See `docs/decisions/0016`'s "First real
+experiment result" section and `docs/validation/manual-mvp-validation.md`'s
+Phase 5A results table for full grading detail.
+
+**That fix was Trial 1 (`docs/decisions/0016`'s "Trial 1" section):
+REAL RESULT RECORDED — ITERATE, aggregate groundedness unchanged.** A
+single controlled change to the extraction instruction — grounding every
+candidate in the ORIGINAL→FINAL transformation via a mandatory
+counterfactual check — targeted the failure mode above. Same 5 real
+`EditEvent`s, same OpenRouter model (`openai/gpt-4o-mini`), same
+schema/candidate kinds/receipt mechanism/acceptance thresholds;
+`providerId` bumped to `openrouter/transformation-grounded-v1`, confirmed
+by receipts to have reprocessed all 5 sources. **Real result: still 15
+candidates, still 10/15 (66.7%) `SUPPORTED` — identical to baseline,
+below the required ≥80% threshold.** A qualitative behavioral shift was
+observed (more directional ORIGINAL→FINAL framing) but did not move the
+aggregate score. Manual grading identified three remaining failure
+classes: preserved+changed meaning mixed within one candidate, overlapping/
+redundant candidates, and over-interpreted removals.
+
+**Trial 2 (`docs/decisions/0016`'s "Trial 2" section): REAL RESULT
+RECORDED — ITERATE, first quantitative groundedness improvement.**
+Targeted the three Trial 1 failure classes by adding a deterministic,
+language-general evidence-localization layer
+(`extension/src/persona/revision-diff.ts`, `computeRevisionDiff`) ahead of
+semantic interpretation — a word/token-level adaptation of Conijn et al.
+(2022)'s restricted-Damerau-Levenshtein revision classification
+(insertion/deletion/substitution/reordering) — plus explicit
+atomic-candidate, local redundancy-avoidance, and removal-discipline
+instruction rules. `providerId` `openrouter/evidence-localized-v2`,
+distinct from both prior trials; confirmed by receipts to have reprocessed
+all 5 sources. **Real result: 17 candidates, 12/17 (70.6%) `SUPPORTED` —
+up from Trial 0/1's 66.7%, still below the required ≥80% threshold.**
+`PARTIALLY_SUPPORTED` fell (26.7% → 17.6%) but `UNSUPPORTED` rose (6.7% →
+11.8%) — both reported. A newly exposed failure class: the deterministic
+layer can correctly localize *that* text changed while the semantic
+extractor still assigns unsupported meaning to that change (`TEXTUAL
+INTERVENTION != SEMANTIC CHANGE != PERSONA-RELEVANT EVIDENCE`), e.g. a
+correctly-localized `davranışlarına` → `hareketine` replacement graded
+`UNSUPPORTED` for an unsupported "narrowing" interpretation on top of it.
+Conservative conclusion: localization appears useful but is not
+sufficient. No claim of statistical significance, generalization, or
+persona-reconstruction validation.
+
+**Trial 3 (`docs/decisions/0016`'s "Trial 3"/"Trial 3 addendum"/"Trial 3 —
+final zero-shot capability assessment" sections): REAL RESULT RECORDED —
+COMPLETE.** Unlike Trial 1/2 (single-variable prompt changes on the same
+provider/call-shape), Trial 3 is an **architecture validation trial**: it
+moves localization, intervention construction, and admission entirely
+into deterministic HDNA logic (`revision-diff.ts` reused unchanged from
+Trial 2, plus new `revision-intervention.ts`/`semantic-revision-admission.ts`),
+leaving the model only one narrow per-intervention judgment
+(`no_meaningful_change`/`meaning_added`/`meaning_removed`/
+`meaning_transformed`/`uncertain` + a one-sentence description), and
+switches transport from OpenRouter to a **local MLX-LM server** running
+**`Qwen3-0.6B`** on Apple Silicon (`LocalMlxSemanticRevisionJudge`), zero-
+shot, thinking disabled, no fine-tuning/LoRA/SFT. **Real result: local
+runtime/MLX execution PASS** (real sub-second per-intervention latency, no
+cloud dependency); **zero-shot semantic capability FAIL** — broad semantic
+matrix 52.9%, A/B discrimination 51% (chance level on a two-way forced
+choice), coarse feature classification 14.9% (below every pre-declared
+feasibility band). **This falsifies the hypothesis that unmodified
+`Qwen3-0.6B` has sufficient zero-shot semantic capability for the Phase 5A
+transformation — explicitly NOT a WebGPU/MLX/local-runtime blocker.** The
+three scores are recorded as the official Phase 5A zero-shot tiny-model
+baseline for future comparison. Trial 3 is marked COMPLETE; **Phase 5A
+overall remains ITERATE**, not validated, not abandoned.
+
+**Trial 4 (planned — external, not implemented; docs/decisions/0016's
+"Trial 4" section) is the next research direction, documentation only:**
+distillation/specialization (large-model teacher → filtered/versioned
+training dataset → `Qwen3-0.6B` LoRA/SFT → held-out falsification →
+failure-driven iteration), targeting the exact same `Qwen3-0.6B` model
+Trial 3 measured (not a different/smaller model), so the effect of
+training can be isolated against the Trial 3 baseline. Held-out
+falsification-benchmark examples must never leak into training data;
+failure categories may only inform new teacher-generated examples. No
+training scripts, dataset generators/files, LoRA configs, model
+artifacts, teacher calls, evaluation-harness changes, new extraction
+architecture, new UI, or new extension runtime behavior exist in this
+repository for Trial 4 as of this writing.
+
+Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider
@@ -319,20 +497,23 @@ call: whether/how to add content-script-based live capture. Future work, each
 execution context per `docs/decisions/0009`); a real trained classifier or
 additional heuristic T2 dimensions (`docs/decisions/0010`); a non-OpenRouter
 `PersonaInterpreterProvider` or per-request cost/rate limiting for T3
-(`docs/decisions/0015`); and Phase 5 (retrieval runtime) to actually wire
-derived signals (including TraitBeliefClaims) into anything user-facing.
-One open research question, not yet an implementation decision: the first
-real T3 dogfood test against the actual OpenRouter API (see
+(`docs/decisions/0015`); Phase 5A's optional (A)-vs-(B) control
+(`docs/decisions/0016`); and retrieval runtime / WebGPU expression engine,
+now explicitly **deferred (not cancelled)** pending the Phase 5A
+evidence-utility answer, to actually wire derived signals (including
+TraitBeliefClaims, and possibly SemanticDeltaCandidates) into anything
+user-facing.
+
+The research question that motivated Phase 5A (see
 `docs/decisions/0015`'s "HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD
 FINDING" section) found that `compressionRatio`/`lexicalOverlap` — the
 only two dimensions PATTERNS currently produces — don't carry enough
 semantic information for T3 to construct a meaningful persona; the T3
 pipeline itself (evidence → patterns → OpenRouter → persisted claims) is
-confirmed working end to end. The next architectural question is how to
-derive higher-information semantic preference/behavioral-delta evidence
-from AI-output → human-edit deltas upstream of PATTERNS, without
-weakening evidence thresholds or the evidence → repeated pattern →
-interpretation discipline.
+confirmed working end to end. Phase 5A is this codebase's answer to "how do
+we derive higher-information semantic preference/behavioral-delta evidence
+from AI-output → human-edit deltas upstream of PATTERNS" — implemented and
+ready to run, not yet validated as actually solving the problem.
 
 ## Current benchmark status
 

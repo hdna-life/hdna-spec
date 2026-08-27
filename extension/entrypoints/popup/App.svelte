@@ -34,6 +34,18 @@
   import { enqueuePersonaInterpretation } from '../../src/queue/processors/persona-interpretation-job';
   import { isEligibleForInterpretation } from '../../src/persona/persona-interpreter';
   import { DEFAULT_PERSONA_INTERPRETER_POLICY } from '@spec/schema/persona-interpreter-policy';
+  import { SemanticDeltaCandidateStore } from '../../src/persona/semantic-delta-candidate-store';
+  import { SemanticDeltaExtractionReceiptStore } from '../../src/persona/semantic-delta-extraction-receipt-store';
+  import {
+    SemanticDeltaExtractorConfigStore,
+    type SemanticDeltaExtractorConfig,
+  } from '../../src/persona/semantic-delta-extractor-config-store';
+  import { enqueueSemanticDeltaExtraction } from '../../src/queue/processors/semantic-delta-extraction-job';
+  import {
+    SemanticRevisionJudgeConfigStore,
+    type SemanticRevisionJudgeConfig,
+  } from '../../src/persona/semantic-revision-judge-config-store';
+  import { enqueueSemanticRevisionJudge } from '../../src/queue/processors/semantic-revision-judge-job';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -41,6 +53,8 @@
   import type { T2Profile } from '@spec/schema/t2-profile';
   import type { Pattern } from '@spec/schema/pattern';
   import type { TraitBeliefClaim } from '@spec/schema/trait-belief';
+  import type { SemanticDeltaCandidate } from '@spec/schema/semantic-delta-candidate';
+  import type { SemanticDeltaExtractionReceipt } from '@spec/schema/semantic-delta-extraction-receipt';
   import Status from '../../src/ui/Status.svelte';
   import Queue from '../../src/ui/Queue.svelte';
   import StorageUsage from '../../src/ui/StorageUsage.svelte';
@@ -53,6 +67,7 @@
   import T2ProfileSummary from '../../src/ui/T2ProfileSummary.svelte';
   import PatternsSummary from '../../src/ui/PatternsSummary.svelte';
   import TraitsBeliefsSummary from '../../src/ui/TraitsBeliefsSummary.svelte';
+  import SemanticDeltaExtractionPanel from '../../src/ui/SemanticDeltaExtractionPanel.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
@@ -72,6 +87,10 @@
   const patternStore = new PatternStore(storage);
   const traitBeliefStore = new TraitBeliefStore(storage);
   const personaInterpreterConfigStore = new PersonaInterpreterConfigStore();
+  const semanticDeltaCandidateStore = new SemanticDeltaCandidateStore(storage);
+  const semanticDeltaExtractionReceiptStore = new SemanticDeltaExtractionReceiptStore(storage);
+  const semanticDeltaExtractorConfigStore = new SemanticDeltaExtractorConfigStore();
+  const semanticRevisionJudgeConfigStore = new SemanticRevisionJudgeConfigStore();
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -88,6 +107,10 @@
   let patterns: Pattern[] = [];
   let traitBeliefs: TraitBeliefClaim[] = [];
   let personaInterpreterConfig: PersonaInterpreterConfig = { enabled: false };
+  let semanticDeltaCandidates: SemanticDeltaCandidate[] = [];
+  let semanticDeltaReceipts: SemanticDeltaExtractionReceipt[] = [];
+  let semanticDeltaExtractorConfig: SemanticDeltaExtractorConfig = { enabled: false };
+  let semanticRevisionJudgeConfig: SemanticRevisionJudgeConfig = { enabled: false };
   // Same pure gate PersonaInterpreterService.interpret() itself checks
   // before ever calling the provider — computed here so the panel can show
   // *before* the user clicks "Interpret" whether this run will make any
@@ -115,6 +138,10 @@
     patterns = await patternStore.list();
     traitBeliefs = await traitBeliefStore.list();
     personaInterpreterConfig = await personaInterpreterConfigStore.get();
+    semanticDeltaCandidates = await semanticDeltaCandidateStore.list();
+    semanticDeltaReceipts = await semanticDeltaExtractionReceiptStore.list();
+    semanticDeltaExtractorConfig = await semanticDeltaExtractorConfigStore.get();
+    semanticRevisionJudgeConfig = await semanticRevisionJudgeConfigStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -161,6 +188,26 @@
 
   async function saveInterpreterConfig(event: CustomEvent<PersonaInterpreterConfig>) {
     await personaInterpreterConfigStore.set(event.detail);
+    await refresh();
+  }
+
+  async function extractSemanticDeltas() {
+    await enqueueSemanticDeltaExtraction(queue);
+    await refresh();
+  }
+
+  async function judgeSemanticRevisions() {
+    await enqueueSemanticRevisionJudge(queue);
+    await refresh();
+  }
+
+  async function saveSemanticRevisionJudgeConfig(event: CustomEvent<SemanticRevisionJudgeConfig>) {
+    await semanticRevisionJudgeConfigStore.set(event.detail);
+    await refresh();
+  }
+
+  async function saveSemanticDeltaExtractorConfig(event: CustomEvent<SemanticDeltaExtractorConfig>) {
+    await semanticDeltaExtractorConfigStore.set(event.detail);
     await refresh();
   }
 
@@ -217,6 +264,16 @@
     config={personaInterpreterConfig}
     on:interpret={interpretTraitsBeliefs}
     on:saveConfig={saveInterpreterConfig}
+  />
+  <SemanticDeltaExtractionPanel
+    candidates={semanticDeltaCandidates}
+    receipts={semanticDeltaReceipts}
+    config={semanticDeltaExtractorConfig}
+    judgeConfig={semanticRevisionJudgeConfig}
+    on:extract={extractSemanticDeltas}
+    on:judgeRevisions={judgeSemanticRevisions}
+    on:saveConfig={saveSemanticDeltaExtractorConfig}
+    on:saveJudgeConfig={saveSemanticRevisionJudgeConfig}
   />
   <VectorIndex
     {embeddingCount}
