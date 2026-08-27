@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
   import type { SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
+  import type { Trial4ImportMode } from '../../persona/trial4-training-candidate-import';
   import {
     VERDICT_LABELS_TR,
     VERDICT_ORDER,
@@ -17,8 +18,9 @@
   export let candidates: Trial4TrainingCandidate[] = [];
 
   const dispatch = createEventDispatcher<{
-    importCandidates: Trial4TrainingCandidate[];
+    importCandidates: { candidates: Trial4TrainingCandidate[]; mode: Trial4ImportMode };
     update: Trial4TrainingCandidate;
+    clearAll: void;
   }>();
 
   const FILTERS: { value: Trial4ReviewFilter; label: string }[] = [
@@ -125,8 +127,7 @@
     pushUpdate({ loreNoteTr: value });
   }
 
-  let fileInput: HTMLInputElement;
-  async function handleImportFile(event: Event) {
+  async function handleImportFile(event: Event, mode: Trial4ImportMode) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -136,14 +137,31 @@
       parsed = JSON.parse(text);
     } catch {
       alert('Seçilen dosya geçerli bir JSON değil.');
+      input.value = '';
       return;
     }
     if (!Array.isArray(parsed)) {
       alert('Bir JSON dizisi (candidate objeleri) bekleniyor.');
+      input.value = '';
       return;
     }
-    dispatch('importCandidates', parsed as Trial4TrainingCandidate[]);
+    if (mode === 'replace') {
+      const confirmed = confirm(
+        'Mevcut tüm Trial 4 eğitim adayları silinip yerine bu dosyadaki adaylar mı yüklensin? Bu işlem geri alınamaz.',
+      );
+      if (!confirmed) {
+        input.value = '';
+        return;
+      }
+    }
+    dispatch('importCandidates', { candidates: parsed as Trial4TrainingCandidate[], mode });
     input.value = '';
+  }
+
+  function handleClearAll() {
+    const confirmed = confirm('Tüm Trial 4 eğitim adaylarını temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.');
+    if (!confirmed) return;
+    dispatch('clearAll');
   }
 
   function isTypingInField(event: KeyboardEvent): boolean {
@@ -186,10 +204,17 @@
         <button class:active={filter === f.value} on:click={() => setFilter(f.value)}>{f.label}</button>
       {/each}
     </div>
-    <label class="import-label">
-      Aday içe aktar
-      <input bind:this={fileInput} type="file" accept="application/json" on:change={handleImportFile} />
-    </label>
+    <div class="import-group">
+      <label class="import-label">
+        Mevcutlara ekle
+        <input type="file" accept="application/json" on:change={(e) => handleImportFile(e, 'append')} />
+      </label>
+      <label class="import-label">
+        Temizle ve içe aktar
+        <input type="file" accept="application/json" on:change={(e) => handleImportFile(e, 'replace')} />
+      </label>
+      <button class="danger" on:click={handleClearAll}>Tüm adayları temizle</button>
+    </div>
   </header>
 
   <div class="progress">
@@ -338,9 +363,24 @@
     color: #fff;
     border-color: #2a6b3f;
   }
+  .import-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
   .import-label {
     font-size: 13px;
     color: #555;
+  }
+  button.danger {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid #c0392b;
+    background: #fbe9e7;
+    color: #a33;
+    cursor: pointer;
   }
   .progress {
     margin-bottom: 16px;

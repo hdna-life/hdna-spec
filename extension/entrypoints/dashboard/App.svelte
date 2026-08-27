@@ -5,6 +5,11 @@
   import { RuntimeControls, type RuntimeControlsState } from '../../src/runtime/controls';
   import { FOREGROUND_PORT_NAME } from '../../src/runtime/foreground-tracker';
   import { Trial4TrainingCandidateStore } from '../../src/persona/trial4-training-candidate-store';
+  import {
+    importTrial4TrainingCandidates,
+    clearAllTrial4TrainingCandidates,
+    type Trial4ImportMode,
+  } from '../../src/persona/trial4-training-candidate-import';
   import { Trial4BenchmarkCaseStore } from '../../src/persona/trial4-benchmark-case-store';
   import { Trial4BenchmarkResultStore } from '../../src/persona/trial4-benchmark-result-store';
   import {
@@ -57,22 +62,15 @@
 
   // --- Training Review -------------------------------------------------
 
-  async function importTrial4Candidates(event: CustomEvent<Trial4TrainingCandidate[]>) {
-    const existingIds = new Set(trial4TrainingCandidates.map((c) => c.id));
-    const now = new Date().toISOString();
-    for (const raw of event.detail) {
-      if (!raw?.id || existingIds.has(raw.id)) continue;
-      await trial4TrainingCandidateStore.put({
-        ...raw,
-        humanVerdict: raw.humanVerdict ?? null,
-        includeInTraining: raw.includeInTraining ?? false,
-        exclusionReasons: raw.exclusionReasons ?? [],
-        operatorNoteTr: raw.operatorNoteTr ?? '',
-        loreImportant: raw.loreImportant ?? false,
-        loreNoteTr: raw.loreNoteTr ?? null,
-        importedAt: now,
-      });
-    }
+  async function importTrial4Candidates(
+    event: CustomEvent<{ candidates: Trial4TrainingCandidate[]; mode: Trial4ImportMode }>,
+  ) {
+    await importTrial4TrainingCandidates(trial4TrainingCandidateStore, event.detail.candidates, event.detail.mode);
+    await refresh();
+  }
+
+  async function clearTrial4Candidates() {
+    await clearAllTrial4TrainingCandidates(trial4TrainingCandidateStore);
     await refresh();
   }
 
@@ -194,6 +192,7 @@
         candidates={trial4TrainingCandidates}
         on:importCandidates={importTrial4Candidates}
         on:update={updateTrial4Candidate}
+        on:clearAll={clearTrial4Candidates}
       />
     {:else if page === 'benchmark'}
       <Trial4BenchmarkPanel
