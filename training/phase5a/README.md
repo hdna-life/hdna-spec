@@ -12,23 +12,33 @@ This pipeline generates synthetic training examples via OpenRouter (routed to a 
 
 ### 1. Generate Candidate Examples
 
-Generate ~500 synthetic semantic-change scenarios via OpenRouter:
+Generate ~500 synthetic semantic-change scenarios via OpenRouter. **Generation model: 1 API request = 1 candidate** — earlier batched generation (N candidates per request) proved unreliable in practice (batches of 8 sometimes returned as few as 1 valid candidate, some returned 0, some requests timed out). Each request now asks for exactly one candidate, is validated independently, and retries independently on failure — one bad response can never affect any other candidate. Up to `--concurrency` (default 4) requests run at once via a small fixed thread pool; workers are fully independent (one worker's failure/retry never affects another), and output writes are serialized so concurrent workers can never corrupt or duplicate lines.
+
+Validate with a small run first, before spending the full budget:
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
+python3 dataset/generate_candidates.py --count 10
+```
+
+Confirm exactly 10 valid candidate objects were persisted to `dataset/generated/candidates.json`, then proceed to the full run:
+
+```bash
 python3 dataset/generate_candidates.py --count 500
 ```
 
-**Output:** `dataset/generated/candidates.json` (one JSON object per line, appended incrementally)
+**Output:** `dataset/generated/candidates.json` (one JSON object per line, appended incrementally as each candidate is validated)
 
 **Options:**
-- `--count N`: Total candidates to generate (default: 500)
+- `--count N`: Target number of **valid persisted candidates** — existing + new, NOT a request/API-call count (default: 500). The script keeps issuing individual requests (retrying each up to 3 times on failure/invalid output before skipping it) until either `N` valid candidates exist on disk, or a bounded global failure limit is hit.
 - `--out FILE`: Output path (default: `dataset/generated/candidates.json`)
 - `--model MODEL_ID`: OpenRouter model id (default: `deepseek/deepseek-chat` — a DeepSeek model routed through OpenRouter; verify current availability/pricing at https://openrouter.ai/models, and substitute any other OpenRouter-hosted model if desired)
-- `--batch-size N`: Candidates per API call (default: 8)
+- `--concurrency N`: Number of candidate-generation requests to run concurrently (default: 4). Validate a small run at your intended concurrency first, e.g. `--count 20 --concurrency 4`, and confirm exactly 20 valid candidates are persisted before the full run.
 - `--seed N`: Random seed for topic cycling (optional)
 
-**Resumption:** If the script crashes, re-run the same command — it loads existing candidates and continues from where it left off, without overwriting or duplicating.
+**Resumption:** If the script crashes or is interrupted, re-run the same command — it loads existing candidates from `--out` and continues from where it left off. Already-persisted candidates are never re-requested, overwritten, or duplicated.
+
+**Turkish review assistance:** each generated candidate also carries a `reviewNoteTr` field — a short Turkish-language explanation of the change and proposed verdict, generated in the same request (no second translation call). This is review assistance only for the extension's Training Review panel; it is never read by `split_dataset.py` and never enters the training dataset — see `spec/schema/trial4-training-candidate.ts`'s `reviewNoteTr` docstring.
 
 ### 2. Human Review (Browser Extension)
 

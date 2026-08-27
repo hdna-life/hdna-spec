@@ -87,6 +87,12 @@
         <strong>Proposed verdict:</strong> {current.proposedVerdict}
         {#if current.proposedDescription}<br />{current.proposedDescription}{/if}
       </p>
+      {#if current.reviewNoteTr}
+        <p class="tr-note">
+          <strong>TR (inceleme yardımı — eğitim verisine girmez):</strong><br />
+          {current.reviewNoteTr}
+        </p>
+      {/if}
       <div class="actions">
         <button class="accept" on:click={accept}>Accept for Training (A)</button>
         <button class="reject" on:click={reject}>Reject (R)</button>
@@ -101,7 +107,10 @@
   </button>
   <p class="note">
     Only accepted examples become eligible for Trial 4 training —
-    rejected/pending candidates are never exported. See
+    rejected/pending candidates are never exported. The Turkish note above
+    is review assistance only: it is never used to train the model and is
+    not part of the task/lore contract — English
+    original/final/description remain the sole ground truth. See
     docs/decisions/0017 for the human-filtered specialization rationale.
   </p>
 </section>
@@ -152,6 +161,12 @@
     margin-top: 6px;
     padding-top: 6px;
     border-top: 1px dashed #ddd;
+  }
+  .tr-note {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #ddd;
+    color: #444;
   }
   .actions {
     margin-top: 8px;

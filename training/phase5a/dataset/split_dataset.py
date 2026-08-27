@@ -91,7 +91,15 @@ def load_accepted_candidates(file_path: str) -> list[dict[str, Any]]:
 
 
 def candidate_to_example(candidate: dict[str, Any]) -> dict[str, str]:
-    """Convert one candidate to training example: {"prompt": "...", "completion": "..."}."""
+    """Convert one candidate to training example: {"prompt": "...", "completion": "..."}.
+
+    Deliberately reads only kind/beforeContext/originalText/finalText/
+    afterContext/proposedVerdict/proposedDescription — a candidate's
+    reviewNoteTr field (Turkish operator-review assistance; see
+    spec/schema/trial4-training-candidate.ts) is never read here on
+    purpose, so it structurally cannot enter the training dataset even if
+    present on the input candidate.
+    """
     # Build the prompt
     prompt = build_judge_prompt(
         kind=candidate["kind"],

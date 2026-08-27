@@ -38,6 +38,24 @@ export interface Trial4TrainingCandidate {
   proposedVerdict: SemanticChangeVerdict;
   /** Null exactly when proposedVerdict is 'no_meaningful_change'/'uncertain', mirroring SemanticRevisionJudgmentDraft's convention. */
   proposedDescription: string | null;
+  /**
+   * Turkish-language review assistance ONLY — a natural-language
+   * explanation of the original->final change and the proposed verdict,
+   * for an operator who does not read English comfortably (see the
+   * "Turkish operator review support" task this field was added for).
+   * Generated in the same DeepSeek/OpenRouter request that produces the
+   * rest of this candidate (`training/phase5a/dataset/generate_candidates.py`),
+   * not a second translation call. Displayed by `Trial4TrainingReviewPanel.svelte`
+   * only.
+   *
+   * This field is NOT canonical, NOT part of the task/lore contract, and
+   * MUST NEVER enter the training dataset: `training/phase5a/dataset/split_dataset.py`
+   * deliberately never reads it when building the `{prompt, completion}`
+   * export — the English `originalText`/`finalText`/`proposedDescription`
+   * fields above remain the sole ground truth. Optional (`?`) so
+   * candidates imported before this field existed remain valid.
+   */
+  reviewNoteTr?: string;
   decision: Trial4TrainingCandidateDecision;
   /** ISO timestamp when this candidate was imported into the extension (not when DeepSeek generated it). */
   importedAt: string;

@@ -551,3 +551,149 @@ python3 dataset/generate_candidates.py \
 This has not been run as part of this task. No new candidates exist in
 this repository as a result of this addendum — only the contract and
 generator-prompt changes described above.
+
+## Trial 4 addendum: generation-reliability simplification + concurrency + Turkish review support
+
+**Status: IMPLEMENTED.** Three related operator requests, addressed
+together since the third depends on the first two's request/response
+shape.
+
+### 1-request-1-candidate (reliability simplification)
+
+Real generation runs surfaced brittle behavior in the original batched
+design (`--batch-size 8`, one response containing an array of candidates):
+some batches returned as few as 1 valid candidate out of 8 requested,
+some returned 0, and some requests timed out entirely. Per the operator's
+explicit instruction, this was **not** addressed with more parsing/repair
+logic — it was addressed by shrinking the unit of work. Every request now
+asks the model for exactly one candidate object (`generate_single_candidate_prompt()`
+replaces the old `generate_batch_prompt()`); `parse_single_response()`
+replaces `parse_batch_response()` and does only the same minimal,
+non-recovering normalization already established elsewhere in this
+codebase (whitespace trim, one optional Markdown fence strip — the same
+tolerance `semantic-revision-judge-wire.ts`'s `parseUntrustedJudgmentText()`
+uses) — any other malformation is an invalid response, not a repair
+target. A failed or invalid single-candidate request retries up to
+`MAX_RETRIES_PER_CANDIDATE = 3` times, in isolation; after that it is
+skipped and generation continues — one bad candidate can never abort or
+corrupt any other.
+
+`--count` now means the target number of **valid persisted candidates**
+(existing + new), not a request count — `run_generation()` keeps issuing
+individual requests until that many valid candidates exist on disk, or a
+bounded global failure limit (`max(50, remaining_target * 5)`) is hit,
+whichever comes first; hitting the limit exits non-zero with a clear
+message rather than looping forever. `--batch-size` was removed (no
+longer meaningful); resumability is unchanged — `load_existing_candidates()`
+is untouched, and already-written candidates are never re-requested or
+duplicated.
+
+### Concurrency (4 workers by default)
+
+Per the follow-up request, generation runs up to `--concurrency` (default
+`4`) single-candidate requests at once via Python's stdlib
+`concurrent.futures.ThreadPoolExecutor` — explicitly not a new dependency
+and not "a larger async orchestration framework," per the operator's
+stated constraint. `run_generation()` primes the pool with `concurrency`
+tasks, then replaces each completed task with a new one (via
+`concurrent.futures.wait(..., return_when=FIRST_COMPLETED)`) until the
+target is reached or the failure budget is exhausted. Each worker task
+(`generate_one_candidate_with_retries()`) owns its own full retry loop
+and is fully independent — one worker's failure/timeout never affects any
+other in-flight worker. Output writes are serialized behind a single
+`threading.Lock` (`output_candidate()`) so concurrent workers can never
+interleave or corrupt JSONL lines.
+
+**A real concurrency bug was found and fixed during implementation,
+before any real API run.** An offline smoke test (mocked `call_openrouter_api`,
+no real network calls, run standalone — not part of the pytest/vitest
+suites, since this is a throwaway verification script, not a persisted
+test file) simulating realistic failure/invalid-response rates caught
+that persisted count could **overshoot** the target: when multiple
+workers completed in the same `wait()` batch, each was checked against
+the target *before* any of that batch's increments were applied, so more
+than one could pass the check and all get persisted. Fixed by making the
+target check-and-increment atomic under the same lock that guards
+`state["persisted"]` — a candidate is now persisted only if
+`state["persisted"] < remaining_target` at the moment its own increment
+is applied; any valid candidate arriving after the target is already met
+is discarded (not persisted), which is what keeps `--count 20` producing
+*exactly* 20 persisted candidates rather than "20 or a few more."
+Verified stable across 5 repeated stochastic runs at concurrency 4 after
+the fix (no overshoot, no undershoot, no duplicate/corrupted lines), plus
+a dedicated bounded-failure-exhaustion run (all calls fail -> stops at
+the failure budget, doesn't hang) and a dedicated resumability run
+(pre-seeded existing candidates are read correctly and never touched).
+
+### Turkish operator review support
+
+The operator does not read English comfortably enough to reliably judge
+every candidate. Per the explicit requirement, the canonical candidate
+and training data remain English-only; a **`reviewNoteTr`** field was
+added carrying a short Turkish-language explanation of the original ->
+final change and the proposed verdict, for review purposes only.
+
+**Generated in the same request, not a second call** — per the operator's
+explicit preference ("prefer generating the Turkish review text during
+candidate generation... do not make a second LLM request solely for
+translation unless necessary"). `generate_single_candidate_prompt()` asks
+for `reviewNoteTr` as an eighth required field alongside the existing
+seven; `parse_single_response()`/`REQUIRED_FIELDS` require it to be a
+non-empty string on every candidate, regardless of verdict (including
+`no_meaningful_change`/`uncertain`, where an explanation is still useful
+even though `proposedDescription` is null for those verdicts).
+
+**Structurally cannot enter training data or the task/lore contract.**
+`spec/schema/trial4-training-candidate.ts`'s `Trial4TrainingCandidate.reviewNoteTr`
+is documented as review-assistance-only and optional (so pre-existing
+candidates without it remain valid). `training/phase5a/dataset/split_dataset.py`'s
+`candidate_to_example()` — the only code path that turns an accepted
+candidate into a training example — reads only
+`kind`/`beforeContext`/`originalText`/`finalText`/`afterContext`/
+`proposedVerdict`/`proposedDescription`; it was given an explicit comment
+documenting that `reviewNoteTr` is deliberately never read there, so the
+exclusion is structural (the field literally never reaches
+`candidate_to_example`'s scope), not merely a convention someone could
+accidentally violate. `training/phase5a/lore/task-contract.v2.md` was not
+touched — the Turkish field is UI/generation-pipeline plumbing, not a
+change to what the model is asked to learn.
+
+**Extension UI:** `Trial4TrainingReviewPanel.svelte` now displays
+`reviewNoteTr` (labeled, in Turkish, as review assistance that does not
+enter training) directly under the existing English proposed-verdict/
+description block, when present. The operator's Accept/Reject decision
+remains the only thing that determines training-set membership — the
+Turkish note is display-only and participates in no decision logic.
+`App.svelte`'s `importTrial4Candidates()` handler needed no change: it
+already spreads (`{...raw, ...}`) each imported candidate object, so
+`reviewNoteTr` passes through automatically without a dedicated code path.
+
+### Scope discipline
+
+Per the operator's explicit instructions on all three requests: no change
+to the task/lore contract's rules (`v2.md`'s content is untouched by this
+addendum), no change to the candidate schema's existing required fields
+(only one new *optional* field added), no change to
+`Trial4BenchmarkService`/`DeepSeekSemanticRevisionJudge`/`train_lora.sh`/
+`write_manifest.py`, and no larger async/orchestration framework —
+`ThreadPoolExecutor` plus one lock is the entire concurrency
+implementation. `tsc --noEmit` clean, `wxt build` clean, 652/652 existing
+tests still pass (none needed updating — `reviewNoteTr` is optional, and
+no existing test constructs a `Trial4TrainingCandidate` fixture that
+would be affected by adding it).
+
+### Not done in this addendum
+
+No real generation run — the `--count 10` and `--count 20 --concurrency 4`
+validation runs the operator was asked to perform still require a real
+`OPENROUTER_API_KEY` and make real, billed API calls, both outside this
+session's credentials. The exact commands:
+
+```bash
+cd training/phase5a
+export OPENROUTER_API_KEY=sk-or-...
+python3 dataset/generate_candidates.py --count 10
+# confirm exactly 10 valid candidates persisted, then:
+python3 dataset/generate_candidates.py --count 20 --concurrency 4 --out dataset/generated/validation-run.json
+# confirm exactly 20 valid candidates persisted, then proceed to the full run.
+```
