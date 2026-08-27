@@ -651,15 +651,31 @@ but localization is not sufficient
 No claim of causality, statistical significance, cross-language
 generalization, or persona-reconstruction validation is made.
 
-### Current best Phase 5A result
+### Current best Phase 5A result / trial summary
 
 ```text
-70.6% SUPPORTED (Trial 2)
-Acceptance threshold: >=80%
+Trial 0   groundedness 66.7% SUPPORTED
+Trial 1   groundedness 66.7% SUPPORTED (unchanged)
+Trial 2   groundedness 70.6% SUPPORTED (best groundedness result to date)
+Trial 3   local runtime PASS / zero-shot semantic capability FAIL
+            broad matrix 52.9%, A/B 51%, coarse feature 14.9%
+            (architecture-validation trial — not a groundedness number,
+            not directly comparable to Trial 0-2's SUPPORTED rate)
+
+Acceptance threshold: >=80% SUPPORTED
 Phase 5A = ITERATE
 ```
 
-Trial 0 and Trial 1's results above remain visible, not overwritten.
+Trial 0, 1, and 2's results above remain visible, not overwritten. Trial
+3 tested a different axis (can a tiny local model even perform the
+semantic-judgment task zero-shot) rather than iterating on groundedness
+against the same OpenRouter model, so its scores are not a replacement for
+Trial 2's 70.6% — both are recorded as separate, valid findings. **Phase
+5A is not complete and not validated; overall status remains ITERATE.**
+Trial 4 (distillation/specialization of the same `Qwen3-0.6B` model) is
+the next planned experiment — documented, not implemented, in
+`docs/decisions/0016`'s "Trial 4" section and this document's Trial 4
+subsection below.
 
 ### Trial 3 — deterministic intervention pipeline + narrow small-model judge
 

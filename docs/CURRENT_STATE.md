@@ -30,10 +30,18 @@ specifically: **Trial 1** (transformation-grounding instruction) —
 groundedness unchanged (66.7%), still ITERATE; **Trial 2** (deterministic
 evidence localization + atomic/redundancy/removal discipline) — the first
 quantitative groundedness improvement (66.7% → 70.6%), still below the
-≥80% threshold, still ITERATE — see "Current experiments / pending
-decisions" below for both. The prior immediate roadmap (retrieval runtime
-→ WebGPU expression engine) is **deferred/reordered, not cancelled**,
-pending this evidence-utility question — see `docs/decisions/0016`.
+≥80% threshold, still ITERATE. **Trial 3** (local semantic-revision-judge
+feasibility — an architecture change, not a prompt tweak: deterministic
+per-intervention judging via a tiny local `Qwen3-0.6B` model over MLX,
+zero-shot, no fine-tuning) — **local runtime/MLX execution PASS, but
+zero-shot semantic capability FAIL** (broad semantic matrix 52.9%, A/B
+discrimination 51% — chance level, coarse feature classification 14.9%);
+COMPLETE, recorded as the official zero-shot tiny-model baseline; **still
+ITERATE overall** — see "Current experiments / pending decisions" below
+for all three. **Phase 5A overall status remains ITERATE — not complete,
+not validated.** The prior immediate roadmap (retrieval runtime → WebGPU
+expression engine) is **deferred/reordered, not cancelled**, pending this
+evidence-utility question — see `docs/decisions/0016`.
 
 Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
 PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
@@ -441,7 +449,45 @@ correctly-localized `davranışlarına` → `hareketine` replacement graded
 `UNSUPPORTED` for an unsupported "narrowing" interpretation on top of it.
 Conservative conclusion: localization appears useful but is not
 sufficient. No claim of statistical significance, generalization, or
-persona-reconstruction validation. Trial 3 is not designed or implemented.
+persona-reconstruction validation.
+
+**Trial 3 (`docs/decisions/0016`'s "Trial 3"/"Trial 3 addendum"/"Trial 3 —
+final zero-shot capability assessment" sections): REAL RESULT RECORDED —
+COMPLETE.** Unlike Trial 1/2 (single-variable prompt changes on the same
+provider/call-shape), Trial 3 is an **architecture validation trial**: it
+moves localization, intervention construction, and admission entirely
+into deterministic HDNA logic (`revision-diff.ts` reused unchanged from
+Trial 2, plus new `revision-intervention.ts`/`semantic-revision-admission.ts`),
+leaving the model only one narrow per-intervention judgment
+(`no_meaningful_change`/`meaning_added`/`meaning_removed`/
+`meaning_transformed`/`uncertain` + a one-sentence description), and
+switches transport from OpenRouter to a **local MLX-LM server** running
+**`Qwen3-0.6B`** on Apple Silicon (`LocalMlxSemanticRevisionJudge`), zero-
+shot, thinking disabled, no fine-tuning/LoRA/SFT. **Real result: local
+runtime/MLX execution PASS** (real sub-second per-intervention latency, no
+cloud dependency); **zero-shot semantic capability FAIL** — broad semantic
+matrix 52.9%, A/B discrimination 51% (chance level on a two-way forced
+choice), coarse feature classification 14.9% (below every pre-declared
+feasibility band). **This falsifies the hypothesis that unmodified
+`Qwen3-0.6B` has sufficient zero-shot semantic capability for the Phase 5A
+transformation — explicitly NOT a WebGPU/MLX/local-runtime blocker.** The
+three scores are recorded as the official Phase 5A zero-shot tiny-model
+baseline for future comparison. Trial 3 is marked COMPLETE; **Phase 5A
+overall remains ITERATE**, not validated, not abandoned.
+
+**Trial 4 (planned — external, not implemented; docs/decisions/0016's
+"Trial 4" section) is the next research direction, documentation only:**
+distillation/specialization (large-model teacher → filtered/versioned
+training dataset → `Qwen3-0.6B` LoRA/SFT → held-out falsification →
+failure-driven iteration), targeting the exact same `Qwen3-0.6B` model
+Trial 3 measured (not a different/smaller model), so the effect of
+training can be isolated against the Trial 3 baseline. Held-out
+falsification-benchmark examples must never leak into training data;
+failure categories may only inform new teacher-generated examples. No
+training scripts, dataset generators/files, LoRA configs, model
+artifacts, teacher calls, evaluation-harness changes, new extraction
+architecture, new UI, or new extension runtime behavior exist in this
+repository for Trial 4 as of this writing.
 
 Sixteen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
