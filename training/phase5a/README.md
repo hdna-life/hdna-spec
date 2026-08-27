@@ -6,7 +6,7 @@ A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) ca
 
 This pipeline generates synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
 
-**Ground truth:** `training/phase5a/lore/task-contract.v1.md` — the versioned specification all generated examples must follow.
+**Ground truth:** `training/phase5a/lore/task-contract.v2.md` — the versioned specification all generated examples must follow.
 
 ## Pipeline Steps
 
@@ -134,7 +134,7 @@ training/phase5a/
 ├── README.md                              (this file)
 ├── .gitignore                             (ignore generated data, models, cache)
 ├── lore/
-│   └── task-contract.v1.md               (ground truth specification)
+│   └── task-contract.v2.md               (ground truth specification)
 ├── dataset/
 │   ├── generate_candidates.py            (OpenRouter API client)
 │   ├── split_dataset.py                  (JSONL converter)
@@ -191,7 +191,7 @@ See `benchmark/sample_case.README.md` for the full evaluation-integrity contract
 
 ## References
 
-- Task contract (ground truth): `training/phase5a/lore/task-contract.v1.md`
+- Task contract (ground truth): `training/phase5a/lore/task-contract.v2.md`
 - Phase 5A overview: `docs/decisions/0016-phase5-persona-evidence-utility-validation.md`
 - Trial 3 context: same document, "Trial 3" sections
 - Trial 4 design: `docs/decisions/0017-phase5a-trial4-human-filtered-specialization.md` (if exists)

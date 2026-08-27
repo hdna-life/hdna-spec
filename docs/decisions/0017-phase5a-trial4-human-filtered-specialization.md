@@ -175,14 +175,17 @@ adapter should eventually be identifiable together with the spec/task-lore
 version and dataset version used to produce it — this does not require a
 full model registry in Trial 4.
 
-**Implementation note:** `training/phase5a/lore/task-contract.v1.md` is
-the single versioned contract; its own "Traceability" section maps every
-rule to a specific `docs/decisions/0016` section or observed Trial 0-3
-failure class (no rule was invented fresh for training purposes).
-`training/phase5a/write_manifest.py` records the lore contract version,
-base model id, dataset directory, example counts, and git commit hash
-into `manifest.json` next to a trained adapter — a lightweight identifier,
-not a registry.
+**Implementation note:** `training/phase5a/lore/task-contract.v1.md` (now
+superseded by `v2.md` — see the "Trial 4 addendum: task-contract v2"
+section below) is the versioned contract; its own "Traceability" section
+maps every rule to a specific `docs/decisions/0016` section or observed
+Trial 0-3 failure class (no rule was invented fresh for training
+purposes) — v2 extends this discipline to an explicit operator decision
+made from Trial 4's own first human-review pass, still traced rather than
+asserted. `training/phase5a/write_manifest.py` records the lore contract
+version, base model id, dataset directory, example counts, and git commit
+hash into `manifest.json` next to a trained adapter — a lightweight
+identifier, not a registry.
 
 ### Decision 11 — Multi-agent execution must be cost-adaptive
 
@@ -480,3 +483,71 @@ in the extension -> read aggregate stats from the panel).
   Trial 4 does not touch Trial 3's admission logic at all (this
   benchmark's outputs are graded directly by the operator, not passed
   through `admitJudgment()`).
+
+## Trial 4 addendum: task-contract v2 (failure-driven refinement)
+
+**Status: IMPLEMENTED.** After the operator's first human-review pass
+over 30 candidates generated under `task-contract.v1.md`, a systematic
+misclassification pattern was found: candidates whose two spans discussed
+the same underlying factual topic were being proposed/reviewed as
+`no_meaningful_change` even when hedging, certainty, intensity,
+commitment, directive strength, qualification, rationale, framing, or
+scope had genuinely shifted. This is a real, human-observed failure
+class from Trial 4's own data — not a hypothetical one, and not
+retroactively reinterpreting Trial 0-3.
+
+**What changed.** `training/phase5a/lore/task-contract.v2.md` (new file —
+per the contract's own versioning rule, `v1.md` is preserved unchanged,
+not edited in place) adds one substantive rule, §2.1: "A changed factual
+topic is not required for a meaningful change." The rule states plainly
+that "same topic" is not "same meaning," gives two worked examples
+(certainty: "This might help" -> "This will fix"; directive strength:
+"You should consider running the tests" -> "Run the tests"), and clarifies
+what it does *not* change — a genuinely meaning-preserving same-topic
+rewording remains correctly `no_meaningful_change`; §2.1 corrects a
+specific *over-application* of that rule, not the rule itself. Three
+other sections got one added sentence each restating the same correction
+in context (§3's "must not produce" list, §4's `'replaced'` kind-specific
+note, §5's abstention note); everything else in v1 is unchanged. This is
+recorded as `v2`, not a silent edit — consistent with §"Decision 10" and
+the contract's own stated versioning discipline.
+
+`training/phase5a/dataset/generate_candidates.py`'s embedded
+`TASK_CONTRACT` string and its `KEY DISCIPLINE` prompt block were both
+updated to match `v2.md`: the script's own docstring/comments now name
+`task-contract.v2.md`, the embedded contract text includes §2.1 and its
+two worked examples, and a new `KEY DISCIPLINE` bullet explicitly
+instructs the generator to include a meaningful share of same-topic/
+shifted-force examples labeled `meaning_transformed` (or added/removed as
+appropriate), never `no_meaningful_change`, purely because the topic
+didn't change. `training/phase5a/README.md` and this decision's own
+cross-references were updated to point at `v2.md`.
+
+**No architecture or scope change.** This is a prompt/lore-content
+refinement only, per the operator's explicit instruction. It does not
+touch `Trial4BenchmarkService`, `DeepSeekSemanticRevisionJudge`,
+`split_dataset.py`'s conversion logic, `train_lora.sh`, any extension
+schema/store/UI, or any of Decisions 1-12 above. `generate_candidates.py`
+recompiles cleanly (`py_compile`) after the change; `--help` output is
+unaffected.
+
+**A second, independent 30-candidate batch was requested for the next
+human-review pass**, generated under v2 rather than appended to the first
+(v1) batch, so the two batches remain distinguishable for review
+purposes. Generating it requires a real `OPENROUTER_API_KEY` and makes
+real, billed API calls — both outside what this implementation session
+has credentials for. The exact operator command (writing to a separate
+output file, not overwriting or merging with the first batch):
+
+```bash
+cd training/phase5a
+export OPENROUTER_API_KEY=sk-or-...
+python3 dataset/generate_candidates.py \
+  --count 30 \
+  --model deepseek/deepseek-chat-v3.1 \
+  --out dataset/generated/candidates-v2-batch1.json
+```
+
+This has not been run as part of this task. No new candidates exist in
+this repository as a result of this addendum — only the contract and
+generator-prompt changes described above.

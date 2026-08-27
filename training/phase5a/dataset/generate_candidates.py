@@ -3,7 +3,7 @@
 Phase 5A Trial 4: Generate candidate examples via OpenRouter.
 
 This script synthesizes plausible AI-draft-to-human-edit scenarios following
-the task contract in training/phase5a/lore/task-contract.v1.md.
+the task contract in training/phase5a/lore/task-contract.v2.md.
 
 Routed through OpenRouter (https://openrouter.ai), not a direct DeepSeek API
 call — the same gateway Trial 0-3 already use elsewhere in this repository
@@ -46,7 +46,7 @@ except ImportError:
 
 
 # Task contract text embedded here for the prompt.
-TASK_CONTRACT = """# Phase 5A task/lore contract — v1
+TASK_CONTRACT = """# Phase 5A task/lore contract — v2
 
 ## 1. The task, restated exactly as Trial 3 specifies it
 
@@ -80,7 +80,29 @@ The counterfactual check: would this exact observation still be true having
 only ever seen the ORIGINAL span, never the FINAL span? If yes, the correct
 verdict is `no_meaningful_change` — the meaning was already present.
 
-## 3. What must NOT be produced (failure classes from Trials 0-3)
+### 2.1. A changed factual topic is NOT required for a meaningful change (v2)
+
+Changes to hedging, certainty, intensity, commitment, directive strength,
+qualification, rationale, framing, or scope may constitute meaningful
+behavioral/semantic changes even when the core factual proposition remains
+unchanged. Do NOT classify such changes as `no_meaningful_change` merely
+because the underlying factual topic remains the same. "Same topic" is not
+"same meaning" — apply the counterfactual check above, not a topic-sameness
+shortcut.
+
+Examples:
+- "This might help with the issue." -> "This will fix the issue." — same
+  topic, but certainty shifted from hedged to asserted. `meaning_transformed`.
+- "You should consider running the tests before merging." -> "Run the tests
+  before merging." — same topic, but directive strength shifted from
+  suggestion to imperative. `meaning_transformed`.
+
+This does not mean every same-topic rewording is meaningful: a change that
+alters none of hedging/certainty/intensity/commitment/directive-strength/
+qualification/rationale/framing/scope, and genuinely only rephrases the same
+claim with the same force, is still correctly `no_meaningful_change`.
+
+## 3. What must NOT be produced (failure classes from Trials 0-3, plus v2's addition)
 
 - Do not attribute pre-existing meaning to the edit.
 - Do not infer a motivation, reason, or psychological explanation for a
@@ -88,6 +110,9 @@ verdict is `no_meaningful_change` — the meaning was already present.
 - Do not infer stable personality, motivation, psychology, demographics,
   or identity from one intervention.
 - Do not use textual-diff magnitude as evidence of semantic-change magnitude.
+- Do not use unchanged factual topic as evidence of no semantic change (v2,
+  §2.1) — the same failure shape, one level more specific: "same topic" is
+  not "same meaning."
 - Do not rely on language-specific wording, suffixes, or grammar. Reason about
   the underlying meaning shift, however it happens to be expressed.
 - Do not invent a comparison that contradicts the FINAL text.
@@ -95,6 +120,10 @@ verdict is `no_meaningful_change` — the meaning was already present.
 ## 4. Kind-specific notes
 
 - 'replaced': judge cosmetic corrections (e.g. typo fix) as `no_meaningful_change`.
+  Per §2.1, a 'replaced' pair on the same factual topic is NOT automatically
+  cosmetic either — check hedging/certainty/intensity/commitment/directive-
+  strength/qualification/rationale/framing/scope before defaulting to
+  `no_meaningful_change`.
 - 'added'/'removed': judge only the added/removed content itself in context.
 - 'reordered': word order rarely changes meaning, but judge the actual case.
 
@@ -112,6 +141,13 @@ directness. This is `meaning_transformed`.
 Trial 2 identified: replacing a generic rest recommendation with a concrete
 consequence/personal observation → specificity added. This is `meaning_added`.
 Also: spelling-fix-only replacements → `no_meaningful_change` with null description.
+
+v2 identified (§2.1): "This might help with the issue." → "This will fix
+the issue." — same topic, certainty shifted from hedged to asserted. This
+is `meaning_transformed`, NOT `no_meaningful_change`. Also: "You should
+consider running the tests before merging." → "Run the tests before
+merging." — same topic, directive strength shifted from suggestion to
+imperative. This is `meaning_transformed`, NOT `no_meaningful_change`.
 """
 
 TOPIC_SEEDS = [
@@ -184,6 +220,12 @@ KEY DISCIPLINE:
 - Ensure proposedDescription never describes meaning already present in originalText.
 - Ensure proposedDescription grounds ONLY in what the originalText->finalText
   transformation introduced, removed, or changed; never in context or pre-existing information.
+- Include a meaningful share of examples where the factual topic stays the
+  same but hedging/certainty/intensity/commitment/directive-strength/
+  qualification/rationale/framing/scope shifts (see task contract §2.1) —
+  these must be proposedVerdict='meaning_transformed' (or added/removed as
+  appropriate), NEVER 'no_meaningful_change', even though the topic is
+  unchanged.
 
 TASK CONTRACT:
 {TASK_CONTRACT}
