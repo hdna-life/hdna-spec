@@ -697,3 +697,191 @@ python3 dataset/generate_candidates.py --count 10
 python3 dataset/generate_candidates.py --count 20 --concurrency 4 --out dataset/generated/validation-run.json
 # confirm exactly 20 valid candidates persisted, then proceed to the full run.
 ```
+
+## Trial 4 addendum: structured review decisions + HDNA Dashboard
+
+**Status: IMPLEMENTED.** Two related operator requests, addressed
+together since the Dashboard's primary content is the review workflow the
+first request restructures.
+
+### Structured human review decisions (replaces binary Accept/Reject)
+
+The prior `Trial4TrainingCandidateDecision = 'pending' | 'accepted' |
+'rejected'` field collapsed three genuinely independent judgments into
+one state. Per the operator's explicit instruction, `Trial4TrainingCandidate`
+(`spec/schema/trial4-training-candidate.ts`) now separates them:
+
+1. **Human semantic verdict** (`humanVerdict: SemanticChangeVerdict |
+   null`) — the correct label, becoming training ground truth.
+   `proposedVerdict`/`proposedDescription` (DeepSeek's originals) are
+   **never overwritten** — both values are always preserved, so
+   human/model disagreement stays inspectable after the fact.
+2. **Training eligibility** (`includeInTraining: boolean` +
+   `exclusionReasons: Trial4ExclusionReason[]` + `operatorNoteTr: string`)
+   — should this example train the model? A closed, ten-value reason enum
+   (`synthetic_or_unrealistic`, `insufficient_context`,
+   `malformed_original_or_final`, `wrong_intervention_boundary`,
+   `too_easy_low_training_value`, `duplicate_or_near_duplicate`,
+   `misleading_turkish_explanation`, `description_not_supported_by_edit`,
+   `does_not_fit_category`, `other`) plus free-text Turkish note, exactly
+   matching the operator's specified list; multiple reasons allowed per
+   candidate. An excluded candidate's `humanVerdict` stays `null` — the
+   operator is never required to pick a semantic label for something
+   they're throwing out.
+3. **Lore evidence** (`loreImportant: boolean` + `loreNoteTr: string |
+   null`) — fully independent of 1 and 2, verified by construction: no
+   code path in the review UI or the pure state module ties
+   `loreImportant` to either `humanVerdict` or `includeInTraining`. A
+   candidate can be excluded from training and lore-important
+   simultaneously, or included and lore-important, in any combination —
+   exactly the worked examples the operator gave (an unrealistic
+   `added`-kind candidate: excluded, still lore-important, with an
+   explanation of why generation was wrong; a same-topic hedging shift:
+   included as `no_meaningful_change`, also lore-important, with the
+   operator's own-words explanation of the boundary).
+
+`reviewedAt` (unchanged field) remains the sole "has this candidate ever
+been decided" signal — its absence is `'pending'`, distinguishing an
+unreviewed candidate (`includeInTraining: false` by default) from an
+explicitly excluded one (`includeInTraining: false` **and** `reviewedAt`
+set) — a distinction `extension/src/persona/trial4-review-state.ts`'s
+`isExcluded()`/`isPending()` make explicit and testable, since the two
+states share the same `includeInTraining` value.
+
+**Pure state module, not UI-embedded logic.** `trial4-review-state.ts`
+(new) provides `VERDICT_LABELS_TR`/`EXCLUSION_REASON_LABELS_TR` (Turkish
+display labels, matching the operator's exact wording), `filterCandidates()`
+(six filters: `all`/`pending`/`disagreement`/`lore`/`excluded`/`included`),
+`computeReviewStats()`, and the three export builders below — all pure
+functions over a candidate array, no storage access, unit-tested (47
+tests) independent of any Svelte component.
+
+### Three export artifacts (evidence, not automation)
+
+`buildTrainingDatasetExport()`/`buildLoreEvidenceExport()`/
+`buildGenerationFailuresExport()` produce exactly the three files the
+operator specified — `training-dataset.json` (included candidates,
+human verdict as ground truth), `lore-evidence.json` (lore-important
+candidates, independent of inclusion), `generation-failures.json`
+(excluded candidates with their reasons/notes) — surfaced in the
+Dashboard's Data/Exports page as client-side JSON downloads (no server
+round-trip, same pattern the original Trial 4 UI already used). **Per
+the operator's explicit instruction, nothing in this codebase reads these
+exports automatically** — no retraining, regeneration, or lore-contract
+modification is triggered by producing them; `split_dataset.py` and
+`task-contract.v2.md` are both untouched by this addendum. They are
+evidence for the next explicit, human-made failure-driven decision.
+
+### HDNA Dashboard — full-page operator surface
+
+A new unlisted WXT entrypoint, `extension/entrypoints/dashboard/`
+(`index.html`/`main.ts`/`App.svelte`), builds to `dashboard.html` and is
+opened from the popup via `chrome.tabs.create({ url:
+chrome.runtime.getURL('/dashboard.html') })` — verified this requires no
+"tabs" permission (Chrome's own docs: `tabs.create()` needs no
+permission; only reading another tab's `url`/`title`/`favIconUrl` does),
+so the manifest's permission set is unchanged from before this addendum.
+
+**Popup became a compact launcher**, per the operator's explicit
+instruction ("Keep only compact essentials... Do not put large review
+workflows, benchmark tables, long descriptions, or dense forms in the
+popup"). `Trial4TrainingReviewPanel.svelte` (the old compact
+Accept/Reject panel) is deleted outright — superseded, not left as dead
+code — and `Trial4BenchmarkPanel.svelte` was removed from the popup's
+render tree entirely; the popup's `App.svelte` now only reads enough
+Trial 4 state (`computeReviewStats()`/`computeTrial4BenchmarkStats()`,
+both reused unchanged from their existing modules) to show one summary
+line and an "Open HDNA Dashboard" button. Every Trial 4 write handler
+(`importTrial4Candidates`, `decideTrial4Candidate`, benchmark
+import/run/grade/reveal/config-save) was deleted from the popup and
+re-created in the Dashboard's own `App.svelte`, which owns its own
+`IndexedDbStorageAdapter`/`JobQueue`/store instances — the same
+per-entrypoint wiring pattern the popup and background service worker
+already each use independently against the same shared IndexedDB-backed
+storage. The Dashboard also registers as a foreground surface via the
+same `FOREGROUND_PORT_NAME` connection the popup uses, so a long review
+session keeps the background dispatch loop out of `DEEP_IDLE` exactly
+like an open popup would.
+
+**No scope invented beyond what the operator specified.** The sidebar
+navigation is exactly the five items requested — Overview, Training
+Review, Benchmark, Data/Exports, Settings:
+
+- **Overview** — `DashboardOverview.svelte` shows only real, derived
+  numbers (`computeReviewStats()` for the training-dataset card,
+  `computeTrial4BenchmarkStats()` — Trial 4's existing stats module,
+  reused unchanged — for the benchmark card). Per the operator's explicit
+  "do not fabricate placeholder results" instruction, every
+  benchmark-percentage stat is conditionally rendered only when its
+  `judgedCount > 0`; an empty benchmark shows "Henüz benchmark koşulmadı"
+  (no benchmark run yet) rather than a 0%/blank number.
+- **Training Review** — `DashboardTrainingReview.svelte` is the
+  structured-decisions workspace: large typography (16-19px body text,
+  vs. the popup's original 12-13px), generous block spacing, and clearly
+  separated Context/Original/Final/DeepSeek-proposal/Turkish-assistance/
+  Your-decision sections, exactly as specified. Productivity features:
+  keyboard shortcuts (`1`-`5` select a verdict and auto-advance, `X`
+  enters exclusion mode, `L` toggles lore-important, `←`/`→` or `P`/`N`
+  navigate) guarded against firing while the operator is typing in a
+  note/textarea field; auto-save on every decision-affecting change (no
+  explicit "Save" button — verdict/reason/lore-toggle clicks dispatch
+  immediately, free-text notes save on blur); a progress bar
+  (`reviewed / total`); and the six-way filter bar including the
+  human/model-disagreement and lore-important filters the operator
+  specifically asked for. "Resume position" is achieved structurally, not
+  via a separately-persisted cursor: the default `pending` filter
+  naturally shows the next undecided candidate at the same list position
+  once a decision removes the current one from that filter — no extra
+  state needed. No confirmation dialogs anywhere in the decision flow.
+- **Benchmark** — `Trial4BenchmarkPanel.svelte` is reused **unmodified in
+  structure/logic**, per "Do not redesign the benchmark methodology" —
+  only its `<style>` block was enlarged (12-13px → 14-19px, more padding)
+  now that it renders in the full-page Dashboard rather than the cramped
+  popup. Blind A/B/C grading, randomized label mapping, and reveal-never-
+  mutates-the-judgment behavior are all byte-for-byte unchanged from
+  Trial 4's original benchmark implementation.
+- **Data/Exports** — `DashboardExports.svelte` shows a live count and a
+  download button for each of the three artifacts above.
+- **Settings** — `DashboardSettings.svelte` reuses the existing
+  `Controls.svelte` component (processing/learning pause toggles — a
+  real, pre-existing global setting, not invented for this page) plus a
+  short reference block pointing to where Trial 3/Trial 4 model-endpoint
+  configuration actually lives (Benchmark page's settings form; the
+  popup's existing Semantic Delta Extraction panel) — deliberately not
+  duplicating those forms in a second location.
+
+**No HDNA architecture, training methodology, or benchmark methodology
+change.** This addendum is UI/schema-organization only: the deterministic
+Trial 0-3 pipeline, `Trial4BenchmarkService`, `DeepSeekSemanticRevisionJudge`,
+`training/phase5a/`'s Python scripts, and the task/lore contract are all
+untouched.
+
+### Tests and validation
+
+`extension/tests/persona/trial4-review-state.test.ts` (new, 47 tests)
+covers every exported label map, predicate, filter, stats function, and
+export builder in `trial4-review-state.ts`, including the
+excluded-vs-pending distinction specifically. `extension/tests/persona/trial4-training-candidate-store.test.ts`
+was updated in place for the new candidate shape (no store logic
+changed — it's a generic CRUD store; only the fixture helper's field set
+changed). **699/699 tests pass** (652 prior + 47 new), clean `tsc
+--noEmit`, clean `wxt build` — the build now also emits `dashboard.html`
+as a genuinely separate, unlisted entrypoint bundle
+(`chunks/dashboard-*.js`, `assets/dashboard-*.css`), confirmed via the
+actual build output. The built manifest's `permissions`/`host_permissions`
+are byte-for-byte unchanged from before this addendum (verified against
+`.output/chrome-mv3/manifest.json`), confirming the "no `tabs` permission
+needed" analysis held in practice, not just in theory.
+
+**Not done as part of automated validation:** no real browser session was
+used to click through the Dashboard end-to-end (loading an unpacked MV3
+extension into a real Chrome instance and interacting with it was outside
+what this session's tooling could drive safely/practically). `tsc
+--noEmit` does not type-check `.svelte` files in this project (no
+`svelte-check` is configured) — every `.svelte` file change was instead
+verified via a full `wxt build` (which does catch Svelte-compiler-level
+errors) and, for the schema-shape change specifically, an explicit grep
+across `extension/src`/`extension/entrypoints`/`extension/tests` for
+every remaining reference to the deleted `decision`/
+`Trial4TrainingCandidateDecision` fields before considering the migration
+complete.

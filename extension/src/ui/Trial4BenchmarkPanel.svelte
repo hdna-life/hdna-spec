@@ -250,26 +250,37 @@
 </section>
 
 <style>
+  /*
+   * This component previously rendered inside the extension popup
+   * (small, fixed-width) — it now renders only inside the full-page
+   * Dashboard (docs/decisions/0017's Dashboard addendum), so its
+   * typography/spacing were enlarged for comfortable long-session
+   * reading. Structure/markup/logic are unchanged; only sizing/spacing
+   * values below were bumped up. Blind grading and reveal behavior are
+   * untouched — this is a surface change only.
+   */
   section {
-    margin-bottom: 10px;
+    max-width: 900px;
+    margin: 0 auto 20px;
   }
   h2 {
-    font-size: 12px;
-    text-transform: uppercase;
-    color: #666;
-    margin: 0 0 4px;
+    font-size: 20px;
+    color: #333;
+    margin: 0 0 10px;
   }
   h3 {
-    font-size: 11px;
+    font-size: 14px;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
     color: #777;
-    margin: 10px 0 2px;
+    margin: 16px 0 6px;
   }
   p,
   ul {
-    margin: 4px 0 0;
+    margin: 8px 0 0;
     padding: 0;
-    font-size: 13px;
+    font-size: 15px;
+    line-height: 1.6;
   }
   ul.stats {
     list-style: none;
@@ -279,23 +290,24 @@
   }
   .file-label {
     display: block;
-    margin-top: 6px;
-    font-size: 12px;
+    margin-top: 10px;
+    font-size: 14px;
   }
   .result {
-    margin-top: 8px;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    margin-top: 14px;
+    padding: 16px 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
   }
   .response {
-    margin-top: 6px;
-    padding: 6px;
+    margin-top: 10px;
+    padding: 12px 14px;
     background: #fafafa;
-    border-radius: 4px;
+    border-radius: 6px;
   }
   .label {
-    font-size: 13px;
+    font-size: 15px;
   }
   .role {
     color: #888;
@@ -306,43 +318,58 @@
   }
   .grade-buttons {
     display: flex;
-    gap: 10px;
-    font-size: 12px;
-    margin-top: 4px;
+    gap: 14px;
+    font-size: 14px;
+    margin-top: 8px;
   }
   .note-field {
     display: block;
-    margin-top: 6px;
-    font-size: 12px;
+    margin-top: 10px;
+    font-size: 14px;
   }
   .note-field input {
     width: 100%;
     box-sizing: border-box;
+    font-size: 15px;
+    padding: 8px;
+    margin-top: 4px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
   }
   .actions {
-    margin-top: 8px;
+    margin-top: 12px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
   }
   button {
-    font-size: 12px;
-    margin-top: 6px;
+    font-size: 14px;
+    margin-top: 10px;
+    padding: 10px 16px;
+    border-radius: 6px;
   }
   details {
-    margin-top: 8px;
-    font-size: 12px;
+    margin-top: 14px;
+    font-size: 14px;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 12px 16px;
   }
   label {
     display: block;
-    margin-top: 4px;
+    margin-top: 8px;
   }
   input[type='password'],
   input[type='text'] {
     width: 100%;
     box-sizing: border-box;
+    font-size: 15px;
+    padding: 8px;
+    margin-top: 4px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
   }
   .note {
     color: #888;
-    font-size: 11px;
+    font-size: 13px;
   }
 </style>

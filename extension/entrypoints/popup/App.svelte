@@ -47,16 +47,11 @@
   } from '../../src/persona/semantic-revision-judge-config-store';
   import { enqueueSemanticRevisionJudge } from '../../src/queue/processors/semantic-revision-judge-job';
   import { Trial4TrainingCandidateStore } from '../../src/persona/trial4-training-candidate-store';
-  import { Trial4BenchmarkCaseStore } from '../../src/persona/trial4-benchmark-case-store';
   import { Trial4BenchmarkResultStore } from '../../src/persona/trial4-benchmark-result-store';
-  import {
-    Trial4BenchmarkConfigStore,
-    type Trial4BenchmarkConfig,
-  } from '../../src/persona/trial4-benchmark-config-store';
-  import { enqueueTrial4BenchmarkCase } from '../../src/queue/processors/trial4-benchmark-job';
+  import { computeReviewStats } from '../../src/persona/trial4-review-state';
+  import { computeTrial4BenchmarkStats } from '../../src/persona/trial4-benchmark-stats';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
-  import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
-  import type { Trial4BenchmarkLabel, Trial4BenchmarkResult, Trial4ResponseGrade } from '@spec/schema/trial4-benchmark-result';
+  import type { Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -79,8 +74,6 @@
   import PatternsSummary from '../../src/ui/PatternsSummary.svelte';
   import TraitsBeliefsSummary from '../../src/ui/TraitsBeliefsSummary.svelte';
   import SemanticDeltaExtractionPanel from '../../src/ui/SemanticDeltaExtractionPanel.svelte';
-  import Trial4TrainingReviewPanel from '../../src/ui/Trial4TrainingReviewPanel.svelte';
-  import Trial4BenchmarkPanel from '../../src/ui/Trial4BenchmarkPanel.svelte';
 
   const storage = new IndexedDbStorageAdapter();
   const queue = new JobQueue(storage);
@@ -104,10 +97,12 @@
   const semanticDeltaExtractionReceiptStore = new SemanticDeltaExtractionReceiptStore(storage);
   const semanticDeltaExtractorConfigStore = new SemanticDeltaExtractorConfigStore();
   const semanticRevisionJudgeConfigStore = new SemanticRevisionJudgeConfigStore();
+  // Only enough Trial 4 read access for the popup's compact status summary
+  // — the full review/benchmark workflows live in the Dashboard tab now
+  // (docs/decisions/0017's Dashboard addendum). No Trial 4 write handlers
+  // exist in this file anymore.
   const trial4TrainingCandidateStore = new Trial4TrainingCandidateStore(storage);
-  const trial4BenchmarkCaseStore = new Trial4BenchmarkCaseStore(storage);
   const trial4BenchmarkResultStore = new Trial4BenchmarkResultStore(storage);
-  const trial4BenchmarkConfigStore = new Trial4BenchmarkConfigStore();
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -129,9 +124,9 @@
   let semanticDeltaExtractorConfig: SemanticDeltaExtractorConfig = { enabled: false };
   let semanticRevisionJudgeConfig: SemanticRevisionJudgeConfig = { enabled: false };
   let trial4TrainingCandidates: Trial4TrainingCandidate[] = [];
-  let trial4BenchmarkCases: Trial4BenchmarkCase[] = [];
   let trial4BenchmarkResults: Trial4BenchmarkResult[] = [];
-  let trial4BenchmarkConfig: Trial4BenchmarkConfig = { enabled: false };
+  $: trial4ReviewStats = computeReviewStats(trial4TrainingCandidates);
+  $: trial4BenchmarkStats = computeTrial4BenchmarkStats(trial4BenchmarkResults);
   // Same pure gate PersonaInterpreterService.interpret() itself checks
   // before ever calling the provider — computed here so the panel can show
   // *before* the user clicks "Interpret" whether this run will make any
@@ -164,9 +159,7 @@
     semanticDeltaExtractorConfig = await semanticDeltaExtractorConfigStore.get();
     semanticRevisionJudgeConfig = await semanticRevisionJudgeConfigStore.get();
     trial4TrainingCandidates = await trial4TrainingCandidateStore.list();
-    trial4BenchmarkCases = await trial4BenchmarkCaseStore.list();
     trial4BenchmarkResults = await trial4BenchmarkResultStore.list();
-    trial4BenchmarkConfig = await trial4BenchmarkConfigStore.get();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -231,88 +224,15 @@
     await refresh();
   }
 
-  // --- Trial 4 (docs/decisions/0017) ---------------------------------
-  // submitTrial4Judgment/revealTrial4Result intentionally duplicate
-  // Trial4BenchmarkService's small grading/reveal logic rather than
-  // instantiating that service here — the service exists to run model
-  // calls (base/trained/DeepSeek), which only ever happens in the
-  // background job (createTrial4BenchmarkProcessor), never from the
-  // popup. Grading/reveal are pure local-storage mutations with no model
-  // call involved, so a popup-local implementation avoids constructing
-  // unused providers just to reach two methods.
-
-  async function importTrial4Candidates(event: CustomEvent<Trial4TrainingCandidate[]>) {
-    const existingIds = new Set(trial4TrainingCandidates.map((c) => c.id));
-    const now = new Date().toISOString();
-    for (const raw of event.detail) {
-      if (!raw?.id || existingIds.has(raw.id)) continue;
-      await trial4TrainingCandidateStore.put({ ...raw, decision: raw.decision ?? 'pending', importedAt: now });
-    }
-    await refresh();
-  }
-
-  async function decideTrial4Candidate(event: CustomEvent<{ id: string; decision: 'accepted' | 'rejected' }>) {
-    const candidate = await trial4TrainingCandidateStore.get(event.detail.id);
-    if (!candidate) return;
-    await trial4TrainingCandidateStore.put({
-      ...candidate,
-      decision: event.detail.decision,
-      reviewedAt: new Date().toISOString(),
-    });
-    await refresh();
-  }
-
-  async function importTrial4BenchmarkCases(event: CustomEvent<Trial4BenchmarkCase[]>) {
-    const existingIds = new Set(trial4BenchmarkCases.map((c) => c.id));
-    for (const raw of event.detail) {
-      if (!raw?.id || existingIds.has(raw.id)) continue;
-      await trial4BenchmarkCaseStore.put(raw);
-    }
-    await refresh();
-  }
-
-  async function runTrial4BenchmarkCase() {
-    await enqueueTrial4BenchmarkCase(queue);
-    await refresh();
-  }
-
-  async function submitTrial4Judgment(
-    event: CustomEvent<{
-      resultId: string;
-      grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade>;
-      bestResponse: Trial4BenchmarkResult['bestResponse'];
-      note: string;
-    }>,
-  ) {
-    const result = await trial4BenchmarkResultStore.get(event.detail.resultId);
-    if (!result || result.judged) return;
-    const { grades, bestResponse, note } = event.detail;
-    const updated: Trial4BenchmarkResult = {
-      ...result,
-      labelMapping: {
-        A: { ...result.labelMapping.A, grade: grades.A },
-        B: { ...result.labelMapping.B, grade: grades.B },
-        C: { ...result.labelMapping.C, grade: grades.C },
-      },
-      bestResponse,
-      note,
-      judged: true,
-      judgedAt: new Date().toISOString(),
-    };
-    await trial4BenchmarkResultStore.put(updated);
-    await refresh();
-  }
-
-  async function revealTrial4Result(event: CustomEvent<string>) {
-    const result = await trial4BenchmarkResultStore.get(event.detail);
-    if (!result) return;
-    await trial4BenchmarkResultStore.put({ ...result, revealed: true });
-    await refresh();
-  }
-
-  async function saveTrial4BenchmarkConfig(event: CustomEvent<Trial4BenchmarkConfig>) {
-    await trial4BenchmarkConfigStore.set(event.detail);
-    await refresh();
+  // Trial 4 (docs/decisions/0017): the popup only reads enough state for
+  // the compact status summary below — all review/benchmark actions
+  // (import, decide, run, grade, reveal, configure) live in the Dashboard
+  // tab now, which owns its own full set of handlers against the same
+  // shared storage. Opening it needs no "tabs" permission — chrome.tabs.create
+  // with an extension-owned URL works without it (only reading another
+  // tab's url/title/favIconUrl requires the permission).
+  function openDashboard() {
+    chrome.tabs.create({ url: chrome.runtime.getURL('/dashboard.html') });
   }
 
   async function saveSemanticDeltaExtractorConfig(event: CustomEvent<SemanticDeltaExtractorConfig>) {
@@ -384,21 +304,17 @@
     on:saveConfig={saveSemanticDeltaExtractorConfig}
     on:saveJudgeConfig={saveSemanticRevisionJudgeConfig}
   />
-  <Trial4TrainingReviewPanel
-    candidates={trial4TrainingCandidates}
-    on:importCandidates={importTrial4Candidates}
-    on:decide={decideTrial4Candidate}
-  />
-  <Trial4BenchmarkPanel
-    cases={trial4BenchmarkCases}
-    results={trial4BenchmarkResults}
-    config={trial4BenchmarkConfig}
-    on:importCases={importTrial4BenchmarkCases}
-    on:runNextCase={runTrial4BenchmarkCase}
-    on:submitJudgment={submitTrial4Judgment}
-    on:reveal={revealTrial4Result}
-    on:saveConfig={saveTrial4BenchmarkConfig}
-  />
+  <section class="trial4-summary">
+    <h2>Trial 4 (human-filtered specialization)</h2>
+    <p class="status">
+      {trial4ReviewStats.reviewed} / {trial4ReviewStats.total} reviewed ·
+      {trial4ReviewStats.includedInTraining} included · {trial4ReviewStats.excluded} excluded
+      {#if trial4BenchmarkStats.judgedResultCount > 0}
+        · {trial4BenchmarkStats.judgedResultCount} benchmark case(s) graded
+      {/if}
+    </p>
+    <button on:click={openDashboard}>Open HDNA Dashboard</button>
+  </section>
   <VectorIndex
     {embeddingCount}
     extractorId={embeddingProvider.extractorId}
@@ -430,5 +346,23 @@
   h1 {
     font-size: 16px;
     margin: 0 0 8px;
+  }
+  .trial4-summary {
+    margin-bottom: 10px;
+  }
+  .trial4-summary h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #666;
+    margin: 0 0 4px;
+  }
+  .trial4-summary .status {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: #555;
+  }
+  .trial4-summary button {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 </style>

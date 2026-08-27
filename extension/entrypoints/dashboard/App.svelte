@@ -1,0 +1,281 @@
+<script lang="ts">
+  import { onDestroy, onMount } from 'svelte';
+  import { IndexedDbStorageAdapter } from '../../src/storage/indexeddb-adapter';
+  import { JobQueue } from '../../src/queue/job-queue';
+  import { RuntimeControls, type RuntimeControlsState } from '../../src/runtime/controls';
+  import { FOREGROUND_PORT_NAME } from '../../src/runtime/foreground-tracker';
+  import { Trial4TrainingCandidateStore } from '../../src/persona/trial4-training-candidate-store';
+  import { Trial4BenchmarkCaseStore } from '../../src/persona/trial4-benchmark-case-store';
+  import { Trial4BenchmarkResultStore } from '../../src/persona/trial4-benchmark-result-store';
+  import {
+    Trial4BenchmarkConfigStore,
+    type Trial4BenchmarkConfig,
+  } from '../../src/persona/trial4-benchmark-config-store';
+  import { enqueueTrial4BenchmarkCase } from '../../src/queue/processors/trial4-benchmark-job';
+  import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
+  import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
+  import type { Trial4BenchmarkLabel, Trial4BenchmarkResult, Trial4ResponseGrade } from '@spec/schema/trial4-benchmark-result';
+
+  import DashboardOverview from '../../src/ui/dashboard/DashboardOverview.svelte';
+  import DashboardTrainingReview from '../../src/ui/dashboard/DashboardTrainingReview.svelte';
+  import DashboardExports from '../../src/ui/dashboard/DashboardExports.svelte';
+  import DashboardSettings from '../../src/ui/dashboard/DashboardSettings.svelte';
+  import Trial4BenchmarkPanel from '../../src/ui/Trial4BenchmarkPanel.svelte';
+
+  const storage = new IndexedDbStorageAdapter();
+  const queue = new JobQueue(storage);
+  const controls = new RuntimeControls(storage);
+  const trial4TrainingCandidateStore = new Trial4TrainingCandidateStore(storage);
+  const trial4BenchmarkCaseStore = new Trial4BenchmarkCaseStore(storage);
+  const trial4BenchmarkResultStore = new Trial4BenchmarkResultStore(storage);
+  const trial4BenchmarkConfigStore = new Trial4BenchmarkConfigStore();
+
+  type Page = 'overview' | 'review' | 'benchmark' | 'exports' | 'settings';
+  let page: Page = 'overview';
+
+  const NAV: { id: Page; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'review', label: 'Training Review' },
+    { id: 'benchmark', label: 'Benchmark' },
+    { id: 'exports', label: 'Data / Exports' },
+    { id: 'settings', label: 'Settings' },
+  ];
+
+  let controlsState: RuntimeControlsState = { processingPaused: false, learningPaused: false };
+  let trial4TrainingCandidates: Trial4TrainingCandidate[] = [];
+  let trial4BenchmarkCases: Trial4BenchmarkCase[] = [];
+  let trial4BenchmarkResults: Trial4BenchmarkResult[] = [];
+  let trial4BenchmarkConfig: Trial4BenchmarkConfig = { enabled: false };
+
+  async function refresh() {
+    controlsState = await controls.get();
+    trial4TrainingCandidates = await trial4TrainingCandidateStore.list();
+    trial4BenchmarkCases = await trial4BenchmarkCaseStore.list();
+    trial4BenchmarkResults = await trial4BenchmarkResultStore.list();
+    trial4BenchmarkConfig = await trial4BenchmarkConfigStore.get();
+  }
+
+  // --- Training Review -------------------------------------------------
+
+  async function importTrial4Candidates(event: CustomEvent<Trial4TrainingCandidate[]>) {
+    const existingIds = new Set(trial4TrainingCandidates.map((c) => c.id));
+    const now = new Date().toISOString();
+    for (const raw of event.detail) {
+      if (!raw?.id || existingIds.has(raw.id)) continue;
+      await trial4TrainingCandidateStore.put({
+        ...raw,
+        humanVerdict: raw.humanVerdict ?? null,
+        includeInTraining: raw.includeInTraining ?? false,
+        exclusionReasons: raw.exclusionReasons ?? [],
+        operatorNoteTr: raw.operatorNoteTr ?? '',
+        loreImportant: raw.loreImportant ?? false,
+        loreNoteTr: raw.loreNoteTr ?? null,
+        importedAt: now,
+      });
+    }
+    await refresh();
+  }
+
+  async function updateTrial4Candidate(event: CustomEvent<Trial4TrainingCandidate>) {
+    await trial4TrainingCandidateStore.put(event.detail);
+    await refresh();
+  }
+
+  // --- Benchmark ---------------------------------------------------------
+  // submitTrial4Judgment/revealTrial4Result intentionally duplicate
+  // Trial4BenchmarkService's small grading/reveal logic rather than
+  // instantiating that service here — the service exists to run model
+  // calls (base/trained/DeepSeek), which only ever happens in the
+  // background job (createTrial4BenchmarkProcessor), never from this
+  // dashboard tab. Grading/reveal are pure local-storage mutations with
+  // no model call involved. Mirrors extension/entrypoints/popup/App.svelte's
+  // identical Trial 4 handlers exactly, before they were relocated here.
+
+  async function importTrial4BenchmarkCases(event: CustomEvent<Trial4BenchmarkCase[]>) {
+    const existingIds = new Set(trial4BenchmarkCases.map((c) => c.id));
+    for (const raw of event.detail) {
+      if (!raw?.id || existingIds.has(raw.id)) continue;
+      await trial4BenchmarkCaseStore.put(raw);
+    }
+    await refresh();
+  }
+
+  async function runTrial4BenchmarkCase() {
+    await enqueueTrial4BenchmarkCase(queue);
+    await refresh();
+  }
+
+  async function submitTrial4Judgment(
+    event: CustomEvent<{
+      resultId: string;
+      grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade>;
+      bestResponse: Trial4BenchmarkResult['bestResponse'];
+      note: string;
+    }>,
+  ) {
+    const result = await trial4BenchmarkResultStore.get(event.detail.resultId);
+    if (!result || result.judged) return;
+    const { grades, bestResponse, note } = event.detail;
+    const updated: Trial4BenchmarkResult = {
+      ...result,
+      labelMapping: {
+        A: { ...result.labelMapping.A, grade: grades.A },
+        B: { ...result.labelMapping.B, grade: grades.B },
+        C: { ...result.labelMapping.C, grade: grades.C },
+      },
+      bestResponse,
+      note,
+      judged: true,
+      judgedAt: new Date().toISOString(),
+    };
+    await trial4BenchmarkResultStore.put(updated);
+    await refresh();
+  }
+
+  async function revealTrial4Result(event: CustomEvent<string>) {
+    const result = await trial4BenchmarkResultStore.get(event.detail);
+    if (!result) return;
+    await trial4BenchmarkResultStore.put({ ...result, revealed: true });
+    await refresh();
+  }
+
+  async function saveTrial4BenchmarkConfig(event: CustomEvent<Trial4BenchmarkConfig>) {
+    await trial4BenchmarkConfigStore.set(event.detail);
+    await refresh();
+  }
+
+  // --- Settings ---------------------------------------------------------
+
+  async function toggleProcessing() {
+    if (controlsState.processingPaused) await controls.resumeProcessing();
+    else await controls.pauseProcessing();
+    await refresh();
+  }
+
+  async function toggleLearning() {
+    if (controlsState.learningPaused) await controls.resumeLearning();
+    else await controls.pauseLearning();
+    await refresh();
+  }
+
+  let interval: ReturnType<typeof setInterval>;
+  let foregroundPort: chrome.runtime.Port | undefined;
+  onMount(() => {
+    // Same foreground-signal discipline as the popup — a long-lived
+    // dashboard tab should also keep the background dispatch loop out of
+    // DEEP_IDLE while the operator is actively reviewing/benchmarking.
+    foregroundPort = chrome.runtime.connect({ name: FOREGROUND_PORT_NAME });
+    refresh();
+    interval = setInterval(refresh, 2000);
+  });
+  onDestroy(() => {
+    clearInterval(interval);
+    foregroundPort?.disconnect();
+  });
+</script>
+
+<div class="shell">
+  <nav class="sidebar">
+    <h1>HDNA</h1>
+    <ul>
+      {#each NAV as item}
+        <li>
+          <button class:active={page === item.id} on:click={() => (page = item.id)}>{item.label}</button>
+        </li>
+      {/each}
+    </ul>
+  </nav>
+
+  <main class="content">
+    {#if page === 'overview'}
+      <DashboardOverview candidates={trial4TrainingCandidates} benchmarkResults={trial4BenchmarkResults} />
+    {:else if page === 'review'}
+      <DashboardTrainingReview
+        candidates={trial4TrainingCandidates}
+        on:importCandidates={importTrial4Candidates}
+        on:update={updateTrial4Candidate}
+      />
+    {:else if page === 'benchmark'}
+      <Trial4BenchmarkPanel
+        cases={trial4BenchmarkCases}
+        results={trial4BenchmarkResults}
+        config={trial4BenchmarkConfig}
+        on:importCases={importTrial4BenchmarkCases}
+        on:runNextCase={runTrial4BenchmarkCase}
+        on:submitJudgment={submitTrial4Judgment}
+        on:reveal={revealTrial4Result}
+        on:saveConfig={saveTrial4BenchmarkConfig}
+      />
+    {:else if page === 'exports'}
+      <DashboardExports candidates={trial4TrainingCandidates} />
+    {:else if page === 'settings'}
+      <DashboardSettings {controlsState} on:toggleProcessing={toggleProcessing} on:toggleLearning={toggleLearning} />
+    {/if}
+  </main>
+</div>
+
+<style>
+  :global(html),
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+    color: #222;
+    background: #fff;
+  }
+  .shell {
+    display: flex;
+    min-height: 100vh;
+  }
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: #f5f5f5;
+    border-right: 1px solid #e0e0e0;
+    padding: 24px 16px;
+    box-sizing: border-box;
+  }
+  .sidebar h1 {
+    font-size: 20px;
+    margin: 0 0 20px 8px;
+    letter-spacing: 0.02em;
+  }
+  .sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .sidebar li {
+    margin-bottom: 4px;
+  }
+  .sidebar button {
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #333;
+    cursor: pointer;
+  }
+  .sidebar button:hover {
+    background: #e9e9e9;
+  }
+  .sidebar button.active {
+    background: #2a6b3f;
+    color: #fff;
+    font-weight: 600;
+  }
+  .content {
+    flex: 1;
+    padding: 40px 48px;
+    box-sizing: border-box;
+    max-width: 1200px;
+  }
+</style>

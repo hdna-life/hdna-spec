@@ -14,7 +14,12 @@ function candidate(overrides: Partial<Trial4TrainingCandidate> = {}): Trial4Trai
     afterContext: 'after context',
     proposedVerdict: 'meaning_added',
     proposedDescription: 'A change was made.',
-    decision: 'pending',
+    humanVerdict: null,
+    includeInTraining: false,
+    exclusionReasons: [],
+    operatorNoteTr: '',
+    loreImportant: false,
+    loreNoteTr: null,
     importedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
@@ -79,10 +84,14 @@ describe('Trial4TrainingCandidateStore', () => {
     expect(stored?.reviewedAt).toBeUndefined();
   });
 
-  it('stores a candidate with reviewedAt present (accepted/rejected decision)', async () => {
+  it('stores a candidate with reviewedAt present (included/excluded decision)', async () => {
     const storage = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
     const store = new Trial4TrainingCandidateStore(storage);
-    const c = candidate({ decision: 'accepted', reviewedAt: '2026-01-02T00:00:00.000Z' });
+    const c = candidate({
+      humanVerdict: 'meaning_added',
+      includeInTraining: true,
+      reviewedAt: '2026-01-02T00:00:00.000Z',
+    });
 
     await store.put(c);
     const stored = await store.get(c.id);
