@@ -2469,13 +2469,15 @@ held-out falsification benchmark
 failure-driven dataset expansion (iterative)
 ```
 
-**Target model:** `Qwen3-0.6B` remains the initial Trial 4 target —
-deliberately the same model Trial 3 already established a baseline for, so
-Trial 4's result isolates the effect of specialization/training against
-an exact, already-measured zero-shot baseline rather than confounding a
-model-size change with a training-method change. Smaller models (e.g.
-SmolLM ~360M) may be evaluated later under the same protocol, as a
-separate follow-up, not as part of the initial Trial 4 comparison.
+**Target model:** `Qwen3-0.6B` — the exact same model that failed Trial 3's
+zero-shot assessment — is the Trial 4 target, and currently the **only**
+planned target. Trial 4 trains/specializes this specific model rather than
+switching to a different one, so its result isolates the effect of
+specialization/training against an exact, already-measured zero-shot
+baseline rather than confounding a model-size change with a
+training-method change. No other model is currently planned for Trial 4;
+evaluating a different/smaller model under this protocol is out of scope
+unless a separate, explicit decision introduces it later.
 
 ### Evaluation integrity (pre-declared, before any Trial 4 work begins)
 

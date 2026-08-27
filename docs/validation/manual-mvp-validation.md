@@ -873,12 +873,12 @@ is now COMPLETE.**
 ### Phase 5A — Trial 4 (planned, external — not implemented)
 
 **Research direction:** DeepSeek teacher model → filtered lore/training
-dataset → tiny-model LoRA/SFT (target: `Qwen3-0.6B`, the same model Trial
-3's baseline was measured against) → held-out falsification benchmark →
-failure-driven dataset expansion. Tests whether distillation/specialization
-training can close the zero-shot semantic-capability gap Trial 3 measured,
-while preserving tiny/local execution. Smaller models (e.g. SmolLM ~360M)
-may be evaluated later under the same protocol, as a separate follow-up.
+dataset → tiny-model LoRA/SFT (target: `Qwen3-0.6B` — the exact same model
+that failed Trial 3's zero-shot assessment, and currently the only planned
+Trial 4 target) → held-out falsification benchmark → failure-driven
+dataset expansion. Tests whether distillation/specialization training can
+close the zero-shot semantic-capability gap Trial 3 measured, while
+preserving tiny/local execution.
 
 **Evaluation integrity (pre-declared):** the held-out falsification
 benchmark must remain isolated from training; failure categories may
