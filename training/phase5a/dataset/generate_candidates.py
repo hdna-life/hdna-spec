@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 """
-Phase 5A Trial 4: Generate candidate examples via DeepSeek API.
+Phase 5A Trial 4: Generate candidate examples via OpenRouter.
 
 This script synthesizes plausible AI-draft-to-human-edit scenarios following
 the task contract in training/phase5a/lore/task-contract.v1.md.
+
+Routed through OpenRouter (https://openrouter.ai), not a direct DeepSeek API
+call — the same gateway Trial 0-3 already use elsewhere in this repository
+(extension/src/persona/openrouter-*.ts), so there is one API-key/billing
+surface for the whole Phase 5A experiment family rather than a second,
+DeepSeek-specific one. The generator model defaults to a DeepSeek model
+routed through OpenRouter (--model deepseek/deepseek-chat) to preserve
+Operator Decision 1's "DeepSeek generates candidates, never validates them"
+role — but the model id is a plain OpenRouter model string, so any other
+OpenRouter-hosted model can be substituted with --model.
 
 Usage:
   python3 generate_candidates.py --count 500
   python3 generate_candidates.py --count 500 --batch-size 8 --seed 42
 
 Environment:
-  DEEPSEEK_API_KEY (required): Your DeepSeek API authentication token.
+  OPENROUTER_API_KEY (required): Your OpenRouter API authentication token.
 
 Output:
   candidates.json (by default, or --out <path>): JSON array of candidate objects,
@@ -187,11 +197,11 @@ Example format (one object per line):
 """
 
 
-def call_deepseek_api(
+def call_openrouter_api(
     prompt: str, model: str, api_key: str
 ) -> tuple[bool, str]:
-    """Call DeepSeek API and return (success, response_text)."""
-    url = "https://api.deepseek.com/chat/completions"
+    """Call OpenRouter's chat completions endpoint and return (success, response_text)."""
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -319,7 +329,7 @@ def output_candidate(out_path: str, candidate_dict: dict) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Phase 5A Trial 4 candidate examples via DeepSeek API."
+        description="Generate Phase 5A Trial 4 candidate examples via OpenRouter."
     )
     parser.add_argument(
         "--count",
@@ -334,8 +344,14 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="deepseek-v4-flash",
-        help="DeepSeek model ID (default: deepseek-v4-flash). Verify against your account.",
+        default="deepseek/deepseek-chat",
+        help=(
+            "OpenRouter model ID (default: deepseek/deepseek-chat — a DeepSeek "
+            "model routed through OpenRouter, per Operator Decision 1: DeepSeek "
+            "generates candidates, it never validates/decides inclusion). Any "
+            "OpenRouter-hosted model id may be substituted; verify availability "
+            "against https://openrouter.ai/models."
+        ),
     )
     parser.add_argument(
         "--batch-size",
@@ -352,10 +368,10 @@ def main():
     args = parser.parse_args()
 
     # Check API key
-    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         print(
-            "Error: DEEPSEEK_API_KEY environment variable not set.",
+            "Error: OPENROUTER_API_KEY environment variable not set.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -388,7 +404,7 @@ def main():
         print(f"\nBatch {generated // args.batch_size + 1}: topic='{topic}', size={batch_size}...", end=" ", flush=True)
 
         prompt = generate_batch_prompt(topic, batch_size)
-        success, response_text = call_deepseek_api(prompt, args.model, api_key)
+        success, response_text = call_openrouter_api(prompt, args.model, api_key)
 
         if not success:
             print(f"FAILED: {response_text}", file=sys.stderr)

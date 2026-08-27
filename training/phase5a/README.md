@@ -4,7 +4,7 @@ A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) ca
 
 ## Overview
 
-This pipeline generates synthetic training examples via the DeepSeek API, imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
+This pipeline generates synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
 
 **Ground truth:** `training/phase5a/lore/task-contract.v1.md` — the versioned specification all generated examples must follow.
 
@@ -12,10 +12,10 @@ This pipeline generates synthetic training examples via the DeepSeek API, import
 
 ### 1. Generate Candidate Examples
 
-Generate ~500 synthetic semantic-change scenarios via the DeepSeek API:
+Generate ~500 synthetic semantic-change scenarios via OpenRouter:
 
 ```bash
-export DEEPSEEK_API_KEY=sk_...
+export OPENROUTER_API_KEY=sk-or-...
 python3 dataset/generate_candidates.py --count 500
 ```
 
@@ -24,7 +24,7 @@ python3 dataset/generate_candidates.py --count 500
 **Options:**
 - `--count N`: Total candidates to generate (default: 500)
 - `--out FILE`: Output path (default: `dataset/generated/candidates.json`)
-- `--model MODEL_ID`: DeepSeek model (default: `deepseek-v4-flash` — verify against your account)
+- `--model MODEL_ID`: OpenRouter model id (default: `deepseek/deepseek-chat` — a DeepSeek model routed through OpenRouter; verify current availability/pricing at https://openrouter.ai/models, and substitute any other OpenRouter-hosted model if desired)
 - `--batch-size N`: Candidates per API call (default: 8)
 - `--seed N`: Random seed for topic cycling (optional)
 
@@ -136,7 +136,7 @@ training/phase5a/
 ├── lore/
 │   └── task-contract.v1.md               (ground truth specification)
 ├── dataset/
-│   ├── generate_candidates.py            (DeepSeek API client)
+│   ├── generate_candidates.py            (OpenRouter API client)
 │   ├── split_dataset.py                  (JSONL converter)
 │   ├── sample_candidate.json             (format fixture)
 │   ├── sample_candidate.README.md        (fixture documentation)
@@ -181,7 +181,7 @@ See `benchmark/sample_case.README.md` for the full evaluation-integrity contract
 
 ## Troubleshooting
 
-**Generation fails:** Check `DEEPSEEK_API_KEY` is set and valid. Review error message; the script logs failures per batch and includes error details.
+**Generation fails:** Check `OPENROUTER_API_KEY` is set and valid, and that the configured `--model` is available on your OpenRouter account. Review error message; the script logs failures per batch and includes error details.
 
 **Resuming after crash:** Re-run `generate_candidates.py` with the same arguments — it loads existing candidates and continues appending new ones.
 

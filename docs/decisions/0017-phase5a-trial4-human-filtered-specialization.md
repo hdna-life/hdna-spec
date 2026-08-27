@@ -121,7 +121,8 @@ explicitly prohibited.
 
 **Implementation note:** `training/phase5a/dataset/generate_candidates.py`
 has no code path that reads any benchmark/held-out file — it only reads
-`training/phase5a/lore/task-contract.v1.md` and calls DeepSeek. The
+`training/phase5a/lore/task-contract.v1.md` and calls OpenRouter (routed
+to a DeepSeek model by default). The
 held-out benchmark corpus is operator-supplied directly into the
 extension's `Trial4BenchmarkPanel` import (a separate `Trial4BenchmarkCaseStore`,
 never touched by the training pipeline). `training/phase5a/benchmark/sample_case.json`
@@ -220,7 +221,7 @@ produced it.
 ### Architecture
 
 ```text
-DeepSeek (candidate/stimulus generation only, per Decision 1)
+OpenRouter, routed to DeepSeek by default (candidate/stimulus generation only, per Decision 1)
     |
     v
 training/phase5a/dataset/generate_candidates.py  -->  candidates.json
@@ -389,9 +390,14 @@ providers already parse.
 - `lore/task-contract.v1.md` — the versioned task/lore contract (Decision
   10), traced to specific `docs/decisions/0016` sections and observed
   failure classes.
-- `dataset/generate_candidates.py` — calls DeepSeek only (never reads any
-  benchmark file), embeds the lore contract, cycles through topic seeds
-  for diversity, writes incrementally/resumably to
+- `dataset/generate_candidates.py` — calls OpenRouter only (never reads
+  any benchmark file), routed by default to a DeepSeek model
+  (`deepseek/deepseek-chat`, substitutable via `--model` to any
+  OpenRouter-hosted model) — the same gateway Trial 0-3 already use
+  elsewhere in this codebase, so training-data generation and Trial 0-3
+  share one API-key/billing surface rather than a second, DeepSeek-direct
+  one. Embeds the lore contract, cycles through topic seeds for
+  diversity, writes incrementally/resumably to
   `dataset/generated/candidates.json` (gitignored).
 - `dataset/split_dataset.py` — filters an extension-exported file to
   `decision === 'accepted'` only, builds the exact prompt text (verified
