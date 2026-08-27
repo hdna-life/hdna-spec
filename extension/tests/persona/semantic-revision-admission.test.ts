@@ -18,28 +18,29 @@ function intervention(overrides: Partial<RevisionIntervention> = {}): RevisionIn
 
 describe('admitJudgment', () => {
   it('rejects no_meaningful_change', () => {
-    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'no_meaningful_change', description: null, confidence: 0.9 };
+    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 };
     expect(admitJudgment(intervention(), judgment, 'unscoped')).toBeNull();
   });
 
   it('rejects uncertain', () => {
-    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'uncertain', description: null, confidence: 0.3 };
+    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'uncertain', dimensions: [], description: null, confidence: 0.3 };
     expect(admitJudgment(intervention(), judgment, 'unscoped')).toBeNull();
   });
 
   it('rejects a structurally invalid judgment (missing description on a change verdict)', () => {
-    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'meaning_added', description: null, confidence: 0.7 };
+    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'meaning_added', dimensions: [], description: null, confidence: 0.7 };
     expect(admitJudgment(intervention(), judgment, 'unscoped')).toBeNull();
   });
 
   it('rejects a structurally invalid judgment (out-of-range confidence)', () => {
-    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'meaning_added', description: 'x', confidence: 5 };
+    const judgment: SemanticRevisionJudgmentDraft = { verdict: 'meaning_added', dimensions: [], description: 'x', confidence: 5 };
     expect(admitJudgment(intervention(), judgment, 'unscoped')).toBeNull();
   });
 
   it('admits meaning_added on an "added" intervention as behavioral_delta, with HDNA-supplied context', () => {
     const judgment: SemanticRevisionJudgmentDraft = {
       verdict: 'meaning_added',
+      dimensions: [],
       description: 'Introduced an explicit constraint.',
       confidence: 0.8,
     };
@@ -56,6 +57,7 @@ describe('admitJudgment', () => {
   it('admits meaning_removed on a "removed" intervention as behavioral_delta', () => {
     const judgment: SemanticRevisionJudgmentDraft = {
       verdict: 'meaning_removed',
+      dimensions: [],
       description: 'Removed an explicit hedge.',
       confidence: 0.6,
     };
@@ -66,6 +68,7 @@ describe('admitJudgment', () => {
   it('admits meaning_transformed on a "reordered" intervention as behavioral_delta (not contrastive_preference)', () => {
     const judgment: SemanticRevisionJudgmentDraft = {
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'Reordered emphasis.',
       confidence: 0.5,
     };
@@ -80,6 +83,7 @@ describe('admitJudgment', () => {
   it('admits meaning_transformed on a "replaced" intervention as contrastive_preference with preferred=finalText, rejected=originalText', () => {
     const judgment: SemanticRevisionJudgmentDraft = {
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'Shifted from broad to specific framing.',
       confidence: 0.85,
     };
@@ -97,6 +101,7 @@ describe('admitJudgment', () => {
   it('IDs/provenance are never taken from the judgment draft — HDNA-generated fields are not present in the draft output', () => {
     const judgment: SemanticRevisionJudgmentDraft = {
       verdict: 'meaning_added',
+      dimensions: [],
       description: 'Something added.',
       confidence: 0.5,
     };

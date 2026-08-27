@@ -6,7 +6,7 @@ A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) ca
 
 This pipeline generates synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
 
-**Ground truth:** `training/phase5a/lore/task-contract.v2.md` — the versioned specification all generated examples must follow.
+**Ground truth:** `training/phase5a/lore/task-contract.v3.md` — the versioned specification all generated examples must follow (Test 1's two-axis redesign: a `verdict` plus orthogonal `dimensions`; supersedes `task-contract.v2.md`, preserved unchanged as history).
 
 ## Pipeline Steps
 
@@ -42,41 +42,44 @@ python3 dataset/generate_candidates.py --count 500
 
 ### 2. Human Review (Browser Extension)
 
-The HDNA browser extension's **Trial 4 Training Review** panel imports the generated candidates:
+The HDNA browser extension's **Dashboard → Training Review** page (open via the popup's "Open HDNA Dashboard" button) imports the generated candidates:
 
-1. Open the extension popup
-2. Navigate to "Trial 4 Training Review"
-3. Import `dataset/generated/candidates.json`
-4. Review each candidate; mark accept/reject/uncertain
-5. Export accepted examples as `accepted.json`
+1. Open the Dashboard
+2. Navigate to "Training Review"
+3. Import `dataset/generated/candidates.json` (append or replace mode)
+4. Review each candidate: pick the six-option composite verdict (1-6, keyboard shortcuts), select any observable-behavior dimensions under "NE DEĞİŞTİ?", mark "eğitime dahil" vs. an exclusion reason, and optionally flag it lore-important — this sets `humanVerdict`/`humanDimensions`/`includeInTraining` independently of DeepSeek's `proposedVerdict`/`proposedDimensions`, which are never overwritten (docs/decisions/0017's structured-decisions addendum)
+5. Export the training dataset from Dashboard → Data/Exports as `training-dataset.json`
 
 This step is built separately in the TypeScript extension; see `extension/` for implementation.
 
 ### 3. Convert to Training Format
 
-Split accepted examples into train/valid/test sets and convert to mlx_lm format:
+Convert the human-reviewed, included examples into train/valid/test sets in mlx_lm format:
 
 ```bash
-python3 dataset/split_dataset.py --accepted /path/to/accepted.json --out dataset/prepared/
+python3 dataset/split_dataset.py --training-dataset /path/to/training-dataset.json --out dataset/prepared/
 ```
 
+Only candidates with `includeInTraining == true AND humanVerdict != null` are used — the human's reviewed judgment, never DeepSeek's `proposedVerdict`/`proposedDimensions`/`proposedDescription`, is the training target (see `split_dataset.py`'s module docstring for the ground-truth discipline this enforces).
+
 **Output files:**
-- `dataset/prepared/train.jsonl` (80% of accepted examples)
-- `dataset/prepared/valid.jsonl` (10% of accepted examples)
-- `dataset/prepared/test.jsonl` (10% of accepted examples)
+- `dataset/prepared/train.jsonl` (80% of included, human-reviewed examples)
+- `dataset/prepared/valid.jsonl` (10%)
+- `dataset/prepared/test.jsonl` (10%)
 
 **Options:**
-- `--accepted FILE`: Path to accepted candidates export (required)
+- `--training-dataset FILE`: Path to the training-dataset export JSON file (required)
 - `--out DIR`: Output directory (default: `dataset/prepared/`)
 - `--seed N`: Seed for reproducible shuffling (default: 42)
 
 **Format:** Each line is a JSON object with two fields:
 ```json
 {
-  "prompt": "<narrow semantic-change judge prompt>",
-  "completion": "<single-line JSON string with verdict, description, confidence>"
+  "prompt": "<narrow semantic-change judge prompt, v3 two-axis format>",
+  "completion": "<single-line JSON string with verdict, dimensions, description, confidence>"
 }
 ```
+`description` is derived deterministically from the human's structured `verdict`/`dimensions` labels, never copied from any operator/model prose field.
 
 The prompt and completion format **exactly matches** what the extension's judge model was trained on, ensuring the model learns the correct input distribution.
 
@@ -127,13 +130,13 @@ Both servers will serve the narrow semantic-change judge prompt and return verdi
 
 ### 6. Blind Benchmark (Browser Extension)
 
-The extension's **Trial 4 Blind Benchmark** panel runs the held-out benchmark:
+The extension's Dashboard **Benchmark** page runs the held-out benchmark, using an acceptability-gate + ranking methodology (docs/decisions/0017's "acceptability gate + ranking" addendum — DeepSeek is a frontier reference/ceiling, not a success condition; the central question is whether trained Qwen materially improves over base Qwen and reaches acceptable local-judge quality):
 
 1. Configure both server URLs (8080, 8081) in the extension
-2. Configure DeepSeek API credentials (for a reference model if desired)
-3. Import the held-out benchmark cases (operator-supplied, separate from training data)
-4. Run blind comparison; record verdict accuracy for each model
-5. Analyze results
+2. Configure DeepSeek API credentials (for a reference model)
+3. Import the held-out benchmark cases (operator-supplied, separate from training data; optionally with frozen `expectedVerdict`/`expectedDimensions` for objective accuracy scoring)
+4. Run blind comparisons; for each response mark acceptable/unacceptable, then rank the acceptable ones (1 = best) — an unacceptable response is never ranked
+5. Analyze aggregate results: acceptability rate, unacceptable rate, rank-1 rate, mean rank among acceptable, trained-vs-base improvement, and (when frozen ground truth is present) verdict exact accuracy and dimension exact-set/micro-F1
 
 **Evaluation-integrity requirement:** The held-out benchmark must remain completely separate from the training data pipeline. See `benchmark/sample_case.README.md` for the strict requirements.
 
@@ -144,7 +147,9 @@ training/phase5a/
 ├── README.md                              (this file)
 ├── .gitignore                             (ignore generated data, models, cache)
 ├── lore/
-│   └── task-contract.v2.md               (ground truth specification)
+│   ├── task-contract.v1.md                (superseded, preserved as history)
+│   ├── task-contract.v2.md                (superseded, preserved as history)
+│   └── task-contract.v3.md                (ground truth specification)
 ├── dataset/
 │   ├── generate_candidates.py            (OpenRouter API client)
 │   ├── split_dataset.py                  (JSONL converter)
@@ -184,7 +189,7 @@ training/phase5a/
 
 1. **Generation is synthetic:** `generate_candidates.py` invents plausible scenarios; it never reads or reproduces the held-out benchmark.
 2. **No benchmark in training data:** The operator supplies the real benchmark separately and **never** commits it to the `benchmark/` directory in the repository.
-3. **Train/valid/test split:** `split_dataset.py` divides accepted examples (80/10/10), separately from the external benchmark.
+3. **Train/valid/test split:** `split_dataset.py` divides included, human-reviewed examples (80/10/10), separately from the external benchmark.
 4. **Operator supplies ground truth:** The benchmark grading is done manually by the human operator, comparing the trained model's predictions against their own judgments recorded independently.
 
 See `benchmark/sample_case.README.md` for the full evaluation-integrity contract.
@@ -201,7 +206,7 @@ See `benchmark/sample_case.README.md` for the full evaluation-integrity contract
 
 ## References
 
-- Task contract (ground truth): `training/phase5a/lore/task-contract.v2.md`
+- Task contract (ground truth): `training/phase5a/lore/task-contract.v3.md`
 - Phase 5A overview: `docs/decisions/0016-phase5-persona-evidence-utility-validation.md`
 - Trial 3 context: same document, "Trial 3" sections
 - Trial 4 design: `docs/decisions/0017-phase5a-trial4-human-filtered-specialization.md` (if exists)

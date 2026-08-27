@@ -2,12 +2,25 @@
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "kind": "replaced",
-    "originalText": "The system should prioritize avoiding feature expansion during this phase.",
-    "finalText": "Avoid feature expansion for now; ship MVP and test with users instead.",
-    "beforeContext": "According to the requirements,",
-    "afterContext": "We can iterate based on feedback.",
+    "originalText": "Maybe I'll come tomorrow.",
+    "finalText": "I will come tomorrow.",
+    "beforeContext": "Let me check my schedule.",
+    "afterContext": "See you then.",
     "proposedVerdict": "meaning_transformed",
-    "proposedDescription": "Reframes avoidance as an explicit action with a concrete alternative (MVP + user testing).",
-    "decision": "pending"
+    "proposedDimensions": [
+      { "dimension": "certainty", "direction": "increased" },
+      { "dimension": "commitment", "direction": "increased" }
+    ],
+    "proposedDescription": "A hedged possibility becomes a firm commitment.",
+    "language": "en",
+    "reviewNoteTr": "Belirsiz bir olasılık kesin bir taahhüde dönüştü.",
+    "humanVerdict": null,
+    "humanDimensions": [],
+    "includeInTraining": false,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-01-01T00:00:00.000Z"
   }
 ]

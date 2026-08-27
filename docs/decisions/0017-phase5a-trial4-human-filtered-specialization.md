@@ -885,3 +885,213 @@ across `extension/src`/`extension/entrypoints`/`extension/tests` for
 every remaining reference to the deleted `decision`/
 `Trial4TrainingCandidateDecision` fields before considering the migration
 complete.
+
+## Addendum: Test 1 two-axis redesign + acceptability-gate benchmark (v3)
+
+**Status: DECIDED design change, NOT YET VALIDATED result.** This
+addendum documents a redesign of Trial 4 / Test 1's judging contract and
+benchmark methodology made on the currently-open branch. It changes what
+the judge outputs and how the blind benchmark is graded; it does **not**
+introduce a new phase, does **not** implement "Test 2," does **not**
+change the model (still Qwen3-0.6B), and does **not** add RLHF/DPO or any
+other training method. No new real quantitative result exists yet under
+this redesign — the Trial 3 52.9%/51%/14.9% numbers recorded earlier in
+this document remain historical and are explicitly **not** apples-to-
+apples with anything measured under v3, since v3 changes the judging
+policy itself (an added `dimensions` output, a different verdict-axis
+prompt wording, and a materially different benchmark grading model). Any
+future comparison must freshly evaluate base Qwen, trained Qwen, and
+DeepSeek under the same v3 contract and the same frozen held-out cases.
+
+### Motivation
+
+Human review of early Trial 4 candidates surfaced a real gap in the
+5-value verdict contract: a great deal of genuinely observable behavior
+change in a revision — tone, certainty, directness, politeness,
+commitment — was either (a) forced into `meaning_transformed` when it
+didn't really cross the meaning-changed threshold, or (b) silently
+discarded as `no_meaningful_change` with no way to record that a real,
+useful expression shift still happened. Neither outcome is correct: (a)
+inflates the "meaning changed" signal with cases that are really about
+expression, and (b) throws away valuable behavioral evidence.
+Separately, the original blind-benchmark grading model (Correct/Partial/
+Wrong per response + a free-choice "Best response A/B/C/Tie") answers
+the wrong question for Test 1 — Test 1 was never asking "does trained
+Qwen beat DeepSeek," it is asking whether specialization improved the
+same 0.6B model over its own base and whether the result is a usable
+local judge.
+
+### The two-axis judging contract (v3)
+
+**`spec/protocol/semantic-revision-judge.ts`** now defines
+`BehaviorDimension` (15 closed values), `BehaviorDirection` (9 closed
+values), and `BehaviorDimensionChange`, and extends
+`SemanticRevisionJudgmentDraft` with a required `dimensions:
+BehaviorDimensionChange[]` field. **`SemanticChangeVerdict` is
+unchanged — still exactly 5 values.** `dimensions` is orthogonal, not a
+sixth verdict. `extension/src/persona/behavior-dimension.ts` is the
+single source of truth for validating a dimensions array (known
+dimension/direction values, no duplicate dimension within one judgment),
+reused by `semantic-revision-judgment.ts`'s admission validator, the
+shared untrusted-wire parser (`semantic-revision-judge-wire.ts`), and
+the OpenRouter provider's own JSON-Schema-based validator
+(`openrouter-semantic-revision-judge.ts`). All four judge-transport
+implementations (local MLX, DeepSeek, OpenRouter, and the shared wire
+module they build on) share byte-for-byte the same two-axis prompt
+content, verified in `extension/tests/persona/semantic-revision-judge-wire.test.ts`.
+
+**`training/phase5a/lore/task-contract.v3.md`** is the new ground-truth
+document (v1/v2 preserved unchanged, never edited in place) — it defines
+the two axes explicitly and gives 5 worked examples (A-E) that both the
+generator prompt (`generate_candidates.py`) and the review UI's
+calibration are built to match exactly.
+
+**Training candidate schema** (`spec/schema/trial4-training-candidate.ts`)
+adds `proposedDimensions`/`humanDimensions: BehaviorDimensionChange[]`
+alongside the existing `proposedVerdict`/`humanVerdict` split — the same
+"proposed is never overwritten, human is never auto-copied from
+proposed" discipline the verdict fields already had now applies to
+dimensions too (`trial4-training-candidate-import.ts` defaults
+`humanDimensions` to `[]`, never to `raw.proposedDimensions`). An
+optional `language: 'tr' | 'en'` field was also added to both the
+training-candidate and benchmark-case schemas — metadata only, for
+balancing/reporting, structurally never read into a judge prompt
+(`Trial4BenchmarkService.judgeWithRole` still destructures only the 5
+`SemanticRevisionJudgeInput` fields). Current Test 1 generation target:
+120 Turkish / 80 English, ordinary daily-life communication (a
+deliberate move away from the earlier generator's software/MVP-jargon-
+heavy topic seeds).
+
+**CRITICAL BUG FIXED:** `training/phase5a/dataset/split_dataset.py`
+previously filtered `candidate.get("decision") == "accepted"` — a field
+that no longer exists on the schema — and built training completions
+from `proposedVerdict`/`proposedDescription` (the model's own unreviewed
+proposal), contradicting "human verdict is authoritative ground truth."
+It now filters `includeInTraining == True AND humanVerdict is not None`
+and builds completions from `humanVerdict`/`humanDimensions` only.
+`description` in the completion is derived deterministically from the
+structured human labels (verdict + dimensions), never copied from
+`proposedDescription`/`reviewNoteTr`/`operatorNoteTr`/`loreNoteTr` — this
+was option A from the two description-handling choices considered
+(deterministic derivation vs. treating description as non-primary),
+chosen because the training completion format still needs a
+`description` key matching the judge's own output contract. The
+generator prompt (`build_judge_prompt` in `split_dataset.py`) is verified
+byte-for-byte identical to `buildNarrowJudgePrompt` in
+`semantic-revision-judge-wire.ts` (checked directly, not just by
+inspection — see this file's own git history for the verification
+script) so the trained model sees exactly the prompt every inference
+transport will actually serve it.
+
+### Dashboard review UX
+
+`DashboardTrainingReview.svelte`'s main candidate view now reconstructs
+and prominently displays **ÖNCE** (`beforeContext + originalText +
+afterContext`) and **SONRA** (`beforeContext + finalText +
+afterContext`) as the largest elements on the page, with the raw
+localized-intervention fields (`kind`/spans/context) moved into a
+smaller collapsed "Teknik edit sınırı" details block underneath — the
+underlying localized-intervention data model itself is unchanged, this
+is a display-only reorganization. The decision UI is now a six-option
+composite verdict choice (keyboard 1-6): options 1/2/3/6 map straight to
+`meaning_added`/`meaning_removed`/`meaning_transformed`/`uncertain`;
+option 4 ("Anlam aynı, ifade/ton değişti") and option 5 ("Anlamlı
+değişiklik yok") both write `humanVerdict: 'no_meaningful_change'` and
+are distinguished only by whether `humanDimensions` is non-empty —
+`trial4-review-state.ts`'s `composeVerdictOption`/
+`verdictForCompositeOption` implement this mapping and its inverse.
+Below the verdict buttons, a "NE DEĞİŞTİ?" section groups the 15
+dimensions into three Turkish-labeled categories (İfade/ton, Duruş,
+Anlam/pratik içerik), each dimension a checkbox + direction dropdown;
+DeepSeek's `proposedDimensions` are shown separately in the proposal
+block, never pre-selected. `isDisagreement()` now flags a disagreement
+when the human verdict differs from the proposed verdict **or** the
+(order-independent) human dimension set differs from the proposed
+dimension set — either condition alone is sufficient.
+
+### Benchmark methodology: acceptability gate + ranking (supersedes the original Correct/Partial/Wrong + Best-response model)
+
+Mid-implementation, the operator corrected the benchmark UX/methodology
+itself, before any of the new dimension-related benchmark work had been
+built: the original Correct/Partial/Wrong-per-response plus a free-choice
+"Best response A/B/C/Tie" framing does not match what Test 1 is actually
+asking. **Test 1's central falsifiable question is whether trained Qwen
+materially improves over base Qwen and reaches an acceptable local-judge
+quality level — not whether it beats DeepSeek.** DeepSeek remains a
+frontier reference/ceiling only.
+
+`spec/schema/trial4-benchmark-result.ts` replaces the free-choice
+best-response model with: `Trial4BenchmarkResponse.humanAcceptable:
+boolean | null` and `humanRank: 1 | 2 | 3 | null` (rank set only when
+acceptable is true), and `Trial4BenchmarkResult.bestResponse` is now
+**derived** (whichever label has `humanRank === 1`, or `null` if none
+were acceptable) rather than a separately-chosen field — the "Tie" option
+is removed for this first pass, per explicit operator instruction not to
+let tie handling complicate the UI. The legacy `grade: Trial4ResponseGrade
+| null` field is kept on the schema (always `null` on new results) only
+so previously-stored results remain readable.
+`Trial4BenchmarkService.submitJudgment()` now takes
+`(resultId, acceptability, note)` and enforces structurally: an
+unacceptable response can never carry a rank, and acceptable responses
+must form a dense 1..N permutation with no duplicates — throwing rather
+than silently repairing a violation, same untrusted-input discipline as
+the rest of Trial 3/4. `Trial4BenchmarkPanel.svelte`'s judging form and
+`entrypoints/dashboard/App.svelte`'s duplicate handler were both rewritten
+to match (the dashboard handler intentionally re-derives the same
+validation/`bestResponse` logic inline rather than instantiating the
+service, per this file's existing "service only runs from the background
+job" design — see that file's own comment).
+
+`spec/schema/trial4-benchmark-case.ts` gained optional frozen
+`expectedVerdict`/`expectedDimensions` — an operator's own held-out
+ground truth for a case, structurally never forwarded to any model
+(`judgeWithRole` still destructures only the 5 input fields) and never
+shown to the operator before they submit acceptability/rank judgments.
+`trial4-benchmark-stats.ts`'s `computeTrial4BenchmarkStats()` was rewritten
+to compute, per role: acceptability rate, unacceptable rate, rank-1
+count/rate, mean rank among acceptable responses, and — only when a
+case's frozen ground truth is present — verdict exact accuracy and
+dimension exact-set accuracy / micro-averaged F1 (over `{dimension,
+direction}` pairs). `trainedVsBaseImprovement` is now defined as
+`trained.acceptableRate - base.acceptableRate` (previously
+`correctRate`-based). No dimension-success threshold is defined yet, per
+explicit operator instruction not to invent one; the existing ≥80%
+semantic-verdict research target remains the operator's stated target
+until explicitly revised, understood now to apply to the v3 contract's
+verdict axis specifically, not the pre-v3 numbers.
+
+### Tests and validation
+
+New/updated: `extension/tests/persona/behavior-dimension.test.ts` (14
+tests, new), dimension-focused additions to
+`semantic-revision-judgment.test.ts`, `semantic-revision-judge-wire.test.ts`
+(fully rewritten, 50 tests), `openrouter-semantic-revision-judge.test.ts`
+(28 tests), `local-mlx-semantic-revision-judge.test.ts`,
+`deepseek-semantic-revision-judge.test.ts`, `trial4-benchmark-service.test.ts`
+(rewritten `submitJudgment`/`reveal` describe blocks for the acceptability-
+gate signature, plus new tests for the dense-ranking/no-rank-on-
+unacceptable/zero-acceptable/single-acceptable validation paths),
+`trial4-benchmark-stats.test.ts` (rewritten for acceptability/rank/ground-
+truth metrics), `trial4-benchmark-result-store.test.ts` (fixture updated
+for `humanAcceptable`/`humanRank`), `trial4-review-state.test.ts` (new
+tests for dimension-set disagreement detection and the composite-option
+4-vs-5 mapping). **778/778 tests pass** (699 prior + a net 79 new/changed
+across the above files), clean `tsc --noEmit`, clean `wxt build`. The
+Python side was verified with a byte-for-byte prompt-fidelity check
+(`build_judge_prompt` in `split_dataset.py` diffed against
+`buildNarrowJudgePrompt`'s actual output for identical inputs — verified
+identical) and an end-to-end smoke test of `split_dataset.py` against a
+hand-built 3-candidate fixture (one included+reviewed, one excluded, one
+carrying the legacy `decision: "accepted"` field with no `humanVerdict`)
+confirming exactly the 1 correctly-included candidate is converted, with
+`proposedDescription` verified absent from the resulting completion.
+
+**Not done as part of automated validation:** no real browser session
+click-through of the new six-option composite verdict UI, the "NE
+DEĞİŞTİ?" dimension picker, or the acceptability-gate benchmark judging
+form (same limitation as the original Dashboard addendum above — this
+session's tooling cannot drive a real unpacked-extension Chrome session).
+No real LoRA training run or real DeepSeek/OpenRouter API call was made
+under the v3 contract — the generator/split-pipeline changes are verified
+structurally and via the smoke test above, not against a real generated
+corpus.

@@ -1,10 +1,10 @@
 import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
 import type {
   Trial4BenchmarkLabel,
+  Trial4BenchmarkRank,
   Trial4BenchmarkResponse,
   Trial4BenchmarkResult,
   Trial4BenchmarkRole,
-  Trial4ResponseGrade,
 } from '@spec/schema/trial4-benchmark-result';
 import type { SemanticRevisionJudgeProvider } from '@spec/protocol/semantic-revision-judge';
 import type { Trial4BenchmarkCaseStore } from './trial4-benchmark-case-store';
@@ -118,6 +118,10 @@ export class Trial4BenchmarkService {
     benchmarkCase: Trial4BenchmarkCase,
   ): Promise<Trial4BenchmarkResponse> {
     try {
+      // Deliberately destructures only the five SemanticRevisionJudgeInput
+      // fields — benchmarkCase.expectedVerdict/expectedDimensions (frozen
+      // ground truth, Test 1 addendum) are never forwarded to a model,
+      // enforced structurally here, not just by convention.
       const judgment = await provider.judge({
         kind: benchmarkCase.kind,
         originalText: benchmarkCase.originalText,
@@ -128,48 +132,86 @@ export class Trial4BenchmarkService {
       return {
         role,
         verdict: judgment.verdict,
+        dimensions: judgment.dimensions,
         description: judgment.description,
         confidence: judgment.confidence,
         error: null,
         grade: null,
+        humanAcceptable: null,
+        humanRank: null,
       };
     } catch (err) {
       return {
         role,
         verdict: null,
+        dimensions: [],
         description: null,
         confidence: null,
         error: err instanceof Error ? err.message : String(err),
         grade: null,
+        humanAcceptable: null,
+        humanRank: null,
       };
     }
   }
 
   /**
-   * Records the operator's blind judgment: a grade per label plus overall
-   * `bestResponse`/`note`. Throws if the result is already judged — a
-   * result is judged exactly once; re-grading after reveal is not
-   * supported, per Operator Decision 6 ("the recorded judgment must not
-   * change automatically after identities are revealed" — this method
-   * enforces that a *manual* re-judgment isn't possible either, since
-   * there is no separate "edit" path).
+   * Records the operator's blind judgment using the acceptability-gate +
+   * ranking model (docs/decisions/0017's "acceptability gate + ranking"
+   * addendum, superseding the earlier Correct/Partial/Wrong + free-choice
+   * "Best response" model). For each label: `acceptable` is required;
+   * `rank` MUST be `null` when `acceptable` is `false` — an unacceptable
+   * response can never receive a rank — and when one or more labels are
+   * acceptable, their `rank` values must form a dense 1..N permutation (no
+   * gaps, no duplicates, N = count of acceptable labels in this
+   * submission). Throws on any violation of that structural invariant
+   * rather than silently repairing it (same untrusted-input discipline as
+   * the rest of Trial 3/4). `bestResponse` is derived here, not supplied
+   * by the caller — it is simply whichever label has `rank === 1`, or
+   * `null` if zero responses were acceptable (itself a valid, meaningful,
+   * explicitly-recorded outcome, not an error).
+   *
+   * Throws if the result is already judged — a result is judged exactly
+   * once; re-grading after reveal is not supported, per Operator Decision
+   * 6 ("the recorded judgment must not change automatically after
+   * identities are revealed" — this method enforces that a *manual*
+   * re-judgment isn't possible either, since there is no separate "edit"
+   * path).
    */
   async submitJudgment(
     resultId: string,
-    grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade>,
-    bestResponse: Trial4BenchmarkResult['bestResponse'],
+    acceptability: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }>,
     note: string,
   ): Promise<Trial4BenchmarkResult> {
     const result = await this.resultStore.get(resultId);
     if (!result) throw new Error(`No Trial 4 benchmark result with id "${resultId}"`);
     if (result.judged) throw new Error('This Trial 4 benchmark result has already been judged');
 
+    const acceptableLabels = LABELS.filter((label) => acceptability[label].acceptable);
+    const unacceptableLabels = LABELS.filter((label) => !acceptability[label].acceptable);
+
+    if (unacceptableLabels.some((label) => acceptability[label].rank !== null)) {
+      throw new Error('An unacceptable response must not carry a rank');
+    }
+    const ranks = acceptableLabels.map((label) => acceptability[label].rank);
+    if (ranks.some((rank) => rank === null)) {
+      throw new Error('Every acceptable response must have a rank');
+    }
+    const expectedRanks = acceptableLabels.map((_label, index) => index + 1);
+    if (JSON.stringify([...ranks].sort()) !== JSON.stringify(expectedRanks)) {
+      throw new Error(
+        `Acceptable responses must be ranked as a dense 1..${acceptableLabels.length} permutation with no duplicates`,
+      );
+    }
+
+    const bestResponse = acceptableLabels.find((label) => acceptability[label].rank === 1) ?? null;
+
     const updated: Trial4BenchmarkResult = {
       ...result,
       labelMapping: {
-        A: { ...result.labelMapping.A, grade: grades.A },
-        B: { ...result.labelMapping.B, grade: grades.B },
-        C: { ...result.labelMapping.C, grade: grades.C },
+        A: { ...result.labelMapping.A, humanAcceptable: acceptability.A.acceptable, humanRank: acceptability.A.rank },
+        B: { ...result.labelMapping.B, humanAcceptable: acceptability.B.acceptable, humanRank: acceptability.B.rank },
+        C: { ...result.labelMapping.C, humanAcceptable: acceptability.C.acceptable, humanRank: acceptability.C.rank },
       },
       bestResponse,
       note,

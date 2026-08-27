@@ -19,7 +19,7 @@
   import { enqueueTrial4BenchmarkCase } from '../../src/queue/processors/trial4-benchmark-job';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
-  import type { Trial4BenchmarkLabel, Trial4BenchmarkResult, Trial4ResponseGrade } from '@spec/schema/trial4-benchmark-result';
+  import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
 
   import DashboardOverview from '../../src/ui/dashboard/DashboardOverview.svelte';
   import DashboardTrainingReview from '../../src/ui/dashboard/DashboardTrainingReview.svelte';
@@ -103,23 +103,38 @@
     await refresh();
   }
 
+  const TRIAL4_LABELS: Trial4BenchmarkLabel[] = ['A', 'B', 'C'];
+
   async function submitTrial4Judgment(
     event: CustomEvent<{
       resultId: string;
-      grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade>;
-      bestResponse: Trial4BenchmarkResult['bestResponse'];
+      acceptability: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }>;
       note: string;
     }>,
   ) {
     const result = await trial4BenchmarkResultStore.get(event.detail.resultId);
     if (!result || result.judged) return;
-    const { grades, bestResponse, note } = event.detail;
+    const { acceptability, note } = event.detail;
+
+    // Mirrors Trial4BenchmarkService.submitJudgment's validation and
+    // derived-bestResponse logic (docs/decisions/0017's "acceptability
+    // gate + ranking" addendum) — see this file's Benchmark-section
+    // docstring for why this handler doesn't just call that service.
+    const acceptableLabels = TRIAL4_LABELS.filter((label) => acceptability[label].acceptable);
+    const unacceptableLabels = TRIAL4_LABELS.filter((label) => !acceptability[label].acceptable);
+    if (unacceptableLabels.some((label) => acceptability[label].rank !== null)) return;
+    const ranks = acceptableLabels.map((label) => acceptability[label].rank);
+    if (ranks.some((rank) => rank === null)) return;
+    const expectedRanks = acceptableLabels.map((_label, index) => index + 1);
+    if (JSON.stringify([...ranks].sort()) !== JSON.stringify(expectedRanks)) return;
+    const bestResponse = acceptableLabels.find((label) => acceptability[label].rank === 1) ?? null;
+
     const updated: Trial4BenchmarkResult = {
       ...result,
       labelMapping: {
-        A: { ...result.labelMapping.A, grade: grades.A },
-        B: { ...result.labelMapping.B, grade: grades.B },
-        C: { ...result.labelMapping.C, grade: grades.C },
+        A: { ...result.labelMapping.A, humanAcceptable: acceptability.A.acceptable, humanRank: acceptability.A.rank },
+        B: { ...result.labelMapping.B, humanAcceptable: acceptability.B.acceptable, humanRank: acceptability.B.rank },
+        C: { ...result.labelMapping.C, humanAcceptable: acceptability.C.acceptable, humanRank: acceptability.C.rank },
       },
       bestResponse,
       note,

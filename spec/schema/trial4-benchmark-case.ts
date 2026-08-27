@@ -1,4 +1,5 @@
-import type { RevisionInterventionKind } from '../protocol/semantic-revision-judge';
+import type { BehaviorDimensionChange, RevisionInterventionKind, SemanticChangeVerdict } from '../protocol/semantic-revision-judge';
+import type { Trial4CandidateLanguage } from './trial4-training-candidate';
 
 /**
  * One held-out falsification-benchmark case for Trial 4's blind
@@ -16,6 +17,20 @@ import type { RevisionInterventionKind } from '../protocol/semantic-revision-jud
  * see docs/decisions/0017's evaluation-integrity section. This schema
  * only describes the shape; it carries no data of its own, and no sample
  * fixture in this repository is the real benchmark.
+ *
+ * **Frozen ground truth (`expectedVerdict`/`expectedDimensions`), Test 1
+ * addendum.** Both optional, both entirely absent from every current call
+ * site that constructs a `SemanticRevisionJudgeInput` for a model
+ * (`Trial4BenchmarkService.judgeWithRole` sends only
+ * `kind`/`originalText`/`finalText`/`beforeContext`/`afterContext` — never
+ * these two fields) — a model can never see its own answer key. Also
+ * never shown to the operator by `Trial4BenchmarkPanel.svelte` before
+ * blind grading is submitted, for the same reason the A/B/C role mapping
+ * stays hidden until `revealed`. Present so a future, explicit scoring
+ * pass can compute objective semantic-verdict/dimension-set accuracy
+ * alongside the existing blind subjective comparison — computing that
+ * score is deliberately NOT implemented in this addendum (see
+ * docs/decisions/0017's "no dimension success threshold yet" note).
  */
 export interface Trial4BenchmarkCase {
   id: string;
@@ -24,4 +39,10 @@ export interface Trial4BenchmarkCase {
   finalText: string;
   beforeContext: string;
   afterContext: string;
+  /** Dataset balancing/reporting metadata only — never fed to the judge prompt. */
+  language?: Trial4CandidateLanguage;
+  /** Frozen ground truth — never sent to a model, never shown before blind grading. See this interface's docstring. */
+  expectedVerdict?: SemanticChangeVerdict;
+  /** Frozen ground truth — never sent to a model, never shown before blind grading. See this interface's docstring. */
+  expectedDimensions?: BehaviorDimensionChange[];
 }

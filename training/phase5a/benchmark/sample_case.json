@@ -3,8 +3,13 @@
     "id": "660e8400-e29b-41d4-a716-446655440001",
     "kind": "added",
     "originalText": "",
-    "finalText": "Consider user feedback before expanding features.",
-    "beforeContext": "The plan is solid.",
-    "afterContext": "This will help prioritize development."
+    "finalText": "Let's talk about it after dinner.",
+    "beforeContext": "I don't want to decide right now.",
+    "afterContext": "I need some time to think.",
+    "language": "en",
+    "expectedVerdict": "meaning_added",
+    "expectedDimensions": [
+      { "dimension": "action_or_decision", "direction": "added" }
+    ]
   }
 ]

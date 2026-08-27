@@ -1,4 +1,15 @@
-import type { RevisionInterventionKind, SemanticChangeVerdict } from '../protocol/semantic-revision-judge';
+import type { BehaviorDimensionChange, RevisionInterventionKind, SemanticChangeVerdict } from '../protocol/semantic-revision-judge';
+
+/**
+ * Which language this candidate's text is in — metadata for dataset
+ * balancing/reporting ONLY (docs/decisions/0017's Test 1 addendum: current
+ * target is 120 Turkish / 80 English). MUST NEVER be fed to the judge
+ * prompt (`buildNarrowJudgePrompt` never reads it) — the whole point of
+ * Trial 3/4's language-generality requirement is that the judge reasons
+ * about meaning/behavior shift, not language identity. Optional so
+ * candidates imported before this field existed remain valid.
+ */
+export type Trial4CandidateLanguage = 'tr' | 'en';
 
 /**
  * Structured reason codes for excluding a candidate from training
@@ -39,11 +50,15 @@ export type Trial4ExclusionReason =
  * **Three independent concepts, never collapsed into one Accept/Reject
  * state** (docs/decisions/0017's structured-decisions addendum):
  *
- * 1. **Human semantic verdict** (`humanVerdict`) — what is the correct
- *    label? This is the authoritative training ground truth, replacing
- *    `proposedVerdict` for that purpose — but `proposedVerdict`/
- *    `proposedDescription` are NEVER overwritten; both values are always
- *    preserved so human/model disagreement remains inspectable.
+ * 1. **Human semantic verdict + observable-behavior dimensions**
+ *    (`humanVerdict`/`humanDimensions`) — what is the correct label, on
+ *    BOTH the semantic/practical axis (`humanVerdict`) and the orthogonal
+ *    observable-behavior axis (`humanDimensions`)? Together these are the
+ *    authoritative training ground truth, replacing
+ *    `proposedVerdict`/`proposedDimensions` for that purpose — but
+ *    `proposedVerdict`/`proposedDimensions`/`proposedDescription` are
+ *    NEVER overwritten; all proposed values are always preserved so
+ *    human/model disagreement remains inspectable on both axes.
  * 2. **Training eligibility** (`includeInTraining`) — should this example
  *    train the model? Independent of whether a verdict was ever assigned:
  *    an unrealistic candidate can be excluded (`includeInTraining: false`,
@@ -62,10 +77,23 @@ export interface Trial4TrainingCandidate {
   finalText: string;
   beforeContext: string;
   afterContext: string;
+  /** Dataset balancing/reporting metadata only — never fed to the judge prompt. See `Trial4CandidateLanguage`. Optional for candidates imported before this field existed. */
+  language?: Trial4CandidateLanguage;
   /** DeepSeek's original proposed judgment — a training-signal proposal, never overwritten by the human's decision. */
   proposedVerdict: SemanticChangeVerdict;
   /** DeepSeek's original proposed description — never overwritten. Null exactly when proposedVerdict is 'no_meaningful_change'/'uncertain'. */
   proposedDescription: string | null;
+  /**
+   * DeepSeek's original proposed observable-behavior dimensions — never
+   * overwritten by the human's selection, exactly like `proposedVerdict`.
+   * The review UI may display these as suggestions, but they remain
+   * visually/structurally separate from `humanDimensions` and are NEVER
+   * auto-copied into it (that would reintroduce teacher bias — see this
+   * interface's top-level docstring). Optional so candidates imported
+   * before this field existed default to `[]`, never `undefined`, at the
+   * point of import (`extension/src/persona/trial4-training-candidate-import.ts`).
+   */
+  proposedDimensions: BehaviorDimensionChange[];
   /**
    * Turkish-language review assistance ONLY — DeepSeek's own natural-
    * language explanation of the original->final change and its proposed
@@ -90,6 +118,17 @@ export interface Trial4TrainingCandidate {
    * candidate does not require a verdict at all.
    */
   humanVerdict: SemanticChangeVerdict | null;
+  /**
+   * The operator's authoritative observable-behavior dimensions —
+   * training ground truth alongside `humanVerdict`. Independent of which
+   * top-level review choice was made: the "Anlam aynı, ifade / ton
+   * değişti" UI option requires at least one entry here (enforced by the
+   * review UI, not this schema); "Anlamlı değişiklik yok" explicitly saves
+   * `[]`; `meaning_added`/`meaning_removed`/`meaning_transformed` may also
+   * carry dimensions. Defaults to `[]` for an unreviewed/excluded
+   * candidate — never `undefined`.
+   */
+  humanDimensions: BehaviorDimensionChange[];
   /**
    * True = valid example; `humanVerdict` is ground truth and this
    * candidate is eligible for the training-dataset export. False = either

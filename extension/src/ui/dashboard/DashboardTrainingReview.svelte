@@ -1,18 +1,24 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
-  import type { SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
+  import type { BehaviorDimension } from '@spec/protocol/semantic-revision-judge';
   import type { Trial4ImportMode } from '../../persona/trial4-training-candidate-import';
   import {
     VERDICT_LABELS_TR,
-    VERDICT_ORDER,
     EXCLUSION_REASON_LABELS_TR,
     EXCLUSION_REASON_ORDER,
+    DIMENSION_LABELS_TR,
+    DIRECTION_LABELS_TR,
+    DIRECTION_ORDER,
+    DIMENSION_GROUPS_TR,
     filterCandidates,
     isReviewed,
     isDisagreement,
     computeReviewStats,
+    composeVerdictOption,
+    verdictForCompositeOption,
     type Trial4ReviewFilter,
+    type Trial4CompositeVerdictOption,
   } from '../../persona/trial4-review-state';
 
   export let candidates: Trial4TrainingCandidate[] = [];
@@ -91,8 +97,67 @@
     dispatch('update', { ...current, ...patch });
   }
 
-  function selectVerdict(verdict: SemanticChangeVerdict) {
+  // Six-option composite verdict UI (Test 1 / v3 addendum). Options 1-3 and
+  // 6 map straight through to a SemanticChangeVerdict and commit
+  // immediately. Option 5 ("Anlamlı değişiklik yok") forces
+  // humanDimensions: [] and commits immediately. Option 4 ("Anlam aynı,
+  // ifade/ton değişti") sets the verdict but does NOT commit
+  // (includeInTraining/reviewedAt) until the operator picks at least one
+  // dimension below — mirrors the existing toggleExclusionReason pattern
+  // ("only the first reason picked marks reviewed").
+  const COMPOSITE_OPTIONS: { option: Trial4CompositeVerdictOption; label: string; key: string }[] = [
+    { option: 'meaning_added', label: 'Anlam eklendi', key: '1' },
+    { option: 'meaning_removed', label: 'Anlam çıkarıldı', key: '2' },
+    { option: 'meaning_transformed', label: 'Anlam dönüştü', key: '3' },
+    { option: 'no_meaningful_change_expression_shifted', label: 'Anlam aynı, ifade/ton değişti', key: '4' },
+    { option: 'no_meaningful_change_no_shift', label: 'Anlamlı değişiklik yok', key: '5' },
+    { option: 'uncertain', label: 'Belirsiz / karar veremiyorum', key: '6' },
+  ];
+
+  $: currentComposite = current ? composeVerdictOption(current) : null;
+
+  function selectComposite(option: Trial4CompositeVerdictOption) {
     if (!current) return;
+    const verdict = verdictForCompositeOption(option);
+
+    if (option === 'no_meaningful_change_no_shift') {
+      pushUpdate({
+        humanVerdict: verdict,
+        humanDimensions: [],
+        includeInTraining: true,
+        exclusionReasons: [],
+        reviewedAt: new Date().toISOString(),
+      });
+      modeOverride = 'valid';
+      goNext();
+      return;
+    }
+
+    if (option === 'no_meaningful_change_expression_shifted') {
+      // Left incomplete (not reviewed/included) until a dimension is
+      // picked — see toggleDimension below.
+      pushUpdate({ humanVerdict: verdict, exclusionReasons: [] });
+      modeOverride = 'valid';
+      return;
+    }
+
+    if (option === 'uncertain') {
+      // "For this first Test 1 pass, keep it simple: uncertain => []."
+      pushUpdate({
+        humanVerdict: verdict,
+        humanDimensions: [],
+        includeInTraining: true,
+        exclusionReasons: [],
+        reviewedAt: new Date().toISOString(),
+      });
+      modeOverride = 'valid';
+      goNext();
+      return;
+    }
+
+    // meaning_added / meaning_removed / meaning_transformed — dimensions
+    // may also be selected for these (worked example E), so any dimensions
+    // already picked are preserved, not cleared.
     pushUpdate({
       humanVerdict: verdict,
       includeInTraining: true,
@@ -101,6 +166,36 @@
     });
     modeOverride = 'valid';
     goNext();
+  }
+
+  function toggleDimension(dimension: BehaviorDimension) {
+    if (!current) return;
+    const has = current.humanDimensions.some((d) => d.dimension === dimension);
+    const nextDimensions = has
+      ? current.humanDimensions.filter((d) => d.dimension !== dimension)
+      : [...current.humanDimensions, { dimension, direction: 'changed' as const }];
+
+    const patch: Partial<Trial4TrainingCandidate> = { humanDimensions: nextDimensions };
+    if (current.humanVerdict === 'no_meaningful_change') {
+      if (nextDimensions.length > 0) {
+        patch.includeInTraining = true;
+        patch.reviewedAt = current.reviewedAt ?? new Date().toISOString();
+      } else {
+        // Removed the only dimension while mid-way through option 4 — this
+        // is no longer option 5 (which forces [] explicitly and commits
+        // immediately elsewhere), so revert to incomplete/pending.
+        patch.includeInTraining = false;
+        patch.reviewedAt = undefined;
+      }
+    }
+    pushUpdate(patch);
+  }
+
+  function setDimensionDirection(dimension: BehaviorDimension, direction: (typeof DIRECTION_ORDER)[number]) {
+    if (!current) return;
+    pushUpdate({
+      humanDimensions: current.humanDimensions.map((d) => (d.dimension === dimension ? { ...d, direction } : d)),
+    });
   }
 
   function enterBadMode() {
@@ -187,9 +282,9 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (!current || isTypingInField(event)) return;
-    if (event.key >= '1' && event.key <= '5') {
+    if (event.key >= '1' && event.key <= '6') {
       const idx = Number(event.key) - 1;
-      selectVerdict(VERDICT_ORDER[idx]);
+      selectComposite(COMPOSITE_OPTIONS[idx].option);
       return;
     }
     switch (event.key.toLowerCase()) {
@@ -250,28 +345,42 @@
     </div>
 
     <article class="candidate">
-      <div class="block context-block">
-        <h3>Bağlam</h3>
-        <p class="context-line">
-          <span class="ctx">{current.beforeContext || '—'}</span>
-          <span class="op-badge">{current.kind}</span>
-          <span class="ctx">{current.afterContext || '—'}</span>
+      <div class="block before-block">
+        <h3>ÖNCE</h3>
+        <p class="reconstructed-text">
+          <span class="ctx">{current.beforeContext}</span>{#if current.beforeContext && current.originalText}{' '}{/if}<span
+            class="highlight-before">{current.originalText}</span
+          >{#if current.afterContext && current.originalText}{' '}{/if}<span class="ctx">{current.afterContext}</span>
         </p>
       </div>
 
-      <div class="block original-block">
-        <h3>Original</h3>
-        <p class="big-text">{current.originalText || '(boş)'}</p>
+      <div class="block after-block">
+        <h3>SONRA</h3>
+        <p class="reconstructed-text">
+          <span class="ctx">{current.beforeContext}</span>{#if current.beforeContext && current.finalText}{' '}{/if}<span
+            class="highlight-after">{current.finalText}</span
+          >{#if current.afterContext && current.finalText}{' '}{/if}<span class="ctx">{current.afterContext}</span>
+        </p>
       </div>
 
-      <div class="block final-block">
-        <h3>Final</h3>
-        <p class="big-text">{current.finalText || '(boş)'}</p>
-      </div>
+      <details class="block technical-block">
+        <summary>Teknik edit sınırı</summary>
+        <p class="tech-line"><strong>kind:</strong> {current.kind}</p>
+        <p class="tech-line"><strong>originalText:</strong> {current.originalText === '' ? '(boş — added edit için geçerli/gerekli)' : current.originalText}</p>
+        <p class="tech-line"><strong>finalText:</strong> {current.finalText === '' ? '(boş — removed edit için geçerli/gerekli)' : current.finalText}</p>
+        <p class="tech-line"><strong>beforeContext:</strong> {current.beforeContext || '—'}</p>
+        <p class="tech-line"><strong>afterContext:</strong> {current.afterContext || '—'}</p>
+      </details>
 
       <div class="block proposal-block">
         <h3>DeepSeek Önerisi</h3>
         <p><strong>{VERDICT_LABELS_TR[current.proposedVerdict]}</strong> ({current.proposedVerdict})</p>
+        {#if current.proposedDimensions.length > 0}
+          <p class="proposed-dimensions">
+            önerilen boyutlar:
+            {#each current.proposedDimensions as change, i}{i > 0 ? ', ' : ' '}{DIMENSION_LABELS_TR[change.dimension]} ({DIRECTION_LABELS_TR[change.direction]}){/each}
+          </p>
+        {/if}
         {#if current.proposedDescription}<p class="proposal-desc">{current.proposedDescription}</p>{/if}
       </div>
 
@@ -291,23 +400,51 @@
 
         {#if mode === 'valid' || mode === 'undecided'}
           <div class="verdict-grid">
-            {#each VERDICT_ORDER as verdict, i}
-              <button
-                class="verdict-btn"
-                class:selected={current.humanVerdict === verdict}
-                class:model-proposed={current.proposedVerdict === verdict}
-                on:click={() => selectVerdict(verdict)}
-              >
-                <span class="key-hint">{i + 1}</span>
-                {VERDICT_LABELS_TR[verdict]}
+            {#each COMPOSITE_OPTIONS as { option, label, key }}
+              <button class="verdict-btn" class:selected={currentComposite === option} on:click={() => selectComposite(option)}>
+                <span class="key-hint">{key}</span>
+                {label}
               </button>
             {/each}
           </div>
+          {#if current.humanVerdict === 'no_meaningful_change' && current.humanDimensions.length === 0 && !isReviewed(current)}
+            <p class="incomplete-note">"Anlam aynı, ifade/ton değişti" seçildi — devam etmek için en az bir boyut seçin.</p>
+          {/if}
           {#if current.humanVerdict !== null && isDisagreement(current)}
             <p class="disagreement-note">
               ⚠ Model önerisi ({VERDICT_LABELS_TR[current.proposedVerdict]}) ile farklı — her iki değer de saklanıyor.
             </p>
           {/if}
+
+          <div class="dimensions-section">
+            <h4>NE DEĞİŞTİ?</h4>
+            {#each DIMENSION_GROUPS_TR as group}
+              <div class="dimension-group">
+                <p class="dimension-group-label">{group.label}</p>
+                <div class="dimension-grid">
+                  {#each group.dimensions as dimension}
+                    {@const active = current.humanDimensions.find((d) => d.dimension === dimension)}
+                    <div class="dimension-item">
+                      <label>
+                        <input type="checkbox" checked={Boolean(active)} on:change={() => toggleDimension(dimension)} />
+                        {DIMENSION_LABELS_TR[dimension]}
+                      </label>
+                      {#if active}
+                        <select
+                          value={active.direction}
+                          on:change={(e) => setDimensionDirection(dimension, (e.target as HTMLSelectElement).value as typeof DIRECTION_ORDER[number])}
+                        >
+                          {#each DIRECTION_ORDER as direction}
+                            <option value={direction}>{DIRECTION_LABELS_TR[direction]}</option>
+                          {/each}
+                        </select>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
         {/if}
 
         {#if mode === 'bad'}
@@ -344,7 +481,7 @@
       </div>
     </article>
 
-    <p class="hints">Kısayollar: 1-5 karar · X kötü örnek · L lore · ← → önceki/sonraki</p>
+    <p class="hints">Kısayollar: 1-6 karar · X kötü örnek · L lore · ← → önceki/sonraki</p>
   {/if}
 </section>
 
@@ -452,35 +589,46 @@
     letter-spacing: 0.03em;
     color: #777;
   }
-  .context-block {
-    background: #f5f5f5;
-  }
-  .context-line {
-    margin: 0;
-    font-size: 15px;
-    color: #888;
-    font-style: italic;
-  }
-  .op-badge {
-    display: inline-block;
-    margin: 0 8px;
-    padding: 2px 8px;
-    background: #e5e5e5;
-    border-radius: 4px;
-    font-style: normal;
-    font-size: 12px;
-    color: #444;
-  }
-  .original-block {
+  .before-block {
     border-left: 4px solid #c0392b;
   }
-  .final-block {
+  .after-block {
     border-left: 4px solid #2a8f4e;
   }
-  .big-text {
-    font-size: 19px;
-    line-height: 1.6;
+  .reconstructed-text {
+    font-size: 20px;
+    line-height: 1.7;
     margin: 0;
+  }
+  .ctx {
+    color: #888;
+  }
+  .highlight-before {
+    background: #fbe9e7;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .highlight-after {
+    background: #e6f4ea;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .technical-block {
+    background: #f5f5f5;
+    font-size: 13px;
+  }
+  .technical-block summary {
+    cursor: pointer;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #777;
+  }
+  .tech-line {
+    margin: 6px 0 0;
+    color: #555;
   }
   .proposal-block {
     background: #f0f4f8;
@@ -489,6 +637,12 @@
     margin: 6px 0 0;
     font-size: 15px;
     color: #333;
+  }
+  .proposed-dimensions {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #556;
+    font-style: italic;
   }
   .tr-block {
     background: #fff7e6;
@@ -541,9 +695,6 @@
     background: #e6f4ea;
     font-weight: 600;
   }
-  .verdict-btn.model-proposed:not(.selected) {
-    border-style: dashed;
-  }
   .key-hint {
     display: inline-flex;
     align-items: center;
@@ -559,6 +710,47 @@
     margin-top: 10px;
     font-size: 14px;
     color: #a35a00;
+  }
+  .incomplete-note {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #a35a00;
+  }
+  .dimensions-section {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e5e5;
+  }
+  .dimensions-section h4 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #777;
+  }
+  .dimension-group {
+    margin-bottom: 12px;
+  }
+  .dimension-group-label {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+  }
+  .dimension-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .dimension-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  .dimension-item select {
+    font-size: 13px;
+    padding: 2px 4px;
   }
   .reason-grid {
     display: grid;

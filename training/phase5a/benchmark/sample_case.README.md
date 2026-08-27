@@ -8,3 +8,5 @@ This file illustrates the exact JSON shape that held-out falsification benchmark
 - Committed to this repository
 
 The benchmark is the independent ground truth against which the trained model's verdict accuracy will be measured. It must remain completely separate from the train/valid/test split produced by `split_dataset.py`.
+
+**Optional frozen ground truth (Test 1 / v3 addendum):** a case may carry `expectedVerdict`/`expectedDimensions` — the operator's own frozen judgment for that case, used only to compute objective verdict-exact-accuracy and dimension exact-set/micro-F1 after blind grading is complete. These fields are **never** sent to any model (`Trial4BenchmarkService.judgeWithRole` destructures only `kind`/`originalText`/`finalText`/`beforeContext`/`afterContext`) and **never** shown to the operator before they submit acceptability/rank judgments for a case — see `spec/schema/trial4-benchmark-case.ts` and `spec/schema/trial4-benchmark-result.ts`.

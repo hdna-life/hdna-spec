@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
-Phase 5A Trial 4: Generate candidate examples via OpenRouter.
+Phase 5A Trial 4 (v3 / Test 1 redesign): Generate candidate examples via OpenRouter.
 
 This script synthesizes plausible AI-draft-to-human-edit scenarios following
-the task contract in training/phase5a/lore/task-contract.v2.md.
+the task contract in training/phase5a/lore/task-contract.v3.md — the
+two-axis (verdict + observable-behavior dimensions) redesign. Every
+generated candidate is a PROPOSAL only (`proposedVerdict`/
+`proposedDimensions`/`proposedDescription`); DeepSeek's output is never
+auto-accepted — human review in the extension's Dashboard sets the
+authoritative `humanVerdict`/`humanDimensions`/`includeInTraining` fields
+(docs/decisions/0017's structured-decisions addendum). This script never
+writes those human-review fields at all; the extension's import path
+(`trial4-training-candidate-import.ts`) defaults them.
 
 Routed through OpenRouter (https://openrouter.ai), not a direct DeepSeek API
 call — the same gateway Trial 0-3 already use elsewhere in this repository
@@ -68,8 +76,38 @@ except ImportError:
     sys.exit(1)
 
 
-# Task contract text embedded here for the prompt.
-TASK_CONTRACT = """# Phase 5A task/lore contract — v2
+BEHAVIOR_DIMENSIONS = [
+    "expressed_affect_valence",
+    "expressed_affect_intensity",
+    "directness",
+    "politeness",
+    "formality",
+    "certainty",
+    "evidentiality",
+    "commitment",
+    "directive_force",
+    "conditionality",
+    "scope",
+    "specificity",
+    "rationale",
+    "factual_content",
+    "action_or_decision",
+]
+
+BEHAVIOR_DIRECTIONS = [
+    "increased",
+    "decreased",
+    "more_positive",
+    "more_negative",
+    "added",
+    "removed",
+    "narrowed",
+    "expanded",
+    "changed",
+]
+
+# Task contract text embedded here for the prompt (v3 — two-axis: verdict + dimensions).
+TASK_CONTRACT = """# Phase 5A task/lore contract — v3 (see training/phase5a/lore/task-contract.v3.md for the full contract)
 
 ## 1. The task, restated exactly as Trial 3 specifies it
 
@@ -125,7 +163,44 @@ alters none of hedging/certainty/intensity/commitment/directive-strength/
 qualification/rationale/framing/scope, and genuinely only rephrases the same
 claim with the same force, is still correctly `no_meaningful_change`.
 
-## 3. What must NOT be produced (failure classes from Trials 0-3, plus v2's addition)
+### 2.2. Two related but distinct axes (v3): verdict AND observable-behavior dimensions
+
+Every candidate has TWO separate outputs: `proposedVerdict` (the semantic/
+practical axis, exactly as above) and `proposedDimensions` (the observable
+behavioral/expression axis — did tone, affect, certainty, directness,
+politeness, formality, commitment, scope, etc. observably shift, regardless
+of whether the proposition itself changed?). Do NOT collapse these into one
+taxonomy. `dimensions` may be non-empty even when verdict is
+`no_meaningful_change` — this is the single most valuable new case v3 adds:
+an expression-only shift with no proposition change.
+
+Worked examples (calibration, from task-contract.v3.md §3):
+- A: "The movie was good." -> "The movie was really good." —
+  `no_meaningful_change`, dimensions: [{"dimension": "expressed_affect_intensity", "direction": "increased"}]
+- B: "She is upset." -> "She looks upset." — `no_meaningful_change`,
+  dimensions: [{"dimension": "certainty", "direction": "decreased"}, {"dimension": "evidentiality", "direction": "changed"}].
+  Do NOT record this as the subject's psychological state changing — only
+  the textual stance changed.
+- C: "Maybe I'll come tomorrow." -> "I will come tomorrow." —
+  `meaning_transformed`, dimensions: [{"dimension": "certainty", "direction": "increased"}, {"dimension": "commitment", "direction": "increased"}].
+  Dimensions can coexist with a meaning-changing verdict.
+- D: "You should consider running the tests before merging." -> "Run the
+  tests before merging." — `meaning_transformed`, dimensions:
+  [{"dimension": "directive_force", "direction": "increased"}].
+- E: a purely cosmetic edit (e.g. a stray double-space fix) —
+  `no_meaningful_change`, dimensions: [] — not every edit needs a dimension.
+
+Allowed dimensions (exactly these 15, no others): """ + ", ".join(BEHAVIOR_DIMENSIONS) + """.
+Allowed directions (exactly these 9, no others): """ + ", ".join(BEHAVIOR_DIRECTIONS) + """.
+
+Never infer a hidden emotional/psychological state as a dimension judgment.
+`expressed_affect_valence`/`expressed_affect_intensity` describe the TEXT's
+expressed affect, never the subject's or writer's actual internal state.
+No duplicate dimensions within one candidate. `uncertain` always has
+dimensions: []. `no_meaningful_change` MAY have non-empty dimensions (see A/B
+above) — do not default it to [] out of habit.
+
+## 3. What must NOT be produced (failure classes from Trials 0-3, plus v2/v3's additions)
 
 - Do not attribute pre-existing meaning to the edit.
 - Do not infer a motivation, reason, or psychological explanation for a
@@ -139,6 +214,9 @@ claim with the same force, is still correctly `no_meaningful_change`.
 - Do not rely on language-specific wording, suffixes, or grammar. Reason about
   the underlying meaning shift, however it happens to be expressed.
 - Do not invent a comparison that contradicts the FINAL text.
+- Do not infer a hidden emotional/psychological state as a `proposedDimensions`
+  judgment (v3, §2.2) — dimensions describe the TEXT's expressed properties,
+  never a subject's or writer's actual internal state.
 
 ## 4. Kind-specific notes
 
@@ -173,27 +251,42 @@ merging." — same topic, directive strength shifted from suggestion to
 imperative. This is `meaning_transformed`, NOT `no_meaningful_change`.
 """
 
+# Test 1 target: primarily ordinary daily-life communication, not software/
+# MVP jargon (a deliberate change from the earlier v1/v2 topic list, which
+# skewed heavily toward product/engineering scenarios). A generated
+# candidate's LANGUAGE is chosen independently of topic — see LANGUAGE_CYCLE
+# below for the 120 TR / 80 EN ratio.
 TOPIC_SEEDS = [
-    "product planning email",
-    "recipe instructions",
-    "travel itinerary note",
-    "code review comment",
-    "customer support reply",
-    "meeting notes summary",
-    "technical documentation",
-    "team retrospective feedback",
-    "project proposal draft",
-    "bug report with steps to reproduce",
-    "job interview feedback",
-    "research paper abstract",
-    "marketing copy for a feature",
-    "apology or clarification message",
-    "design critique note",
-    "financial advice or recommendation",
-    "onboarding instructions",
-    "user experience feedback",
-    "academic writing excerpt",
-    "product roadmap update",
+    "text message between friends making plans",
+    "family group chat about a weekend visit",
+    "note to a roommate about chores",
+    "message to a neighbor about noise or parking",
+    "apology to a friend after a disagreement",
+    "message declining or accepting a social invitation",
+    "note left for a family member",
+    "message to a landlord about a repair",
+    "message to a doctor's office rescheduling an appointment",
+    "message to a teacher about a child's school day",
+    "message coordinating a carpool or ride",
+    "message about splitting a bill among friends",
+    "message checking in on a sick friend or relative",
+    "message planning a birthday or holiday gathering",
+    "message about returning a borrowed item",
+    "message to a partner about evening plans",
+    "message to a parent about visiting",
+    "message giving directions to a meeting place",
+    "message about a pet's care while traveling",
+    "message expressing thanks after a favor",
+]
+
+# Sensible fallback secondary topics — used occasionally to keep coverage
+# from being too narrow, still avoiding tech/MVP jargon.
+SECONDARY_TOPIC_SEEDS = [
+    "recipe instructions shared with a friend",
+    "travel itinerary note for a family trip",
+    "advice to a friend about a personal decision",
+    "feedback to a friend on a personal project (non-technical)",
+    "message about weather affecting weekend plans",
 ]
 
 VALID_VERDICTS = [
@@ -204,6 +297,13 @@ VALID_VERDICTS = [
     "uncertain",
 ]
 
+VALID_LANGUAGES = ["tr", "en"]
+
+# Test 1's target mix: 120 Turkish / 80 English (60% / 40%) — cycled
+# deterministically per candidate index rather than randomized, so a
+# --count N run always produces the same ratio regardless of --seed.
+LANGUAGE_CYCLE = (["tr"] * 3) + (["en"] * 2)  # 60% tr, 40% en
+
 REQUIRED_FIELDS = [
     "kind",
     "originalText",
@@ -211,7 +311,9 @@ REQUIRED_FIELDS = [
     "beforeContext",
     "afterContext",
     "proposedVerdict",
+    "proposedDimensions",
     "proposedDescription",
+    "language",
     "reviewNoteTr",
 ]
 
@@ -237,16 +339,29 @@ def load_existing_candidates(out_path: str) -> list[dict[str, Any]]:
     return []
 
 
-def generate_single_candidate_prompt(topic: str) -> str:
+def generate_single_candidate_prompt(topic: str, language: str) -> str:
     """Build a prompt requesting exactly ONE candidate object (not a batch/array)."""
+    language_name = "Turkish" if language == "tr" else "English"
+    dims_list = ", ".join(BEHAVIOR_DIMENSIONS)
+    dirs_list = ", ".join(BEHAVIOR_DIRECTIONS)
     return f"""You are generating ONE synthetic example for training a semantic-change judgment model.
 
 Given the task contract below, invent ONE PLAUSIBLE AI-draft-to-human-edit scenario in the context of: {topic}
 
+The scenario's originalText/finalText/beforeContext/afterContext must be
+written in {language_name} — ordinary, everyday {language_name}
+communication (a text message, a note, a casual message to a friend or
+family member), NOT software/technical/product-management jargon. Avoid
+scenarios about code, features, sprints, MVPs, or engineering processes
+entirely; this generator previously skewed toward that register and it is
+now explicitly out of scope for new candidates.
+
 Invent:
 1. kind: one of 'added', 'removed', 'replaced', 'reordered'
-2. originalText: the AI-drafted span (may be empty string if kind is 'added')
-3. finalText: the human-edited span (may be empty string if kind is 'removed')
+2. originalText: the AI-drafted span (must be exactly '' if kind is 'added' —
+   do not write a placeholder like "none" or "(empty)")
+3. finalText: the human-edited span (must be exactly '' if kind is 'removed' —
+   do not write a placeholder like "none" or "(empty)")
 4. beforeContext: short unchanged text before the span (may be empty)
 5. afterContext: short unchanged text after the span (may be empty)
 6. proposedVerdict: your judgment of what verdict a human should assign. Must be one of:
@@ -255,17 +370,28 @@ Invent:
    - 'meaning_removed' (edit removes semantic content)
    - 'meaning_transformed' (edit changes existing semantic meaning)
    - 'uncertain' (you cannot confidently judge)
-7. proposedDescription: null if proposedVerdict is 'no_meaningful_change' or 'uncertain';
+7. proposedDimensions: an array of zero or more {{"dimension": ..., "direction": ...}}
+   pairs describing OBSERVABLE expression/behavior shifts (task contract §2.2),
+   separate from proposedVerdict. Allowed dimensions: {dims_list}.
+   Allowed directions: {dirs_list}. No duplicate dimensions. Empty array is a
+   valid answer. 'uncertain' verdicts must have dimensions: []. A
+   'no_meaningful_change' verdict MAY still have non-empty dimensions (an
+   expression-only shift with no proposition change) — this is a valuable,
+   deliberately common case; do not default to [] out of habit whenever
+   verdict is 'no_meaningful_change'.
+8. proposedDescription: null if proposedVerdict is 'no_meaningful_change' or 'uncertain';
    otherwise a one-sentence description of the semantic change grounded in the
    original->final transformation.
-8. reviewNoteTr: a natural, 1-3 sentence TURKISH-language explanation of the
-   original->final change and the proposed verdict, written for a Turkish-
-   speaking human reviewer who does not read English comfortably. Explain
-   what changed and why you chose that verdict, in Turkish, regardless of
-   which verdict you chose (including for no_meaningful_change/uncertain).
-   This field is REQUIRED and must always be a non-empty Turkish string —
-   it is reviewer assistance only, never a substitute for the English
-   fields above.
+9. language: must be exactly "{language}" (matching the language you wrote the scenario in).
+10. reviewNoteTr: a natural, 1-3 sentence TURKISH-language explanation of the
+    original->final change and the proposed verdict/dimensions, written for a
+    Turkish-speaking human reviewer who does not read English comfortably.
+    Explain what changed and why you chose that verdict, in Turkish,
+    regardless of which verdict you chose (including for
+    no_meaningful_change/uncertain) — even when the scenario itself is in
+    English, this field is always Turkish. This field is REQUIRED and must
+    always be a non-empty Turkish string — it is reviewer assistance only,
+    never a substitute for the fields above.
 
 KEY DISCIPLINE:
 - Ensure proposedDescription never describes meaning already present in originalText.
@@ -280,14 +406,27 @@ KEY DISCIPLINE:
   (see task contract §2.1) — when it is, the verdict must be
   'meaning_transformed' (or added/removed as appropriate), NEVER
   'no_meaningful_change', even though the topic is unchanged.
+- Avoid trivially repeating the same "might -> will" certainty-shift pattern
+  across many candidates; vary which dimension(s) shift and how.
+- Across many calls, include a healthy mix of: (a) strong NEGATIVE examples
+  where the text visibly changes but neither the proposition nor any
+  dimension meaningfully shifts (proposedVerdict 'no_meaningful_change',
+  proposedDimensions: []); (b) expression-only examples with useful
+  dimensions but proposedVerdict 'no_meaningful_change'; (c) genuinely
+  uncertain examples (proposedVerdict 'uncertain') — reserve 'uncertain' for
+  cases you genuinely cannot judge, never merely because the expression
+  changed (an expression change alone is not a reason for uncertainty, it
+  usually belongs in dimensions instead).
+- Do not auto-accept your own output as correct — you are proposing a
+  candidate for human review, not producing final ground truth.
 
 TASK CONTRACT:
 {TASK_CONTRACT}
 
 Respond with EXACTLY ONE JSON object and nothing else — no array, no
-Markdown, no explanation before or after it. The object must have ALL
-EIGHT fields above. Example shape (illustrative values only):
-{{"kind": "replaced", "originalText": "...", "finalText": "...", "beforeContext": "...", "afterContext": "...", "proposedVerdict": "meaning_transformed", "proposedDescription": "...", "reviewNoteTr": "..."}}
+Markdown, no explanation before or after it. The object must have ALL TEN
+fields above. Example shape (illustrative values only):
+{{"kind": "replaced", "originalText": "...", "finalText": "...", "beforeContext": "...", "afterContext": "...", "proposedVerdict": "meaning_transformed", "proposedDimensions": [{{"dimension": "certainty", "direction": "increased"}}], "proposedDescription": "...", "language": "{language}", "reviewNoteTr": "..."}}
 """
 
 
@@ -370,20 +509,51 @@ def parse_single_response(response_text: str) -> Optional[dict]:
         if not obj["proposedDescription"] or not isinstance(obj["proposedDescription"], str):
             return None
 
+    if not is_valid_dimensions(obj["proposedDimensions"]):
+        return None
+    if obj["proposedVerdict"] == "uncertain" and len(obj["proposedDimensions"]) > 0:
+        return None
+
+    if obj["language"] not in VALID_LANGUAGES:
+        return None
+
     if not obj["reviewNoteTr"] or not isinstance(obj["reviewNoteTr"], str):
         return None
 
     return obj
 
 
-def generate_one_candidate_with_retries(topic: str, model: str, api_key: str) -> Optional[dict]:
+def is_valid_dimensions(value: Any) -> bool:
+    """Validates a proposedDimensions array: must be a list, every element a
+    well-formed {dimension, direction} pair from the closed taxonomy, and no
+    duplicate dimension within the array. Mirrors
+    extension/src/persona/behavior-dimension.ts's isValidDimensionsArray —
+    same validation, kept in sync by hand (no shared import path from Python
+    into the TS module)."""
+    if not isinstance(value, list):
+        return False
+    seen = set()
+    for entry in value:
+        if not isinstance(entry, dict):
+            return False
+        dimension = entry.get("dimension")
+        direction = entry.get("direction")
+        if dimension not in BEHAVIOR_DIMENSIONS or direction not in BEHAVIOR_DIRECTIONS:
+            return False
+        if dimension in seen:
+            return False
+        seen.add(dimension)
+    return True
+
+
+def generate_one_candidate_with_retries(topic: str, language: str, model: str, api_key: str) -> Optional[dict]:
     """
     Generate exactly one candidate, retrying up to MAX_RETRIES_PER_CANDIDATE
     times on failure/invalid/timeout. Returns a validated candidate dict, or
     None if every attempt failed — the caller treats None as "skip this one
     and continue," never as a reason to abort the whole run.
     """
-    prompt = generate_single_candidate_prompt(topic)
+    prompt = generate_single_candidate_prompt(topic, language)
     last_error = None
     for attempt in range(1, MAX_RETRIES_PER_CANDIDATE + 1):
         success, response_text = call_openrouter_api(prompt, model, api_key)
@@ -395,7 +565,7 @@ def generate_one_candidate_with_retries(topic: str, model: str, api_key: str) ->
             return candidate
         last_error = "invalid/malformed response"
     print(
-        f"  [topic='{topic}'] failed after {MAX_RETRIES_PER_CANDIDATE} attempts: {last_error}",
+        f"  [topic='{topic}', language='{language}'] failed after {MAX_RETRIES_PER_CANDIDATE} attempts: {last_error}",
         file=sys.stderr,
     )
     return None
@@ -406,6 +576,12 @@ def output_candidate(out_path: str, candidate_dict: dict, write_lock: threading.
 
     Guarded by write_lock so concurrent workers can never interleave or
     corrupt output lines — each append is one atomic, lock-held write+flush.
+
+    Deliberately omits any human-review field (humanVerdict/humanDimensions/
+    includeInTraining/reviewedAt/etc.) — this script only ever produces a
+    PROPOSAL; the extension's import path
+    (trial4-training-candidate-import.ts) applies the review-field defaults
+    on import, so there is no auto-accept path here (Operator Decision 1).
     """
     output_obj = {
         "id": str(uuid.uuid4()),
@@ -415,12 +591,13 @@ def output_candidate(out_path: str, candidate_dict: dict, write_lock: threading.
         "beforeContext": candidate_dict["beforeContext"],
         "afterContext": candidate_dict["afterContext"],
         "proposedVerdict": candidate_dict["proposedVerdict"],
+        "proposedDimensions": candidate_dict["proposedDimensions"],
         "proposedDescription": candidate_dict["proposedDescription"],
+        "language": candidate_dict["language"],
         # Review-assistance only — see spec/schema/trial4-training-candidate.ts's
         # reviewNoteTr field docstring. split_dataset.py deliberately never
         # reads this field, so it structurally cannot leak into training data.
         "reviewNoteTr": candidate_dict["reviewNoteTr"],
-        "decision": "pending",
     }
     with write_lock:
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
@@ -435,6 +612,7 @@ def run_generation(
     api_key: str,
     out_path: str,
     topics_cycle: list[str],
+    language_cycle: list[str],
     concurrency: int,
 ) -> tuple[int, int]:
     """
@@ -449,19 +627,22 @@ def run_generation(
     """
     write_lock = threading.Lock()
     state_lock = threading.Lock()
-    state = {"persisted": 0, "failed": 0, "topic_idx": 0}
+    state = {"persisted": 0, "failed": 0, "topic_idx": 0, "language_idx": 0}
     # Bounded global failure limit — generous enough to absorb transient API
     # flakiness across a long run, but never allows an unbounded/infinite loop.
     max_failures = max(50, remaining_target * 5)
 
-    def next_topic() -> str:
+    def next_topic_and_language() -> tuple[str, str]:
         with state_lock:
             topic = topics_cycle[state["topic_idx"] % len(topics_cycle)]
             state["topic_idx"] += 1
-        return topic
+            language = language_cycle[state["language_idx"] % len(language_cycle)]
+            state["language_idx"] += 1
+        return topic, language
 
     def worker_task() -> Optional[dict]:
-        return generate_one_candidate_with_retries(next_topic(), model, api_key)
+        topic, language = next_topic_and_language()
+        return generate_one_candidate_with_retries(topic, language, model, api_key)
 
     stop = False
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -572,7 +753,7 @@ def main():
     # Prepare topic cycling
     if args.seed is not None:
         random.seed(args.seed)
-    topics_cycle = TOPIC_SEEDS.copy()
+    topics_cycle = (TOPIC_SEEDS + SECONDARY_TOPIC_SEEDS).copy()
     random.shuffle(topics_cycle)
 
     persisted, failed = run_generation(
@@ -581,6 +762,7 @@ def main():
         api_key=api_key,
         out_path=args.out,
         topics_cycle=topics_cycle,
+        language_cycle=LANGUAGE_CYCLE,
         concurrency=args.concurrency,
     )
 

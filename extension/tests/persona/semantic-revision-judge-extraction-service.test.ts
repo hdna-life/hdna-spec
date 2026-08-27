@@ -65,8 +65,8 @@ function buildService(
   return { service, createProvider, judge };
 }
 
-const NO_CHANGE: SemanticRevisionJudgmentDraft = { verdict: 'no_meaningful_change', description: null, confidence: 0.9 };
-const UNCERTAIN: SemanticRevisionJudgmentDraft = { verdict: 'uncertain', description: null, confidence: 0.3 };
+const NO_CHANGE: SemanticRevisionJudgmentDraft = { verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 };
+const UNCERTAIN: SemanticRevisionJudgmentDraft = { verdict: 'uncertain', dimensions: [], description: null, confidence: 0.3 };
 
 describe('SemanticRevisionJudgeExtractionService', () => {
   it('throws when not enabled/configured', async () => {
@@ -134,6 +134,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
     const event = await ctx.editEventStore.add('A broad_framing B', 'A specific_framing B');
     const { service } = buildService(ctx, async () => ({
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'Shifted from broad to specific framing.',
       confidence: 0.8,
     }));
@@ -158,6 +159,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
     await ctx.editEventStore.add('a very specific original span', 'a very specific final span');
     const { service } = buildService(ctx, async () => ({
       verdict: 'meaning_added',
+      dimensions: [],
       description: 'Added specificity.',
       confidence: 0.5,
     }));
@@ -177,6 +179,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
     await ctx.editEventStore.add('A X B', 'A Y B');
     const { service, judge } = buildService(ctx, async () => ({
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'Changed X to Y.',
       confidence: 0.7,
     }));
@@ -244,7 +247,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
       const { service } = buildService(ctx, async () => {
         calls += 1;
         if (calls === 1) throw new Error('Local MLX server unreachable at http://127.0.0.1:8080: fetch failed');
-        return { verdict: 'meaning_transformed', description: 'Second change.', confidence: 0.6 };
+        return { verdict: 'meaning_transformed', dimensions: [], description: 'Second change.', confidence: 0.6 };
       });
 
       const { candidates, stats } = await service.runExperiment();
@@ -271,6 +274,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
       await ctx.editEventStore.add('A X B', 'A Y B');
       const { service } = buildService(ctx, async () => ({
         verdict: 'meaning_added',
+        dimensions: [],
         description: null, // invalid: change-claiming verdict with null description
         confidence: 0.5,
       }));
@@ -297,6 +301,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
     const putManySpy = vi.spyOn(ctx.storage, 'putMany');
     const { service } = buildService(ctx, async () => ({
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'Changed X to Y.',
       confidence: 0.7,
     }));
@@ -314,6 +319,7 @@ describe('SemanticRevisionJudgeExtractionService', () => {
     await ctx.editEventStore.add('A X B Y C', 'A Z B W C');
     const { service } = buildService(ctx, async () => ({
       verdict: 'meaning_transformed',
+      dimensions: [],
       description: 'A narrow change.',
       confidence: 0.6,
     }));

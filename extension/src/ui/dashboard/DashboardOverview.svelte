@@ -39,28 +39,34 @@
     {:else}
       <div class="stat-grid">
         <div class="stat"><span class="value">{benchmarkStats.judgedResultCount}</span><span class="label">değerlendirilmiş vaka</span></div>
-        {#if benchmarkStats.base.judgedCount > 0}
+        {#if benchmarkStats.base.acceptabilityJudgedCount > 0}
           <div class="stat">
-            <span class="value">{(benchmarkStats.base.correctRate * 100).toFixed(0)}%</span>
-            <span class="label">base Qwen doğruluk</span>
+            <span class="value">{(benchmarkStats.base.acceptableRate * 100).toFixed(0)}%</span>
+            <span class="label">base Qwen kabul edilebilir</span>
           </div>
         {/if}
-        {#if benchmarkStats.trained.judgedCount > 0}
+        {#if benchmarkStats.trained.acceptabilityJudgedCount > 0}
           <div class="stat">
-            <span class="value">{(benchmarkStats.trained.correctRate * 100).toFixed(0)}%</span>
-            <span class="label">trained Qwen doğruluk</span>
+            <span class="value">{(benchmarkStats.trained.acceptableRate * 100).toFixed(0)}%</span>
+            <span class="label">trained Qwen kabul edilebilir</span>
           </div>
         {/if}
-        {#if benchmarkStats.deepseek.judgedCount > 0}
+        {#if benchmarkStats.deepseek.acceptabilityJudgedCount > 0}
           <div class="stat">
-            <span class="value">{(benchmarkStats.deepseek.correctRate * 100).toFixed(0)}%</span>
-            <span class="label">DeepSeek (frontier) doğruluk</span>
+            <span class="value">{(benchmarkStats.deepseek.acceptableRate * 100).toFixed(0)}%</span>
+            <span class="label">DeepSeek (frontier) kabul edilebilir</span>
           </div>
         {/if}
-        {#if benchmarkStats.base.judgedCount > 0 && benchmarkStats.trained.judgedCount > 0}
+        {#if benchmarkStats.base.acceptabilityJudgedCount > 0 && benchmarkStats.trained.acceptabilityJudgedCount > 0}
           <div class="stat">
             <span class="value">{(benchmarkStats.trainedVsBaseImprovement * 100).toFixed(1)}</span>
             <span class="label">trained − base (puan)</span>
+          </div>
+        {/if}
+        {#if benchmarkStats.noAcceptableResponseCount > 0}
+          <div class="stat">
+            <span class="value">{benchmarkStats.noAcceptableResponseCount}</span>
+            <span class="label">kabul edilebilir yanıt yok</span>
           </div>
         {/if}
       </div>

@@ -45,7 +45,7 @@ function fakeProvider(judgeFn: () => Promise<SemanticRevisionJudgmentDraft>): Se
 }
 
 const ALWAYS_TRANSFORMED = () =>
-  Promise.resolve<SemanticRevisionJudgmentDraft>({ verdict: 'meaning_transformed', description: 'x', confidence: 0.7 });
+  Promise.resolve<SemanticRevisionJudgmentDraft>({ verdict: 'meaning_transformed', dimensions: [], description: 'x', confidence: 0.7 });
 
 function setup() {
   installFakeChromeStorageLocal();
@@ -223,8 +223,8 @@ describe('Trial4BenchmarkService', () => {
     expect(result!.bestResponse).toBeNull();
   });
 
-  describe('submitJudgment', () => {
-    it('records grades per label, bestResponse, and note, and flips judged to true', async () => {
+  describe('submitJudgment (acceptability gate + ranking, docs/decisions/0017 addendum)', () => {
+    it('records acceptability/rank per label, derives bestResponse from rank 1, and flips judged to true', async () => {
       const ctx = setup();
       await ctx.configStore.set(VALID_CONFIG);
       await ctx.caseStore.put(CASE_1);
@@ -237,18 +237,24 @@ describe('Trial4BenchmarkService', () => {
 
       const updated = await service.submitJudgment(
         result!.id,
-        { A: 'correct', B: 'wrong', C: 'partial' },
-        'A',
-        'base was clearly best',
+        {
+          A: { acceptable: true, rank: 1 },
+          B: { acceptable: false, rank: null },
+          C: { acceptable: true, rank: 2 },
+        },
+        'A was clearly best',
       );
 
       expect(updated.judged).toBe(true);
       expect(updated.judgedAt).toBeTruthy();
       expect(updated.bestResponse).toBe('A');
-      expect(updated.note).toBe('base was clearly best');
-      expect(updated.labelMapping.A.grade).toBe('correct');
-      expect(updated.labelMapping.B.grade).toBe('wrong');
-      expect(updated.labelMapping.C.grade).toBe('partial');
+      expect(updated.note).toBe('A was clearly best');
+      expect(updated.labelMapping.A.humanAcceptable).toBe(true);
+      expect(updated.labelMapping.A.humanRank).toBe(1);
+      expect(updated.labelMapping.B.humanAcceptable).toBe(false);
+      expect(updated.labelMapping.B.humanRank).toBeNull();
+      expect(updated.labelMapping.C.humanAcceptable).toBe(true);
+      expect(updated.labelMapping.C.humanRank).toBe(2);
     });
 
     it('throws when re-judging an already-judged result', async () => {
@@ -261,14 +267,22 @@ describe('Trial4BenchmarkService', () => {
         deepseek: fakeProvider(ALWAYS_TRANSFORMED),
       });
       const result = await service.runNextCase();
-      await service.submitJudgment(result!.id, { A: 'correct', B: 'wrong', C: 'wrong' }, 'A', '');
+      await service.submitJudgment(
+        result!.id,
+        { A: { acceptable: true, rank: 1 }, B: { acceptable: false, rank: null }, C: { acceptable: false, rank: null } },
+        '',
+      );
 
       await expect(
-        service.submitJudgment(result!.id, { A: 'wrong', B: 'correct', C: 'wrong' }, 'B', 'changed my mind'),
+        service.submitJudgment(
+          result!.id,
+          { A: { acceptable: false, rank: null }, B: { acceptable: true, rank: 1 }, C: { acceptable: false, rank: null } },
+          'changed my mind',
+        ),
       ).rejects.toThrow(/already been judged/);
     });
 
-    it('supports "tie" as a valid bestResponse', async () => {
+    it('rejects a rank on an unacceptable response', async () => {
       const ctx = setup();
       await ctx.configStore.set(VALID_CONFIG);
       await ctx.caseStore.put(CASE_1);
@@ -278,13 +292,80 @@ describe('Trial4BenchmarkService', () => {
         deepseek: fakeProvider(ALWAYS_TRANSFORMED),
       });
       const result = await service.runNextCase();
-      const updated = await service.submitJudgment(result!.id, { A: 'correct', B: 'correct', C: 'wrong' }, 'tie', '');
-      expect(updated.bestResponse).toBe('tie');
+
+      await expect(
+        service.submitJudgment(
+          result!.id,
+          { A: { acceptable: false, rank: 1 }, B: { acceptable: false, rank: null }, C: { acceptable: false, rank: null } },
+          '',
+        ),
+      ).rejects.toThrow(/must not carry a rank/);
+    });
+
+    it('rejects a non-dense or duplicate ranking among acceptable responses', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      await ctx.caseStore.put(CASE_1);
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+      const result = await service.runNextCase();
+
+      await expect(
+        service.submitJudgment(
+          result!.id,
+          { A: { acceptable: true, rank: 1 }, B: { acceptable: true, rank: 1 }, C: { acceptable: false, rank: null } },
+          '',
+        ),
+      ).rejects.toThrow(/dense/);
+    });
+
+    it('records a case with zero acceptable responses — bestResponse is null, not an error', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      await ctx.caseStore.put(CASE_1);
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+      const result = await service.runNextCase();
+
+      const updated = await service.submitJudgment(
+        result!.id,
+        { A: { acceptable: false, rank: null }, B: { acceptable: false, rank: null }, C: { acceptable: false, rank: null } },
+        'none acceptable',
+      );
+
+      expect(updated.judged).toBe(true);
+      expect(updated.bestResponse).toBeNull();
+    });
+
+    it('gives the single acceptable response rank 1 as bestResponse when the other two are unacceptable', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      await ctx.caseStore.put(CASE_1);
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+      const result = await service.runNextCase();
+
+      const updated = await service.submitJudgment(
+        result!.id,
+        { A: { acceptable: false, rank: null }, B: { acceptable: true, rank: 1 }, C: { acceptable: false, rank: null } },
+        '',
+      );
+
+      expect(updated.bestResponse).toBe('B');
     });
   });
 
   describe('reveal', () => {
-    it('flips revealed to true without touching grade/bestResponse/note', async () => {
+    it('flips revealed to true without touching humanAcceptable/humanRank/bestResponse/note', async () => {
       const ctx = setup();
       await ctx.configStore.set(VALID_CONFIG);
       await ctx.caseStore.put(CASE_1);
@@ -294,7 +375,11 @@ describe('Trial4BenchmarkService', () => {
         deepseek: fakeProvider(ALWAYS_TRANSFORMED),
       });
       const result = await service.runNextCase();
-      const judged = await service.submitJudgment(result!.id, { A: 'correct', B: 'wrong', C: 'wrong' }, 'A', 'clear winner');
+      const judged = await service.submitJudgment(
+        result!.id,
+        { A: { acceptable: true, rank: 1 }, B: { acceptable: false, rank: null }, C: { acceptable: false, rank: null } },
+        'clear winner',
+      );
 
       const revealed = await service.reveal(judged.id);
 
@@ -302,9 +387,10 @@ describe('Trial4BenchmarkService', () => {
       expect(revealed.judged).toBe(true);
       expect(revealed.bestResponse).toBe('A');
       expect(revealed.note).toBe('clear winner');
-      expect(revealed.labelMapping.A.grade).toBe('correct');
-      expect(revealed.labelMapping.B.grade).toBe('wrong');
-      expect(revealed.labelMapping.C.grade).toBe('wrong');
+      expect(revealed.labelMapping.A.humanAcceptable).toBe(true);
+      expect(revealed.labelMapping.A.humanRank).toBe(1);
+      expect(revealed.labelMapping.B.humanAcceptable).toBe(false);
+      expect(revealed.labelMapping.C.humanAcceptable).toBe(false);
     });
 
     it('can be called even before judging (revealed and judged are independent flags)', async () => {

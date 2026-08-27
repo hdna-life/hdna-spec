@@ -1,11 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
-  import type {
-    Trial4BenchmarkLabel,
-    Trial4BenchmarkResult,
-    Trial4ResponseGrade,
-  } from '@spec/schema/trial4-benchmark-result';
+  import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
   import type { Trial4BenchmarkConfig } from '../persona/trial4-benchmark-config-store';
   import { computeTrial4BenchmarkStats } from '../persona/trial4-benchmark-stats';
 
@@ -13,13 +9,17 @@
   export let results: Trial4BenchmarkResult[] = [];
   export let config: Trial4BenchmarkConfig = { enabled: false };
 
+  interface AcceptabilityEntry {
+    acceptable: boolean | null;
+    rank: Trial4BenchmarkRank | null;
+  }
+
   const dispatch = createEventDispatcher<{
     importCases: Trial4BenchmarkCase[];
     runNextCase: void;
     submitJudgment: {
       resultId: string;
-      grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade>;
-      bestResponse: Trial4BenchmarkResult['bestResponse'];
+      acceptability: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }>;
       note: string;
     };
     reveal: string;
@@ -28,7 +28,12 @@
 
   const LABELS: Trial4BenchmarkLabel[] = ['A', 'B', 'C'];
 
-  $: stats = computeTrial4BenchmarkStats(results);
+  // Test 1's central question is not "does trained Qwen beat DeepSeek" — it
+  // is base->trained improvement and acceptable-local-judge quality under
+  // the v3 contract (docs/decisions/0017's "acceptability gate + ranking"
+  // addendum). `cases` is passed through for frozen expectedVerdict/
+  // expectedDimensions ground-truth accuracy, when present.
+  $: stats = computeTrial4BenchmarkStats(results, cases);
   $: unjudged = results.find((r) => !r.judged);
   $: remainingCases = cases.length - results.length;
 
@@ -92,31 +97,60 @@
     input.value = '';
   }
 
-  // --- judging form for the current unjudged result ---
-  let grades: Record<Trial4BenchmarkLabel, Trial4ResponseGrade | ''> = { A: '', B: '', C: '' };
-  let bestResponse: Trial4BenchmarkResult['bestResponse'] = null;
+  // --- judging form for the current unjudged result: acceptability gate +
+  // ranking (docs/decisions/0017's "acceptability gate + ranking"
+  // addendum, superseding the earlier Correct/Partial/Wrong + free-choice
+  // "Best response A/B/C/Tie" model). An unacceptable response can never
+  // carry a rank; acceptable responses must be ranked as a dense 1..N
+  // permutation with no duplicates — this mirrors
+  // Trial4BenchmarkService.submitJudgment's own validation, checked here
+  // too so the operator gets immediate feedback instead of a thrown error. ---
+  let acceptability: Record<Trial4BenchmarkLabel, AcceptabilityEntry> = {
+    A: { acceptable: null, rank: null },
+    B: { acceptable: null, rank: null },
+    C: { acceptable: null, rank: null },
+  };
   let note = '';
 
   $: {
     // Reset the judging form whenever a different result becomes current.
     void unjudged?.id;
-    grades = { A: '', B: '', C: '' };
-    bestResponse = null;
+    acceptability = {
+      A: { acceptable: null, rank: null },
+      B: { acceptable: null, rank: null },
+      C: { acceptable: null, rank: null },
+    };
     note = '';
   }
 
+  function setAcceptable(label: Trial4BenchmarkLabel, value: boolean) {
+    acceptability[label] = { acceptable: value, rank: value ? acceptability[label].rank : null };
+    acceptability = acceptability;
+  }
+
+  function setRank(label: Trial4BenchmarkLabel, rank: Trial4BenchmarkRank) {
+    acceptability[label] = { ...acceptability[label], rank };
+    acceptability = acceptability;
+  }
+
+  $: acceptableLabels = LABELS.filter((label) => acceptability[label].acceptable === true);
+
   function canSubmit(): boolean {
-    return LABELS.every((label) => grades[label] !== '') && bestResponse !== null;
+    if (LABELS.some((label) => acceptability[label].acceptable === null)) return false;
+    const ranks = acceptableLabels.map((label) => acceptability[label].rank);
+    if (ranks.some((rank) => rank === null)) return false;
+    const expected = acceptableLabels.map((_label, index) => index + 1);
+    return JSON.stringify([...ranks].sort()) === JSON.stringify(expected);
   }
 
   function submit() {
     if (!unjudged || !canSubmit()) return;
-    dispatch('submitJudgment', {
-      resultId: unjudged.id,
-      grades: grades as Record<Trial4BenchmarkLabel, Trial4ResponseGrade>,
-      bestResponse,
-      note,
-    });
+    const payload: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }> = {
+      A: { acceptable: acceptability.A.acceptable === true, rank: acceptability.A.rank },
+      B: { acceptable: acceptability.B.acceptable === true, rank: acceptability.B.rank },
+      C: { acceptable: acceptability.C.acceptable === true, rank: acceptability.C.rank },
+    };
+    dispatch('submitJudgment', { resultId: unjudged.id, acceptability: payload, note });
   }
 
   function revealResult(resultId: string) {
@@ -149,7 +183,11 @@
 
   {#if unjudged}
     <div class="result">
-      <p class="note">Case: {unjudged.caseId} — grade each response, then submit.</p>
+      <p class="note">
+        Case: {unjudged.caseId} — mark each response acceptable or unacceptable, then rank the
+        acceptable ones (1 = best). An unacceptable response gets no rank. If none are acceptable,
+        submit with all three marked unacceptable — that is itself a valid, meaningful result.
+      </p>
       {#each LABELS as label}
         {@const responseItem = unjudged.labelMapping[label]}
         <div class="response">
@@ -161,24 +199,49 @@
             <p class="error">Provider error: {responseItem.error}</p>
           {:else}
             <p><strong>verdict:</strong> {responseItem.verdict}</p>
+            {#if responseItem.dimensions.length > 0}
+              <p class="dimensions">
+                dimensions:
+                {#each responseItem.dimensions as change, i}{i > 0 ? ', ' : ' '}{change.dimension}:{change.direction}{/each}
+              </p>
+            {/if}
             {#if responseItem.description}<p>{responseItem.description}</p>{/if}
             <p class="note">confidence: {responseItem.confidence !== null ? (responseItem.confidence * 100).toFixed(0) + '%' : '—'}</p>
           {/if}
           <div class="grade-buttons">
-            <label><input type="radio" name={`grade-${label}`} value="correct" bind:group={grades[label]} /> Correct</label>
-            <label><input type="radio" name={`grade-${label}`} value="partial" bind:group={grades[label]} /> Partial</label>
-            <label><input type="radio" name={`grade-${label}`} value="wrong" bind:group={grades[label]} /> Wrong</label>
+            <label>
+              <input
+                type="radio"
+                name={`acceptable-${label}`}
+                checked={acceptability[label].acceptable === true}
+                on:change={() => setAcceptable(label, true)}
+              /> Acceptable
+            </label>
+            <label>
+              <input
+                type="radio"
+                name={`acceptable-${label}`}
+                checked={acceptability[label].acceptable === false}
+                on:change={() => setAcceptable(label, false)}
+              /> Unacceptable
+            </label>
           </div>
+          {#if acceptability[label].acceptable === true}
+            <div class="grade-buttons">
+              {#each [1, 2, 3] as rank}
+                <label>
+                  <input
+                    type="radio"
+                    name={`rank-${label}`}
+                    checked={acceptability[label].rank === rank}
+                    on:change={() => setRank(label, rank as Trial4BenchmarkRank)}
+                  /> Rank {rank}
+                </label>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/each}
-
-      <p class="note"><strong>Best response:</strong></p>
-      <div class="grade-buttons">
-        {#each LABELS as label}
-          <label><input type="radio" name="best" value={label} bind:group={bestResponse} /> {label}</label>
-        {/each}
-        <label><input type="radio" name="best" value="tie" bind:group={bestResponse} /> Tie</label>
-      </div>
 
       <label class="note-field">
         Note (optional)
@@ -197,15 +260,54 @@
   {/if}
 
   <h3>Aggregate results</h3>
+  <p class="note">
+    DeepSeek is a frontier reference/ceiling, not a success condition — trained Qwen does not need
+    to beat it. The central result is trained-vs-base improvement and whether trained Qwen reaches
+    an acceptable local-judge quality level.
+  </p>
   <ul class="stats">
-    <li>Base Qwen: {(stats.base.correctRate * 100).toFixed(0)}% correct ({stats.base.judgedCount} judged, {stats.base.errors} errors)</li>
-    <li>Trained Qwen: {(stats.trained.correctRate * 100).toFixed(0)}% correct ({stats.trained.judgedCount} judged, {stats.trained.errors} errors)</li>
-    <li>DeepSeek: {(stats.deepseek.correctRate * 100).toFixed(0)}% correct ({stats.deepseek.judgedCount} judged, {stats.deepseek.errors} errors)</li>
-    <li>Trained vs. base improvement: {(stats.trainedVsBaseImprovement * 100).toFixed(1)} points</li>
     <li>
-      Blind wins — base: {stats.winCounts.base}, trained: {stats.winCounts.trained}, DeepSeek:
-      {stats.winCounts.deepseek}, tie: {stats.tieCount}
+      Base Qwen: {(stats.base.acceptableRate * 100).toFixed(0)}% acceptable ({stats.base.acceptableCount}/{stats.base
+        .acceptabilityJudgedCount}), rank-1 {(stats.base.rank1Rate * 100).toFixed(0)}%, mean rank
+      {stats.base.meanRankAmongAcceptable !== null ? stats.base.meanRankAmongAcceptable.toFixed(2) : '—'}
+      ({stats.base.errors} errors)
     </li>
+    <li>
+      Trained Qwen: {(stats.trained.acceptableRate * 100).toFixed(0)}% acceptable ({stats.trained
+        .acceptableCount}/{stats.trained.acceptabilityJudgedCount}), rank-1
+      {(stats.trained.rank1Rate * 100).toFixed(0)}%, mean rank
+      {stats.trained.meanRankAmongAcceptable !== null ? stats.trained.meanRankAmongAcceptable.toFixed(2) : '—'}
+      ({stats.trained.errors} errors)
+    </li>
+    <li>
+      DeepSeek: {(stats.deepseek.acceptableRate * 100).toFixed(0)}% acceptable ({stats.deepseek
+        .acceptableCount}/{stats.deepseek.acceptabilityJudgedCount}), rank-1
+      {(stats.deepseek.rank1Rate * 100).toFixed(0)}%, mean rank
+      {stats.deepseek.meanRankAmongAcceptable !== null ? stats.deepseek.meanRankAmongAcceptable.toFixed(2) : '—'}
+      ({stats.deepseek.errors} errors)
+    </li>
+    <li><strong>Trained vs. base improvement (acceptability rate): {(stats.trainedVsBaseImprovement * 100).toFixed(1)} points</strong></li>
+    <li>
+      Blind rank-1 wins — base: {stats.winCounts.base}, trained: {stats.winCounts.trained}, DeepSeek:
+      {stats.winCounts.deepseek}; no acceptable response: {stats.noAcceptableResponseCount}
+    </li>
+    {#if stats.base.verdictAccuracyCount > 0}
+      <li>
+        Verdict accuracy vs. frozen ground truth — base: {((stats.base.verdictAccuracy ?? 0) * 100).toFixed(0)}%,
+        trained: {((stats.trained.verdictAccuracy ?? 0) * 100).toFixed(0)}%, DeepSeek:
+        {((stats.deepseek.verdictAccuracy ?? 0) * 100).toFixed(0)}% ({stats.base.verdictAccuracyCount} cases)
+      </li>
+    {/if}
+    {#if stats.base.dimensionGroundTruthCount > 0}
+      <li>
+        Dimension exact-set accuracy / micro-F1 vs. frozen ground truth — base:
+        {((stats.base.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% / {(stats.base.dimensionMicroF1 ?? 0).toFixed(2)},
+        trained: {((stats.trained.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% /
+        {(stats.trained.dimensionMicroF1 ?? 0).toFixed(2)}, DeepSeek:
+        {((stats.deepseek.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% /
+        {(stats.deepseek.dimensionMicroF1 ?? 0).toFixed(2)} ({stats.base.dimensionGroundTruthCount} cases)
+      </li>
+    {/if}
   </ul>
 
   <details>
@@ -315,6 +417,10 @@
   }
   .error {
     color: #b00;
+  }
+  .dimensions {
+    color: #666;
+    font-size: 13px;
   }
   .grade-buttons {
     display: flex;

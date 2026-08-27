@@ -40,7 +40,14 @@ export async function importTrial4TrainingCandidates(
     if (mode === 'append' && existingIds.has(raw.id)) continue;
     await store.put({
       ...raw,
+      proposedDimensions: raw.proposedDimensions ?? [],
       humanVerdict: raw.humanVerdict ?? null,
+      // Defaults to [], never to raw.proposedDimensions — auto-copying the
+      // model's proposal into the human ground-truth field would
+      // reintroduce teacher bias (docs/decisions/0017's Test 1 addendum,
+      // explicit operator instruction). humanDimensions is populated only
+      // by an operator's own review action.
+      humanDimensions: raw.humanDimensions ?? [],
       includeInTraining: raw.includeInTraining ?? false,
       exclusionReasons: raw.exclusionReasons ?? [],
       operatorNoteTr: raw.operatorNoteTr ?? '',

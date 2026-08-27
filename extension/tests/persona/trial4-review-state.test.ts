@@ -12,6 +12,8 @@ import {
   isIncluded,
   isLoreImportant,
   isDisagreement,
+  composeVerdictOption,
+  verdictForCompositeOption,
   filterCandidates,
   computeReviewStats,
   buildTrainingDatasetExport,
@@ -29,8 +31,10 @@ function candidate(overrides: Partial<Trial4TrainingCandidate> = {}): Trial4Trai
     beforeContext: 'before context',
     afterContext: 'after context',
     proposedVerdict: 'meaning_added',
+    proposedDimensions: [],
     proposedDescription: 'A change was made.',
     humanVerdict: null,
+    humanDimensions: [],
     includeInTraining: false,
     exclusionReasons: [],
     operatorNoteTr: '',
@@ -277,6 +281,93 @@ describe('trial4-review-state', () => {
         humanVerdict: null,
       });
       expect(isDisagreement(c)).toBe(false);
+    });
+
+    it('returns true when verdicts match but the dimension SET differs (Test 1 / v3 addendum)', () => {
+      const c = candidate({
+        proposedVerdict: 'no_meaningful_change',
+        proposedDimensions: [{ dimension: 'certainty', direction: 'increased' }],
+        humanVerdict: 'no_meaningful_change',
+        humanDimensions: [{ dimension: 'directness', direction: 'increased' }],
+      });
+      expect(isDisagreement(c)).toBe(true);
+    });
+
+    it('returns false when verdicts match and dimension sets are equal but reordered', () => {
+      const c = candidate({
+        proposedVerdict: 'meaning_transformed',
+        proposedDimensions: [
+          { dimension: 'certainty', direction: 'increased' },
+          { dimension: 'commitment', direction: 'increased' },
+        ],
+        humanVerdict: 'meaning_transformed',
+        humanDimensions: [
+          { dimension: 'commitment', direction: 'increased' },
+          { dimension: 'certainty', direction: 'increased' },
+        ],
+      });
+      expect(isDisagreement(c)).toBe(false);
+    });
+
+    it('returns true when dimension sets differ only in count', () => {
+      const c = candidate({
+        proposedVerdict: 'meaning_added',
+        proposedDimensions: [{ dimension: 'certainty', direction: 'increased' }],
+        humanVerdict: 'meaning_added',
+        humanDimensions: [
+          { dimension: 'certainty', direction: 'increased' },
+          { dimension: 'formality', direction: 'increased' },
+        ],
+      });
+      expect(isDisagreement(c)).toBe(true);
+    });
+
+    it('returns false when both proposed and human dimensions are empty and verdicts match', () => {
+      const c = candidate({
+        proposedVerdict: 'meaning_transformed',
+        proposedDimensions: [],
+        humanVerdict: 'meaning_transformed',
+        humanDimensions: [],
+      });
+      expect(isDisagreement(c)).toBe(false);
+    });
+  });
+
+  describe('composeVerdictOption / verdictForCompositeOption (six-option composite UI, Test 1 / v3 addendum)', () => {
+    it('returns null when there is no human verdict yet', () => {
+      const c = candidate({ humanVerdict: null });
+      expect(composeVerdictOption(c)).toBeNull();
+    });
+
+    it('maps meaning_added/meaning_removed/meaning_transformed/uncertain straight through', () => {
+      for (const verdict of ['meaning_added', 'meaning_removed', 'meaning_transformed', 'uncertain'] as const) {
+        const c = candidate({ humanVerdict: verdict });
+        expect(composeVerdictOption(c)).toBe(verdict);
+      }
+    });
+
+    it('maps no_meaningful_change with dimensions to option 4 (expression shifted)', () => {
+      const c = candidate({
+        humanVerdict: 'no_meaningful_change',
+        humanDimensions: [{ dimension: 'certainty', direction: 'increased' }],
+      });
+      expect(composeVerdictOption(c)).toBe('no_meaningful_change_expression_shifted');
+    });
+
+    it('maps no_meaningful_change with no dimensions to option 5 (no shift)', () => {
+      const c = candidate({ humanVerdict: 'no_meaningful_change', humanDimensions: [] });
+      expect(composeVerdictOption(c)).toBe('no_meaningful_change_no_shift');
+    });
+
+    it('verdictForCompositeOption is the inverse for both no_meaningful_change options', () => {
+      expect(verdictForCompositeOption('no_meaningful_change_expression_shifted')).toBe('no_meaningful_change');
+      expect(verdictForCompositeOption('no_meaningful_change_no_shift')).toBe('no_meaningful_change');
+    });
+
+    it('verdictForCompositeOption passes the other four options through unchanged', () => {
+      for (const option of ['meaning_added', 'meaning_removed', 'meaning_transformed', 'uncertain'] as const) {
+        expect(verdictForCompositeOption(option)).toBe(option);
+      }
     });
   });
 
