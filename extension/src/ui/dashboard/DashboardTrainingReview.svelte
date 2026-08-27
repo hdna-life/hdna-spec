@@ -47,8 +47,24 @@
   $: derivedMode = deriveMode(current);
   let modeOverride: DecisionMode | null = null;
   $: mode = modeOverride ?? derivedMode;
-  // Reset the local override whenever the candidate being viewed changes.
-  $: current?.id, (modeOverride = null);
+  // Reset the local override only when the VIEWED CANDIDATE actually
+  // changes (by id), never merely because `current`'s object reference
+  // changed. The dashboard polls refresh() every 2s
+  // (entrypoints/dashboard/App.svelte), which re-fetches candidates from
+  // IndexedDB as brand-new object references on every tick even when
+  // nothing changed — a naive `$: current?.id, (modeOverride = null)`
+  // re-runs on every such poll (Svelte's reactive statements re-run
+  // whenever a *reassigned* dependency is touched, regardless of whether
+  // the derived value differs), silently closing the "Kötü örnek" panel
+  // out from under the operator every ~2s, before they could pick a
+  // reason. Comparing against the last-seen id by value fixes this.
+  let lastCandidateId: string | undefined;
+  $: {
+    if (current?.id !== lastCandidateId) {
+      lastCandidateId = current?.id;
+      modeOverride = null;
+    }
+  }
 
   function deriveMode(candidate: Trial4TrainingCandidate | undefined): DecisionMode {
     if (!candidate) return 'undecided';
