@@ -6,6 +6,10 @@ This is a documentation-only record — no training data, adapter weights,
 benchmark results, or evaluation code were changed to produce or in
 writing this report.
 
+**Superseded as Test 1's answer by `test1-final-result.md`** (a separate,
+later 10-case round) — this smoke round remains documented here unedited,
+as a smoke/debug iteration, never as the final Test 1 result.
+
 **Result in one line:**
 
 - **SPECIALIZATION SIGNAL: CLEARLY POSITIVE**

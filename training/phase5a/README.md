@@ -2,6 +2,8 @@
 
 A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) can be specialized via LoRA fine-tuning on a small human-filtered dataset to judge localized semantic changes in text revisions.
 
+**Test 1 status: CLOSED — SUCCESS.** See `benchmark/test1-final-result.md` for the full closure report (final 10-case validation result, the planned-20/actual-10 protocol deviation, what Test 1 did and did not prove, and the transition to Test 2's synthetic-distillation direction with a planned `google/gemma-3-270m-it` student). `benchmark/test1-smoke-iteration-1.md` is the earlier smoke/debug round, superseded as Test 1's answer.
+
 ## Overview
 
 This pipeline generates synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
