@@ -4,9 +4,11 @@ import { IndexedDbStorageAdapter } from '../../src/storage/indexeddb-adapter';
 import { JobQueue } from '../../src/queue/job-queue';
 import {
   RUN_TRIAL4_BENCHMARK_CASE_JOB,
+  RUN_TRIAL4_BENCHMARK_CASE_PRIORITY,
   createTrial4BenchmarkProcessor,
   enqueueTrial4BenchmarkCase,
 } from '../../src/queue/processors/trial4-benchmark-job';
+import { ALLOWED_PRIORITIES_BY_MODE } from '../../src/governor/mode-priorities';
 import type { Trial4BenchmarkService } from '../../src/persona/trial4-benchmark-service';
 
 function setup() {
@@ -19,10 +21,14 @@ function setup() {
 }
 
 describe('run_trial4_benchmark_case job', () => {
-  it('is enqueued as P3', async () => {
+  it('is enqueued as P1 — NOT P3, so it dispatches under INTERACTIVE mode while the Dashboard tab (which is what triggers it) is open', async () => {
     const { queue } = setup();
     await enqueueTrial4BenchmarkCase(queue);
-    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P1: 1 });
+  });
+
+  it('P1 is allowed to dispatch under INTERACTIVE mode (foreground active) — the actual bug this priority choice fixes', () => {
+    expect(ALLOWED_PRIORITIES_BY_MODE.INTERACTIVE).toContain(RUN_TRIAL4_BENCHMARK_CASE_PRIORITY);
   });
 
   it('invokes service.runNextCase() exactly once when run', async () => {
@@ -38,7 +44,7 @@ describe('run_trial4_benchmark_case job', () => {
     const { queue } = setup();
     const first = await enqueueTrial4BenchmarkCase(queue);
     for (let i = 0; i < 10; i += 1) await enqueueTrial4BenchmarkCase(queue);
-    await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 1 });
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P1: 1 });
 
     const completed = await queue.runNext();
     expect(completed?.id).toBe((first as { id: string }).id);
