@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
-  import type { BehaviorDimension } from '@spec/protocol/semantic-revision-judge';
+  import type { Trial4TrainingCandidate, Trial4ExclusionReason } from '@spec/schema/trial4-training-candidate';
+  import type { BehaviorDimension, BehaviorDimensionChange, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
   import type { Trial4ImportMode } from '../../persona/trial4-training-candidate-import';
   import {
     VERDICT_LABELS_TR,
@@ -13,9 +13,7 @@
     DIMENSION_GROUPS_TR,
     filterCandidates,
     isReviewed,
-    isDisagreement,
     computeReviewStats,
-    composeVerdictOption,
     verdictForCompositeOption,
     type Trial4ReviewFilter,
     type Trial4CompositeVerdictOption,
@@ -45,30 +43,82 @@
   $: current = filtered[Math.min(currentIndex, Math.max(filtered.length - 1, 0))];
   $: stats = computeReviewStats(candidates);
 
-  // Local-only UI mode for the currently-viewed candidate — not persisted
-  // until the operator actually picks a verdict (valid path) or a reason
-  // (bad path), so an undecided in-progress candidate never silently
-  // leaves the "pending" filter mid-decision.
+  // Local-only UI mode for the currently-viewed candidate — purely a
+  // display toggle between the "valid" and "bad" decision panels, never
+  // itself persisted.
   type DecisionMode = 'undecided' | 'valid' | 'bad';
   $: derivedMode = deriveMode(current);
   let modeOverride: DecisionMode | null = null;
   $: mode = modeOverride ?? derivedMode;
-  // Reset the local override only when the VIEWED CANDIDATE actually
-  // changes (by id), never merely because `current`'s object reference
-  // changed. The dashboard polls refresh() every 2s
+
+  // --- Draft state (Test 1 fix): every button/checkbox below mutates ONLY
+  // these local variables, never the store, so nothing the operator marks
+  // is taken in or changed until they explicitly press one of the "Kaydet"
+  // buttons at the bottom of the decision block. Previously, every click
+  // (selectComposite, toggleDimension, toggleExclusionReason, ...)
+  // dispatched an immediate `update` — an operator working through the
+  // six-option verdict + dimension picker could have a still-incomplete
+  // in-progress decision silently committed as includeInTraining/
+  // exclusionReasons before they were done marking options. See this
+  // block's commitInclude/commitExclude/saveLore functions for the only
+  // places that now dispatch `update`.
+  let draftHumanVerdict: SemanticChangeVerdict | null = null;
+  let draftHumanDimensions: BehaviorDimensionChange[] = [];
+  let draftExclusionReasons: Trial4ExclusionReason[] = [];
+  let draftOperatorNoteTr = '';
+  let draftLoreImportant = false;
+  let draftLoreNoteTr: string | null = null;
+
+  $: draftComposite = draftHumanVerdict === null ? null : composeDraftOption(draftHumanVerdict, draftHumanDimensions);
+
+  /** Order-independent set equality over (dimension, direction) pairs — same comparison as trial4-review-state.ts's isDisagreement, applied here against the in-progress DRAFT rather than a saved candidate. */
+  function dimensionSetsEqual(a: BehaviorDimensionChange[], b: BehaviorDimensionChange[]): boolean {
+    if (a.length !== b.length) return false;
+    const aKeys = new Set(a.map((d) => `${d.dimension}:${d.direction}`));
+    const bKeys = new Set(b.map((d) => `${d.dimension}:${d.direction}`));
+    if (aKeys.size !== bKeys.size) return false;
+    for (const key of aKeys) if (!bKeys.has(key)) return false;
+    return true;
+  }
+
+  $: draftDisagreesWithProposal =
+    Boolean(current) &&
+    draftHumanVerdict !== null &&
+    (draftHumanVerdict !== current!.proposedVerdict || !dimensionSetsEqual(draftHumanDimensions, current!.proposedDimensions));
+
+  function composeDraftOption(
+    verdict: SemanticChangeVerdict,
+    dimensions: BehaviorDimensionChange[],
+  ): Trial4CompositeVerdictOption {
+    if (verdict === 'no_meaningful_change') {
+      return dimensions.length > 0 ? 'no_meaningful_change_expression_shifted' : 'no_meaningful_change_no_shift';
+    }
+    return verdict;
+  }
+
+  // Reset ALL draft state — including modeOverride — only when the VIEWED
+  // CANDIDATE actually changes (by id), never merely because `current`'s
+  // object reference changed. The dashboard polls refresh() every 2s
   // (entrypoints/dashboard/App.svelte), which re-fetches candidates from
   // IndexedDB as brand-new object references on every tick even when
-  // nothing changed — a naive `$: current?.id, (modeOverride = null)`
-  // re-runs on every such poll (Svelte's reactive statements re-run
-  // whenever a *reassigned* dependency is touched, regardless of whether
-  // the derived value differs), silently closing the "Kötü örnek" panel
-  // out from under the operator every ~2s, before they could pick a
-  // reason. Comparing against the last-seen id by value fixes this.
+  // nothing changed — a naive `$: current?.id, (draft = ...)` re-runs on
+  // every such poll (Svelte's reactive statements re-run whenever a
+  // *reassigned* dependency is touched, regardless of whether the derived
+  // value differs), which would silently wipe in-progress operator marks
+  // every ~2s. Comparing against the last-seen id by value fixes this —
+  // draft state is seeded from the stored candidate exactly once per
+  // candidate view, then left alone until Kaydet or a candidate switch.
   let lastCandidateId: string | undefined;
   $: {
     if (current?.id !== lastCandidateId) {
       lastCandidateId = current?.id;
       modeOverride = null;
+      draftHumanVerdict = current?.humanVerdict ?? null;
+      draftHumanDimensions = current ? [...current.humanDimensions] : [];
+      draftExclusionReasons = current ? [...current.exclusionReasons] : [];
+      draftOperatorNoteTr = current?.operatorNoteTr ?? '';
+      draftLoreImportant = current?.loreImportant ?? false;
+      draftLoreNoteTr = current?.loreNoteTr ?? null;
     }
   }
 
@@ -97,14 +147,9 @@
     dispatch('update', { ...current, ...patch });
   }
 
-  // Six-option composite verdict UI (Test 1 / v3 addendum). Options 1-3 and
-  // 6 map straight through to a SemanticChangeVerdict and commit
-  // immediately. Option 5 ("Anlamlı değişiklik yok") forces
-  // humanDimensions: [] and commits immediately. Option 4 ("Anlam aynı,
-  // ifade/ton değişti") sets the verdict but does NOT commit
-  // (includeInTraining/reviewedAt) until the operator picks at least one
-  // dimension below — mirrors the existing toggleExclusionReason pattern
-  // ("only the first reason picked marks reviewed").
+  // Six-option composite verdict UI (Test 1 / v3 addendum) — selecting an
+  // option only updates the DRAFT verdict/dimensions; nothing is saved
+  // until commitInclude() runs.
   const COMPOSITE_OPTIONS: { option: Trial4CompositeVerdictOption; label: string; key: string }[] = [
     { option: 'meaning_added', label: 'Anlam eklendi', key: '1' },
     { option: 'meaning_removed', label: 'Anlam çıkarıldı', key: '2' },
@@ -114,88 +159,29 @@
     { option: 'uncertain', label: 'Belirsiz / karar veremiyorum', key: '6' },
   ];
 
-  $: currentComposite = current ? composeVerdictOption(current) : null;
-
   function selectComposite(option: Trial4CompositeVerdictOption) {
     if (!current) return;
-    const verdict = verdictForCompositeOption(option);
-
+    draftHumanVerdict = verdictForCompositeOption(option);
     if (option === 'no_meaningful_change_no_shift') {
-      pushUpdate({
-        humanVerdict: verdict,
-        humanDimensions: [],
-        includeInTraining: true,
-        exclusionReasons: [],
-        reviewedAt: new Date().toISOString(),
-      });
-      modeOverride = 'valid';
-      goNext();
-      return;
-    }
-
-    if (option === 'no_meaningful_change_expression_shifted') {
-      // Left incomplete (not reviewed/included) until a dimension is
-      // picked — see toggleDimension below.
-      pushUpdate({ humanVerdict: verdict, exclusionReasons: [] });
-      modeOverride = 'valid';
-      return;
-    }
-
-    if (option === 'uncertain') {
+      draftHumanDimensions = [];
+    } else if (option === 'uncertain') {
       // "For this first Test 1 pass, keep it simple: uncertain => []."
-      pushUpdate({
-        humanVerdict: verdict,
-        humanDimensions: [],
-        includeInTraining: true,
-        exclusionReasons: [],
-        reviewedAt: new Date().toISOString(),
-      });
-      modeOverride = 'valid';
-      goNext();
-      return;
+      draftHumanDimensions = [];
     }
-
-    // meaning_added / meaning_removed / meaning_transformed — dimensions
-    // may also be selected for these (worked example E), so any dimensions
-    // already picked are preserved, not cleared.
-    pushUpdate({
-      humanVerdict: verdict,
-      includeInTraining: true,
-      exclusionReasons: [],
-      reviewedAt: new Date().toISOString(),
-    });
+    // meaning_added/meaning_removed/meaning_transformed and
+    // "expression_shifted" preserve whatever dimensions are already drafted.
     modeOverride = 'valid';
-    goNext();
   }
 
   function toggleDimension(dimension: BehaviorDimension) {
-    if (!current) return;
-    const has = current.humanDimensions.some((d) => d.dimension === dimension);
-    const nextDimensions = has
-      ? current.humanDimensions.filter((d) => d.dimension !== dimension)
-      : [...current.humanDimensions, { dimension, direction: 'changed' as const }];
-
-    const patch: Partial<Trial4TrainingCandidate> = { humanDimensions: nextDimensions };
-    if (current.humanVerdict === 'no_meaningful_change') {
-      if (nextDimensions.length > 0) {
-        patch.includeInTraining = true;
-        patch.reviewedAt = current.reviewedAt ?? new Date().toISOString();
-      } else {
-        // Removed the only dimension while mid-way through option 4 — this
-        // is no longer option 5 (which forces [] explicitly and commits
-        // immediately elsewhere), so revert to incomplete/pending.
-        patch.includeInTraining = false;
-        patch.reviewedAt = undefined;
-      }
-    }
-    pushUpdate(patch);
+    const has = draftHumanDimensions.some((d) => d.dimension === dimension);
+    draftHumanDimensions = has
+      ? draftHumanDimensions.filter((d) => d.dimension !== dimension)
+      : [...draftHumanDimensions, { dimension, direction: 'changed' as const }];
   }
 
   function setDimensionDirection(dimension: BehaviorDimension, direction: (typeof DIRECTION_ORDER)[number]) {
-    if (!current) return;
-    pushUpdate({
-      humanDimensions: current.humanDimensions.map((d) => (d.dimension === dimension ? { ...d, direction } : d)),
-    });
+    draftHumanDimensions = draftHumanDimensions.map((d) => (d.dimension === dimension ? { ...d, direction } : d));
   }
 
   function enterBadMode() {
@@ -207,35 +193,66 @@
   }
 
   function toggleExclusionReason(reason: (typeof EXCLUSION_REASON_ORDER)[number]) {
-    if (!current) return;
-    const has = current.exclusionReasons.includes(reason);
-    const nextReasons = has
-      ? current.exclusionReasons.filter((r) => r !== reason)
-      : [...current.exclusionReasons, reason];
-    pushUpdate({
-      humanVerdict: null,
-      includeInTraining: false,
-      exclusionReasons: nextReasons,
-      // Only the FIRST reason picked marks this candidate reviewed — an
-      // empty in-progress exclusion (mode opened, nothing chosen yet)
-      // must not vanish from the "pending" filter.
-      reviewedAt: nextReasons.length > 0 ? (current.reviewedAt ?? new Date().toISOString()) : current.reviewedAt,
-    });
+    draftExclusionReasons = draftExclusionReasons.includes(reason)
+      ? draftExclusionReasons.filter((r) => r !== reason)
+      : [...draftExclusionReasons, reason];
   }
 
   function updateOperatorNote(event: Event) {
-    const value = (event.target as HTMLTextAreaElement).value;
-    pushUpdate({ operatorNoteTr: value });
+    draftOperatorNoteTr = (event.target as HTMLTextAreaElement).value;
   }
 
   function toggleLore() {
-    if (!current) return;
-    pushUpdate({ loreImportant: !current.loreImportant, loreNoteTr: current.loreImportant ? null : current.loreNoteTr });
+    draftLoreImportant = !draftLoreImportant;
+    if (!draftLoreImportant) draftLoreNoteTr = null;
   }
 
   function updateLoreNote(event: Event) {
-    const value = (event.target as HTMLTextAreaElement).value;
-    pushUpdate({ loreNoteTr: value });
+    draftLoreNoteTr = (event.target as HTMLTextAreaElement).value;
+  }
+
+  // --- Explicit save actions — the ONLY places that dispatch `update`. ---
+
+  $: canSaveInclude = mode === 'valid' && draftHumanVerdict !== null;
+  $: canSaveExclude = mode === 'bad' && draftExclusionReasons.length > 0;
+
+  function commitInclude() {
+    if (!current || !canSaveInclude) return;
+    pushUpdate({
+      humanVerdict: draftHumanVerdict,
+      humanDimensions: draftHumanDimensions,
+      includeInTraining: true,
+      exclusionReasons: [],
+      operatorNoteTr: draftOperatorNoteTr,
+      loreImportant: draftLoreImportant,
+      loreNoteTr: draftLoreNoteTr,
+      reviewedAt: current.reviewedAt ?? new Date().toISOString(),
+    });
+    goNext();
+  }
+
+  function commitExclude() {
+    if (!current || !canSaveExclude) return;
+    pushUpdate({
+      humanVerdict: null,
+      humanDimensions: [],
+      includeInTraining: false,
+      exclusionReasons: draftExclusionReasons,
+      operatorNoteTr: draftOperatorNoteTr,
+      loreImportant: draftLoreImportant,
+      loreNoteTr: draftLoreNoteTr,
+      reviewedAt: current.reviewedAt ?? new Date().toISOString(),
+    });
+    goNext();
+  }
+
+  // Lore is "fully independent" of the include/exclude decision (see
+  // spec/schema/trial4-training-candidate.ts) — saveable on its own
+  // without requiring a verdict/exclusion decision first, but still only
+  // on explicit Kaydet, never on every checkbox click.
+  function saveLore() {
+    if (!current) return;
+    pushUpdate({ loreImportant: draftLoreImportant, loreNoteTr: draftLoreNoteTr });
   }
 
   async function handleImportFile(event: Event, mode: Trial4ImportMode) {
@@ -293,6 +310,12 @@
         break;
       case 'l':
         toggleLore();
+        break;
+      case 'enter':
+        // Explicit save — mirrors the Kaydet buttons, never fires on its
+        // own from marking options (1-6/X/L only touch draft state above).
+        if (mode === 'valid') commitInclude();
+        else if (mode === 'bad') commitExclude();
         break;
       case 'arrowright':
       case 'n':
@@ -401,18 +424,15 @@
         {#if mode === 'valid' || mode === 'undecided'}
           <div class="verdict-grid">
             {#each COMPOSITE_OPTIONS as { option, label, key }}
-              <button class="verdict-btn" class:selected={currentComposite === option} on:click={() => selectComposite(option)}>
+              <button class="verdict-btn" class:selected={draftComposite === option} on:click={() => selectComposite(option)}>
                 <span class="key-hint">{key}</span>
                 {label}
               </button>
             {/each}
           </div>
-          {#if current.humanVerdict === 'no_meaningful_change' && current.humanDimensions.length === 0 && !isReviewed(current)}
-            <p class="incomplete-note">"Anlam aynı, ifade/ton değişti" seçildi — devam etmek için en az bir boyut seçin.</p>
-          {/if}
-          {#if current.humanVerdict !== null && isDisagreement(current)}
+          {#if draftDisagreesWithProposal}
             <p class="disagreement-note">
-              ⚠ Model önerisi ({VERDICT_LABELS_TR[current.proposedVerdict]}) ile farklı — her iki değer de saklanıyor.
+              ⚠ Model önerisi ({VERDICT_LABELS_TR[current.proposedVerdict]}) ile farklı — kaydedince her iki değer de saklanacak.
             </p>
           {/if}
 
@@ -423,7 +443,7 @@
                 <p class="dimension-group-label">{group.label}</p>
                 <div class="dimension-grid">
                   {#each group.dimensions as dimension}
-                    {@const active = current.humanDimensions.find((d) => d.dimension === dimension)}
+                    {@const active = draftHumanDimensions.find((d) => d.dimension === dimension)}
                     <div class="dimension-item">
                       <label>
                         <input type="checkbox" checked={Boolean(active)} on:change={() => toggleDimension(dimension)} />
@@ -445,6 +465,15 @@
               </div>
             {/each}
           </div>
+
+          <div class="save-row">
+            <button class="save-btn save-include" on:click={commitInclude} disabled={!canSaveInclude}>
+              Eğitimde Kullan (Kaydet)
+            </button>
+            {#if !canSaveInclude}
+              <span class="save-hint">Kaydetmek için önce bir karar seçin (1-6).</span>
+            {/if}
+          </div>
         {/if}
 
         {#if mode === 'bad'}
@@ -453,7 +482,7 @@
               <label class="reason-item">
                 <input
                   type="checkbox"
-                  checked={current.exclusionReasons.includes(reason)}
+                  checked={draftExclusionReasons.includes(reason)}
                   on:change={() => toggleExclusionReason(reason)}
                 />
                 {EXCLUSION_REASON_LABELS_TR[reason]}
@@ -462,26 +491,40 @@
           </div>
           <label class="note-field">
             Neden kötü? / Not
-            <textarea rows="2" value={current.operatorNoteTr} on:blur={updateOperatorNote}></textarea>
+            <textarea rows="2" value={draftOperatorNoteTr} on:input={updateOperatorNote}></textarea>
           </label>
+
+          <div class="save-row">
+            <button class="save-btn save-exclude" on:click={commitExclude} disabled={!canSaveExclude}>
+              Eğitimden Çıkar (Kaydet)
+            </button>
+            {#if !canSaveExclude}
+              <span class="save-hint">Kaydetmek için en az bir neden işaretleyin.</span>
+            {/if}
+          </div>
         {/if}
       </div>
 
       <div class="block lore-block">
         <label class="lore-toggle">
-          <input type="checkbox" checked={current.loreImportant} on:change={toggleLore} />
+          <input type="checkbox" checked={draftLoreImportant} on:change={toggleLore} />
           Lore için önemli (L)
         </label>
-        {#if current.loreImportant}
+        {#if draftLoreImportant}
           <label class="note-field">
             Bu örnek bize ne öğretiyor?
-            <textarea rows="3" value={current.loreNoteTr ?? ''} on:blur={updateLoreNote}></textarea>
+            <textarea rows="3" value={draftLoreNoteTr ?? ''} on:input={updateLoreNote}></textarea>
           </label>
+        {/if}
+        {#if draftLoreImportant !== current.loreImportant || draftLoreNoteTr !== current.loreNoteTr}
+          <div class="save-row">
+            <button class="save-btn save-lore" on:click={saveLore}>Lore Notunu Kaydet</button>
+          </div>
         {/if}
       </div>
     </article>
 
-    <p class="hints">Kısayollar: 1-6 karar · X kötü örnek · L lore · ← → önceki/sonraki</p>
+    <p class="hints">Kısayollar: 1-6 karar · X kötü örnek · L lore · Enter kaydet · ← → önceki/sonraki</p>
   {/if}
 </section>
 
@@ -711,11 +754,6 @@
     font-size: 14px;
     color: #a35a00;
   }
-  .incomplete-note {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #a35a00;
-  }
   .dimensions-section {
     margin-top: 18px;
     padding-top: 14px;
@@ -784,6 +822,43 @@
     align-items: center;
     gap: 8px;
     font-size: 15px;
+  }
+  .save-row {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .save-btn {
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+  }
+  .save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .save-include {
+    background: #2a8f4e;
+    color: #fff;
+  }
+  .save-exclude {
+    background: #c0392b;
+    color: #fff;
+  }
+  .save-lore {
+    background: #a35a00;
+    color: #fff;
+  }
+  .save-hint {
+    font-size: 13px;
+    color: #888;
   }
   .hints {
     margin-top: 16px;
