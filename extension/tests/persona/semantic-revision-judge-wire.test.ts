@@ -283,6 +283,45 @@ describe('semantic-revision-judge-wire', () => {
       });
     });
 
+    describe('trailing <|im_end|> Qwen transport token stripping', () => {
+      it('strips a plain valid JSON payload followed by <|im_end|>', () => {
+        const raw = JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.0 });
+        const result = parseUntrustedJudgmentText(`${raw}<|im_end|>`);
+        expect(result).toEqual({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.0 });
+      });
+
+      it('strips <|im_end|> with whitespace between the JSON and the token', () => {
+        const raw = JSON.stringify({ verdict: 'meaning_transformed', dimensions: [{ dimension: 'certainty', direction: 'increased' }], description: 'x', confidence: 0.7 });
+        const result = parseUntrustedJudgmentText(`${raw}\n<|im_end|>\n`);
+        expect(result.verdict).toBe('meaning_transformed');
+      });
+
+      it('strips a Markdown-fenced JSON payload followed by <|im_end|>', () => {
+        const raw = JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.0 });
+        const fenced = `\`\`\`json\n${raw}\n\`\`\`<|im_end|>`;
+        const result = parseUntrustedJudgmentText(fenced);
+        expect(result).toEqual({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.0 });
+      });
+
+      it('strips a <think> block, then a fenced JSON payload, then a trailing <|im_end|>', () => {
+        const raw = JSON.stringify({ verdict: 'meaning_added', dimensions: [{ dimension: 'commitment', direction: 'increased' }], description: 'x', confidence: 0.8 });
+        const combined = `<think>reasoning</think>\n\`\`\`json\n${raw}\n\`\`\`<|im_end|>`;
+        const result = parseUntrustedJudgmentText(combined);
+        expect(result.verdict).toBe('meaning_added');
+        expect(result.dimensions).toEqual([{ dimension: 'commitment', direction: 'increased' }]);
+      });
+
+      it('prose + JSON + trailing <|im_end|> must still fail — stripping the token never extracts JSON out of surrounding prose', () => {
+        const raw = JSON.stringify({ verdict: 'meaning_added', dimensions: [], description: 'x', confidence: 0.5 });
+        const withProse = `Sure, here you go: ${raw}<|im_end|>`;
+        expect(() => parseUntrustedJudgmentText(withProse)).toThrow(/not valid JSON/);
+      });
+
+      it('still rejects malformed JSON even with a trailing <|im_end|> token', () => {
+        expect(() => parseUntrustedJudgmentText('{verdict: no_meaningful_change}<|im_end|>')).toThrow(/not valid JSON/);
+      });
+    });
+
     describe('<think> block stripping', () => {
       it('strips a well-formed <think>...</think> block and does not persist it', () => {
         const json = JSON.stringify({ verdict: 'meaning_transformed', dimensions: [], description: 'x', confidence: 0.5 });

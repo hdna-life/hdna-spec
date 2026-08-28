@@ -21,8 +21,12 @@
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
   import type { BehaviorDimensionChange, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
-  import { applyTrial4BenchmarkCaseDefaults } from '../../src/persona/trial4-benchmark-case-store';
   import { isValidDimensionsArray } from '../../src/persona/behavior-dimension';
+  import {
+    importTrial4BenchmarkCases as importTrial4BenchmarkCasesIntoStore,
+    clearTrial4BenchmarkData as clearTrial4BenchmarkDataFromStores,
+    type Trial4BenchmarkImportMode,
+  } from '../../src/persona/trial4-benchmark-case-import';
 
   import DashboardOverview from '../../src/ui/dashboard/DashboardOverview.svelte';
   import DashboardTrainingReview from '../../src/ui/dashboard/DashboardTrainingReview.svelte';
@@ -92,16 +96,25 @@
   // no model call involved. Mirrors extension/entrypoints/popup/App.svelte's
   // identical Trial 4 handlers exactly, before they were relocated here.
 
-  async function importTrial4BenchmarkCases(event: CustomEvent<Trial4BenchmarkCase[]>) {
-    const existingIds = new Set(trial4BenchmarkCases.map((c) => c.id));
-    for (const raw of event.detail) {
-      if (!raw?.id || existingIds.has(raw.id)) continue;
-      // Ground truth is deliberately NOT required in an imported file — the
-      // operator labels and locks each case in the Dashboard afterward
-      // (Test 1 evaluation-stage addendum). Any missing/legacy field is
-      // defaulted to "not yet labeled," never inferred from the raw import.
-      await trial4BenchmarkCaseStore.put(applyTrial4BenchmarkCaseDefaults(raw));
+  async function importTrial4BenchmarkCases(
+    event: CustomEvent<{ cases: Trial4BenchmarkCase[]; mode: Trial4BenchmarkImportMode }>,
+  ) {
+    // Ground truth is deliberately NOT required in an imported file — the
+    // operator labels and locks each case in the Dashboard afterward (Test
+    // 1 evaluation-stage addendum). Any missing/legacy field is defaulted
+    // to "not yet labeled," never inferred from the raw import. 'replace'
+    // clears BOTH stores first (a stale result referencing a case id no
+    // longer in the store would otherwise silently survive) — cases and
+    // results are cleared together, never cases alone.
+    if (event.detail.mode === 'replace') {
+      await trial4BenchmarkResultStore.clear();
     }
+    await importTrial4BenchmarkCasesIntoStore(trial4BenchmarkCaseStore, event.detail.cases, event.detail.mode);
+    await refresh();
+  }
+
+  async function clearTrial4BenchmarkData() {
+    await clearTrial4BenchmarkDataFromStores(trial4BenchmarkCaseStore, trial4BenchmarkResultStore);
     await refresh();
   }
 
@@ -257,6 +270,7 @@
         results={trial4BenchmarkResults}
         config={trial4BenchmarkConfig}
         on:importCases={importTrial4BenchmarkCases}
+        on:clearBenchmarkData={clearTrial4BenchmarkData}
         on:lockGroundTruth={lockGroundTruthCase}
         on:runNextCase={runTrial4BenchmarkCase}
         on:submitJudgment={submitTrial4Judgment}

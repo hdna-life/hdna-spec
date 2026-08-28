@@ -75,7 +75,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       expect(body).not.toHaveProperty('response_format');
     });
 
-    it('instructs the model in-prompt to return exactly one JSON object with the three expected keys', async () => {
+    it('instructs the model in-prompt to return exactly one JSON object with all four v3 keys — verdict, dimensions, description, confidence (never the old three-key Trial 3 shape)', async () => {
       const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
@@ -85,8 +85,10 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       const body = JSON.parse(init.body);
       const prompt = body.messages[0].content as string;
       expect(prompt).toContain('"verdict"');
+      expect(prompt).toContain('"dimensions"');
       expect(prompt).toContain('"description"');
       expect(prompt).toContain('"confidence"');
+      expect(prompt).toMatch(/exactly these four keys/i);
     });
 
     it('uses the default fetch.bind(globalThis) binding when no fetchImpl is supplied', async () => {

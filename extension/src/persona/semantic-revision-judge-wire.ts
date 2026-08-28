@@ -33,6 +33,8 @@ import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from
 
 const THINK_BLOCK_PATTERN = /<think>[\s\S]*?<\/think>/i;
 const MARKDOWN_JSON_FENCE_PATTERN = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+/** The MLX-LM local server's Qwen chat template appends this end-of-turn transport token after the model's actual completion text — observed verbatim in real local Qwen3-0.6B output, both plain and fenced. Anchored to end-of-string (`$`) so only a genuine TRAILING token is stripped, never an occurrence elsewhere (never used to hunt for JSON embedded in prose). */
+const TRAILING_QWEN_IM_END_PATTERN = /\s*<\|im_end\|>\s*$/i;
 
 /**
  * Test 1's narrow judge prompt (docs/decisions/0016's Trial 3 §8,
@@ -109,6 +111,20 @@ function stripMarkdownFence(content: string): string {
   return match ? match[1] : content;
 }
 
+/**
+ * Strips ONLY an exact trailing `<|im_end|>` transport token (plus
+ * surrounding whitespace), if present at the very end of the string.
+ * Observed real local MLX/Qwen3-0.6B output: a valid JSON payload
+ * immediately followed by this token, e.g. `{"verdict": ...}<|im_end|>` or
+ * a fenced ` ```json\n{...}\n``` <|im_end|>`. Anchored to end-of-string —
+ * never strips the token from the middle of prose, never a signal to hunt
+ * for JSON elsewhere in the content (same "harmless transport formatting
+ * only, never repair" discipline as `stripThinkingBlock`/`stripMarkdownFence`).
+ */
+function stripTrailingQwenImEndToken(content: string): string {
+  return content.replace(TRAILING_QWEN_IM_END_PATTERN, '');
+}
+
 const VALID_VERDICTS = new Set([
   'no_meaningful_change',
   'meaning_added',
@@ -132,17 +148,28 @@ function isValidJudgmentWireShape(value: unknown): value is SemanticRevisionJudg
  * Parses a raw chat-completion `content` string into a validated
  * `SemanticRevisionJudgmentDraft`, or throws. Tolerates only harmless
  * transport formatting (surrounding whitespace, one `<think>` block, one
- * Markdown JSON fence) — never repairs, guesses, or infers a missing/
- * malformed field; a response that fails structural validation is a judge
- * failure, not degraded evidence (Trial 3 §10-11). This includes
- * `dimensions`: a missing/malformed `dimensions` array, a duplicate
- * dimension, an unrecognized dimension/direction value, or a non-empty
- * `dimensions` array on an `'uncertain'` verdict are all rejected here,
- * never silently repaired to `[]`.
+ * trailing `<|im_end|>` transport token, one Markdown JSON fence) — never
+ * repairs, guesses, or infers a missing/malformed field; a response that
+ * fails structural validation is a judge failure, not degraded evidence
+ * (Trial 3 §10-11). This includes `dimensions`: a missing/malformed
+ * `dimensions` array, a duplicate dimension, an unrecognized dimension/
+ * direction value, or a non-empty `dimensions` array on an `'uncertain'`
+ * verdict are all rejected here, never silently repaired to `[]`.
+ *
+ * Normalization pipeline, in this exact order (each step only strips
+ * known, harmless transport artifacts — never extracts `{...}` from
+ * surrounding prose, never repairs malformed JSON):
+ * 1. strip a leading `<think>...</think>` block, if present
+ * 2. strip a trailing `<|im_end|>` token, if present
+ * 3. trim surrounding whitespace
+ * 4. strip a single surrounding Markdown JSON fence, if present
+ * 5. `JSON.parse`
+ * 6. strict schema validation (`isValidJudgmentWireShape`)
  */
 export function parseUntrustedJudgmentText(content: string): SemanticRevisionJudgmentDraft {
   const withoutThinking = stripThinkingBlock(content);
-  const jsonText = stripMarkdownFence(withoutThinking);
+  const withoutTransportToken = stripTrailingQwenImEndToken(withoutThinking).trim();
+  const jsonText = stripMarkdownFence(withoutTransportToken);
 
   let parsed: unknown;
   try {

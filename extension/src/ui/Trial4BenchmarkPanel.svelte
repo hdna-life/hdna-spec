@@ -2,11 +2,17 @@
   import { createEventDispatcher } from 'svelte';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
-  import type { BehaviorDimension, BehaviorDimensionChange, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
+  import type { BehaviorDimension, BehaviorDimensionChange, BehaviorDirection, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
   import type { Trial4BenchmarkConfig } from '../persona/trial4-benchmark-config-store';
   import { computeTrial4BenchmarkStats } from '../persona/trial4-benchmark-stats';
-  import { BEHAVIOR_DIRECTIONS } from '../persona/behavior-dimension';
-  import { DIMENSION_GROUPS_TR } from '../persona/trial4-review-state';
+  import type { Trial4BenchmarkImportMode } from '../persona/trial4-benchmark-case-import';
+  import {
+    DIMENSION_LABELS_TR,
+    DIRECTION_LABELS_TR,
+    DIMENSION_GROUPS_TR,
+    VERDICT_LABELS_TR,
+    VERDICT_ORDER,
+  } from '../persona/trial4-review-state';
 
   export let cases: Trial4BenchmarkCase[] = [];
   export let results: Trial4BenchmarkResult[] = [];
@@ -18,7 +24,8 @@
   }
 
   const dispatch = createEventDispatcher<{
-    importCases: Trial4BenchmarkCase[];
+    importCases: { cases: Trial4BenchmarkCase[]; mode: Trial4BenchmarkImportMode };
+    clearBenchmarkData: void;
     lockGroundTruth: { caseId: string; humanVerdict: SemanticChangeVerdict; humanDimensions: BehaviorDimensionChange[] };
     runNextCase: void;
     submitJudgment: {
@@ -32,18 +39,23 @@
 
   const LABELS: Trial4BenchmarkLabel[] = ['A', 'B', 'C'];
 
-  // Reuses the SAME closed dimension taxonomy + grouping structure Training
-  // Review's "NE DEĞİŞTİ?" section uses (behavior-dimension.ts,
-  // trial4-review-state.ts's DIMENSION_GROUPS_TR) — this panel is
-  // English-labeled throughout, so only the grouping (which dimensions
-  // belong together) is reused, not the Turkish label text.
-  const VERDICT_OPTIONS: { verdict: SemanticChangeVerdict; label: string }[] = [
-    { verdict: 'meaning_added', label: 'Meaning added' },
-    { verdict: 'meaning_removed', label: 'Meaning removed' },
-    { verdict: 'meaning_transformed', label: 'Meaning transformed' },
-    { verdict: 'no_meaningful_change', label: 'No meaningful change' },
-    { verdict: 'uncertain', label: 'Uncertain' },
-  ];
+  // English canonical labels, paired with the SAME Turkish labels Training
+  // Review's "NE DEĞİŞTİ?" section already uses (trial4-review-state.ts) —
+  // reused, never duplicated/retranslated, so the two UIs can never drift
+  // into inconsistent Turkish wording for the same enum value. This panel
+  // displays "English canonical (Türkçe)" throughout its ground-truth and
+  // response sections; only the persisted value is the English enum.
+  const VERDICT_LABELS_EN: Record<SemanticChangeVerdict, string> = {
+    meaning_added: 'Meaning added',
+    meaning_removed: 'Meaning removed',
+    meaning_transformed: 'Meaning transformed',
+    no_meaningful_change: 'No meaningful change',
+    uncertain: 'Uncertain',
+  };
+  function verdictLabel(verdict: SemanticChangeVerdict): string {
+    return `${VERDICT_LABELS_EN[verdict]} (${VERDICT_LABELS_TR[verdict]})`;
+  }
+
   const DIMENSION_GROUP_LABELS_EN = ['Expression / tone', 'Stance', 'Meaning / practical content'];
   const DIMENSION_LABELS_EN: Record<BehaviorDimension, string> = {
     expressed_affect_valence: 'Expressed affect valence',
@@ -62,6 +74,51 @@
     factual_content: 'Factual content',
     action_or_decision: 'Action / decision',
   };
+  function dimensionLabel(dimension: BehaviorDimension): string {
+    return `${DIMENSION_LABELS_EN[dimension]} (${DIMENSION_LABELS_TR[dimension]})`;
+  }
+
+  const DIRECTION_LABELS_EN: Record<BehaviorDirection, string> = {
+    increased: 'Increased',
+    decreased: 'Decreased',
+    more_positive: 'More positive',
+    more_negative: 'More negative',
+    added: 'Added',
+    removed: 'Removed',
+    narrowed: 'Narrowed',
+    expanded: 'Expanded',
+    changed: 'Changed',
+  };
+  function directionLabel(direction: BehaviorDirection): string {
+    return `${DIRECTION_LABELS_EN[direction]} (${DIRECTION_LABELS_TR[direction]})`;
+  }
+
+  // Ground-truth-entry-only restriction (docs/decisions/0017 Test 1
+  // ground-truth-flow addendum) — NOT the general per-dimension/direction
+  // validity rule (`isValidDimensionsArray` deliberately keeps that open,
+  // per `behavior-dimension.ts`'s docstring, "to avoid building a rigid
+  // ontology platform"). This narrower list exists only so the HUMAN
+  // operator, hand-labeling frozen held-out ground truth, cannot lock a
+  // nonsensical pairing (e.g. "scope: increased") — it is intentionally
+  // scoped to this file and never imported elsewhere, so it can never
+  // start constraining what a model is allowed to output.
+  const GROUND_TRUTH_DIRECTIONS_BY_DIMENSION: Record<BehaviorDimension, BehaviorDirection[]> = {
+    expressed_affect_valence: ['more_positive', 'more_negative'],
+    expressed_affect_intensity: ['increased', 'decreased'],
+    directness: ['increased', 'decreased'],
+    politeness: ['increased', 'decreased'],
+    formality: ['increased', 'decreased'],
+    certainty: ['increased', 'decreased'],
+    evidentiality: ['changed'],
+    commitment: ['increased', 'decreased'],
+    directive_force: ['increased', 'decreased'],
+    conditionality: ['added', 'removed'],
+    scope: ['narrowed', 'expanded'],
+    specificity: ['increased', 'decreased'],
+    rationale: ['added', 'removed'],
+    factual_content: ['changed'],
+    action_or_decision: ['changed'],
+  };
 
   // Test 1's central question is not "does trained Qwen beat DeepSeek" — it
   // is base->trained improvement and acceptable-local-judge quality under
@@ -72,7 +129,8 @@
   $: unjudged = results.find((r) => !r.judged);
   $: benchmarkedCaseIds = new Set(results.map((r) => r.caseId));
   $: unlockedCases = cases.filter((c) => !c.groundTruthLocked);
-  $: remainingCases = cases.filter((c) => c.groundTruthLocked && !benchmarkedCaseIds.has(c.id)).length;
+  $: lockedCases = cases.filter((c) => c.groundTruthLocked);
+  $: readyToRunCases = lockedCases.filter((c) => !benchmarkedCaseIds.has(c.id)).length;
   $: judgedResults = results.filter((r) => r.judged).slice().reverse();
 
   // --- Ground truth entry + lock (Test 1 evaluation-stage addendum). A
@@ -84,34 +142,61 @@
   let gtIndex = 0;
   $: groundTruthCase = unlockedCases[Math.min(gtIndex, Math.max(unlockedCases.length - 1, 0))];
   let gtVerdict: SemanticChangeVerdict | null = null;
-  let gtDimensions: BehaviorDimensionChange[] = [];
+  // Selected dimensions and their chosen direction are tracked separately
+  // (rather than eagerly defaulting every checked dimension to some
+  // direction) so an operator who has checked a dimension but not yet
+  // picked a valid direction for it is visibly blocked from locking —
+  // never silently defaulted to a placeholder direction.
+  let gtSelectedDimensions: BehaviorDimension[] = [];
+  let gtDirectionByDimension: Partial<Record<BehaviorDimension, BehaviorDirection>> = {};
   let lastGtCaseId: string | undefined;
   $: {
     if (groundTruthCase?.id !== lastGtCaseId) {
       lastGtCaseId = groundTruthCase?.id;
       gtVerdict = null;
-      gtDimensions = [];
+      gtSelectedDimensions = [];
+      gtDirectionByDimension = {};
     }
   }
 
   function selectGtVerdict(verdict: SemanticChangeVerdict) {
     gtVerdict = verdict;
-    if (verdict === 'uncertain') gtDimensions = [];
+    if (verdict === 'uncertain') {
+      gtSelectedDimensions = [];
+      gtDirectionByDimension = {};
+    }
   }
 
   function toggleGtDimension(dimension: BehaviorDimension) {
-    const has = gtDimensions.some((d) => d.dimension === dimension);
-    gtDimensions = has ? gtDimensions.filter((d) => d.dimension !== dimension) : [...gtDimensions, { dimension, direction: 'changed' as const }];
+    if (gtSelectedDimensions.includes(dimension)) {
+      gtSelectedDimensions = gtSelectedDimensions.filter((d) => d !== dimension);
+      const rest = { ...gtDirectionByDimension };
+      delete rest[dimension];
+      gtDirectionByDimension = rest;
+    } else {
+      gtSelectedDimensions = [...gtSelectedDimensions, dimension];
+    }
   }
 
-  function setGtDimensionDirection(dimension: BehaviorDimension, direction: (typeof BEHAVIOR_DIRECTIONS)[number]) {
-    gtDimensions = gtDimensions.map((d) => (d.dimension === dimension ? { ...d, direction } : d));
+  function setGtDirection(dimension: BehaviorDimension, direction: BehaviorDirection) {
+    gtDirectionByDimension = { ...gtDirectionByDimension, [dimension]: direction };
   }
 
-  $: canLockGroundTruth = gtVerdict !== null;
+  // A selected dimension with no direction chosen yet (or, defensively, a
+  // direction outside its allowed set) makes the whole draft un-lockable —
+  // see this component's GROUND_TRUTH_DIRECTIONS_BY_DIMENSION docstring.
+  $: gtDimensionsValid = gtSelectedDimensions.every((dimension) => {
+    const direction = gtDirectionByDimension[dimension];
+    return direction !== undefined && GROUND_TRUTH_DIRECTIONS_BY_DIMENSION[dimension].includes(direction);
+  });
+  $: gtDimensions = gtSelectedDimensions.map((dimension) => ({
+    dimension,
+    direction: gtDirectionByDimension[dimension]!,
+  }));
+  $: canLockGroundTruth = gtVerdict !== null && gtDimensionsValid;
 
   function lockGroundTruth() {
-    if (!groundTruthCase || gtVerdict === null) return;
+    if (!groundTruthCase || !canLockGroundTruth || gtVerdict === null) return;
     dispatch('lockGroundTruth', { caseId: groundTruthCase.id, humanVerdict: gtVerdict, humanDimensions: gtDimensions });
     if (gtIndex < unlockedCases.length - 1) gtIndex += 1;
   }
@@ -156,7 +241,12 @@
     openRouterApiKeyInput = '';
   }
 
-  async function handleImportFile(event: Event) {
+  // --- import (append/replace) + clear (docs/decisions/0017 Test 1
+  // "benchmark data management" addendum). Mirrors DashboardTrainingReview's
+  // established append/replace-file-input + confirm-then-dispatch pattern
+  // exactly, so operators get one consistent import UX across the
+  // Dashboard rather than two different conventions. ---
+  async function handleImportFile(event: Event, mode: Trial4BenchmarkImportMode) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -166,14 +256,33 @@
       parsed = JSON.parse(text);
     } catch {
       alert('Selected file is not valid JSON.');
+      input.value = '';
       return;
     }
     if (!Array.isArray(parsed)) {
       alert('Expected a JSON array of benchmark case objects.');
+      input.value = '';
       return;
     }
-    dispatch('importCases', parsed as Trial4BenchmarkCase[]);
+    if (mode === 'replace') {
+      const confirmed = confirm(
+        'This will DELETE every currently imported benchmark case AND every result run against them, then import this file. This cannot be undone. Continue?',
+      );
+      if (!confirmed) {
+        input.value = '';
+        return;
+      }
+    }
+    dispatch('importCases', { cases: parsed as Trial4BenchmarkCase[], mode });
     input.value = '';
+  }
+
+  function handleClearBenchmarkData() {
+    const confirmed = confirm(
+      'This will permanently delete ALL imported Trial 4 benchmark cases and ALL run/judged results. This cannot be undone. Continue?',
+    );
+    if (!confirmed) return;
+    dispatch('clearBenchmarkData');
   }
 
   // --- judging form for the current unjudged result: acceptability gate +
@@ -191,15 +300,27 @@
   };
   let note = '';
 
+  // Reset the judging form ONLY when a genuinely different result becomes
+  // current — compared by id, not by object identity. `results` (and
+  // therefore `unjudged`) is a brand-new array/object on every poll tick
+  // (App.svelte's `setInterval(refresh, 2000)` re-fetches from storage),
+  // so a Svelte `$:` block that merely references `unjudged` — even just
+  // `unjudged?.id` — reruns on every such reassignment regardless of
+  // whether the id actually changed, silently wiping in-progress
+  // Acceptable/Unacceptable/Rank selections every couple of seconds. This
+  // explicit lastUnjudgedId comparison is the fix, mirroring the
+  // groundTruthCase/lastGtCaseId guard above.
+  let lastUnjudgedId: string | undefined;
   $: {
-    // Reset the judging form whenever a different result becomes current.
-    void unjudged?.id;
-    acceptability = {
-      A: { acceptable: null, rank: null },
-      B: { acceptable: null, rank: null },
-      C: { acceptable: null, rank: null },
-    };
-    note = '';
+    if (unjudged?.id !== lastUnjudgedId) {
+      lastUnjudgedId = unjudged?.id;
+      acceptability = {
+        A: { acceptable: null, rank: null },
+        B: { acceptable: null, rank: null },
+        C: { acceptable: null, rank: null },
+      };
+      note = '';
+    }
   }
 
   function setAcceptable(label: Trial4BenchmarkLabel, value: boolean) {
@@ -232,6 +353,11 @@
     dispatch('submitJudgment', { resultId: unjudged.id, acceptability: payload, note });
   }
 
+  // Reveal Models is deliberately gated in this template on
+  // `judgedResult.judged` (never merely on the result existing) — the
+  // control is not rendered at all before commit, so there is no disabled
+  // button to route around; Trial4BenchmarkService.reveal enforces the
+  // same rule server-side as a second, structural guard.
   function revealResult(resultId: string) {
     dispatch('reveal', resultId);
   }
@@ -246,21 +372,34 @@
 <section>
   <h2>Trial 4 — Blind Benchmark (experimental)</h2>
   <p class="status">
-    {cases.length} case(s) imported · {results.length} run · {Math.max(remainingCases, 0)} remaining ·
-    {stats.judgedResultCount} judged
+    Imported: <strong>{cases.length}</strong> ·
+    Unlocked: <strong>{unlockedCases.length}</strong> ·
+    Locked (ready to run): <strong>{readyToRunCases}</strong> ·
+    Run: <strong>{results.length}</strong> ·
+    Judged: <strong>{stats.judgedResultCount}</strong>
   </p>
 
-  <label class="file-label">
-    Import held-out benchmark cases (JSON array — operator-supplied real
-    held-out corpus, never generator output). Cases may be imported without
-    ground truth; label and lock them below before running models.
-    <input type="file" accept="application/json" on:change={handleImportFile} />
-  </label>
+  <div class="import-group">
+    <label class="import-label">
+      Import — append to existing cases
+      <input type="file" accept="application/json" on:change={(e) => handleImportFile(e, 'append')} />
+    </label>
+    <label class="import-label">
+      Import — replace all cases + results
+      <input type="file" accept="application/json" on:change={(e) => handleImportFile(e, 'replace')} />
+    </label>
+    <button class="danger" on:click={handleClearBenchmarkData}>Clear benchmark data</button>
+  </div>
+  <p class="note">
+    Cases may be imported without ground truth; label and lock them below
+    before running models. "Replace" and "Clear benchmark data" delete
+    existing cases AND results and cannot be undone.
+  </p>
 
   <h3>Ground truth ({unlockedCases.length} unlocked)</h3>
   <p class="note">
-    Enter the semantic verdict and observable-behavior dimensions for this
-    case, then lock it. Once locked, ground truth cannot be changed through
+    Select the semantic verdict, then zero or more dimension + direction
+    pairs, then lock. Once locked, ground truth cannot be changed through
     this UI, and only locked cases become eligible to run.
   </p>
   {#if groundTruthCase}
@@ -273,35 +412,45 @@
 
       <p class="note"><strong>Semantic verdict:</strong></p>
       <div class="grade-buttons">
-        {#each VERDICT_OPTIONS as { verdict, label }}
+        {#each VERDICT_ORDER as verdict}
           <label>
             <input type="radio" name="gt-verdict" checked={gtVerdict === verdict} on:change={() => selectGtVerdict(verdict)} />
-            {label}
+            {verdictLabel(verdict)}
           </label>
         {/each}
       </div>
 
-      <p class="note"><strong>Behavioral dimensions:</strong></p>
+      <p class="note"><strong>Behavioral dimensions:</strong> (disabled when verdict is Uncertain)</p>
       {#each DIMENSION_GROUPS_TR as group, groupIndex}
         <div class="dimension-group">
-          <p class="dimension-group-label">{DIMENSION_GROUP_LABELS_EN[groupIndex]}</p>
+          <p class="dimension-group-label">{DIMENSION_GROUP_LABELS_EN[groupIndex]} ({group.label})</p>
           <div class="dimension-grid">
             {#each group.dimensions as dimension}
-              {@const active = gtDimensions.find((d) => d.dimension === dimension)}
+              {@const selected = gtSelectedDimensions.includes(dimension)}
+              {@const chosenDirection = gtDirectionByDimension[dimension]}
               <div class="dimension-item">
                 <label>
-                  <input type="checkbox" checked={Boolean(active)} on:change={() => toggleGtDimension(dimension)} />
-                  {DIMENSION_LABELS_EN[dimension]}
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={gtVerdict === 'uncertain'}
+                    on:change={() => toggleGtDimension(dimension)}
+                  />
+                  {dimensionLabel(dimension)}
                 </label>
-                {#if active}
+                {#if selected}
                   <select
-                    value={active.direction}
-                    on:change={(e) => setGtDimensionDirection(dimension, (e.target as HTMLSelectElement).value as typeof BEHAVIOR_DIRECTIONS[number])}
+                    value={chosenDirection ?? ''}
+                    on:change={(e) => setGtDirection(dimension, (e.target as HTMLSelectElement).value as BehaviorDirection)}
                   >
-                    {#each BEHAVIOR_DIRECTIONS as direction}
-                      <option value={direction}>{direction}</option>
+                    <option value="" disabled>— select direction —</option>
+                    {#each GROUND_TRUTH_DIRECTIONS_BY_DIMENSION[dimension] as direction}
+                      <option value={direction}>{directionLabel(direction)}</option>
                     {/each}
                   </select>
+                  {#if !chosenDirection}
+                    <span class="error">direction required</span>
+                  {/if}
                 {/if}
               </div>
             {/each}
@@ -315,13 +464,18 @@
           <button on:click={() => (gtIndex = (gtIndex + 1) % unlockedCases.length)}>Skip to next unlocked case</button>
         {/if}
       </div>
+      {#if gtVerdict === null}
+        <p class="note error">Select a semantic verdict to enable locking.</p>
+      {:else if !gtDimensionsValid}
+        <p class="note error">Every selected dimension needs a direction before you can lock.</p>
+      {/if}
     </div>
   {:else}
     <p>No unlocked cases. Import cases, or all imported cases already have locked ground truth.</p>
   {/if}
 
-  <button on:click={() => dispatch('runNextCase')} disabled={remainingCases <= 0}>
-    Run next case ({Math.max(remainingCases, 0)} remaining, ground-truth-locked only)
+  <button on:click={() => dispatch('runNextCase')} disabled={readyToRunCases <= 0}>
+    Run next case ({readyToRunCases} locked case(s) ready)
   </button>
 
   {#if unjudged}
@@ -341,11 +495,11 @@
           {#if responseItem.error}
             <p class="error">Provider error: {responseItem.error}</p>
           {:else}
-            <p><strong>verdict:</strong> {responseItem.verdict}</p>
+            <p><strong>verdict:</strong> {responseItem.verdict !== null ? verdictLabel(responseItem.verdict) : '—'}</p>
             {#if responseItem.dimensions.length > 0}
               <p class="dimensions">
                 dimensions:
-                {#each responseItem.dimensions as change, i}{i > 0 ? ', ' : ' '}{change.dimension}:{change.direction}{/each}
+                {#each responseItem.dimensions as change, i}{i > 0 ? ', ' : ' '}{dimensionLabel(change.dimension)}: {directionLabel(change.direction)}{/each}
               </p>
             {/if}
             {#if responseItem.description}<p>{responseItem.description}</p>{/if}
@@ -522,7 +676,7 @@
     </label>
     <label>
       DeepSeek/OpenRouter model id
-      <input type="text" bind:value={deepSeekModelIdInput} on:input={markDirty} placeholder="deepseek/deepseek-chat-v3.1" />
+      <input type="text" bind:value={deepSeekModelIdInput} on:input={markDirty} placeholder="deepseek/deepseek-v4-flash-0731" />
     </label>
     <label>
       <input type="checkbox" bind:checked={enabledInput} on:change={markDirty} />
@@ -544,9 +698,8 @@
    * (small, fixed-width) — it now renders only inside the full-page
    * Dashboard (docs/decisions/0017's Dashboard addendum), so its
    * typography/spacing were enlarged for comfortable long-session
-   * reading. Structure/markup/logic are unchanged; only sizing/spacing
-   * values below were bumped up. Blind grading and reveal behavior are
-   * untouched — this is a surface change only.
+   * reading. Blind grading and reveal behavior are untouched — this is
+   * a surface + ground-truth-entry change only.
    */
   section {
     max-width: 900px;
@@ -574,10 +727,22 @@
   .status {
     color: #555;
   }
-  .file-label {
-    display: block;
+  .import-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
     margin-top: 10px;
-    font-size: 14px;
+  }
+  .import-label {
+    display: block;
+    font-size: 13px;
+    color: #555;
+  }
+  button.danger {
+    background: #b00020;
+    color: #fff;
+    border: none;
   }
   .result {
     margin-top: 14px;
@@ -639,7 +804,7 @@
   }
   .dimension-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 6px;
   }
   .dimension-item {
@@ -647,9 +812,13 @@
     align-items: center;
     gap: 6px;
     font-size: 13px;
+    flex-wrap: wrap;
   }
   .dimension-item select {
     font-size: 12px;
+  }
+  .dimension-item .error {
+    font-size: 11px;
   }
   .table-wrap {
     overflow-x: auto;
