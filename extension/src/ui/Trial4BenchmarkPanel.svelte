@@ -335,16 +335,26 @@
 
   $: acceptableLabels = LABELS.filter((label) => acceptability[label].acceptable === true);
 
-  function canSubmit(): boolean {
+  // A plain `function canSubmit() {...}` called from the template
+  // (`disabled={!canSubmit()}`) is NOT reactive in Svelte — the compiler
+  // only re-evaluates a template expression when one of the REACTIVE
+  // identifiers it references changes, and a bare function reference is
+  // never itself invalidated. The button's `disabled` value was frozen at
+  // its first-render result (`true`, since `acceptability` starts all
+  // null) and never updated again no matter what the operator selected —
+  // this is the "Submit judgment is always disabled" bug. Fixed by making
+  // this an actual `$:` derived value that reads `acceptability`/
+  // `acceptableLabels` directly, so Svelte tracks it correctly.
+  $: canSubmit = (() => {
     if (LABELS.some((label) => acceptability[label].acceptable === null)) return false;
     const ranks = acceptableLabels.map((label) => acceptability[label].rank);
     if (ranks.some((rank) => rank === null)) return false;
     const expected = acceptableLabels.map((_label, index) => index + 1);
     return JSON.stringify([...ranks].sort()) === JSON.stringify(expected);
-  }
+  })();
 
   function submit() {
-    if (!unjudged || !canSubmit()) return;
+    if (!unjudged || !canSubmit) return;
     const payload: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }> = {
       A: { acceptable: acceptability.A.acceptable === true, rank: acceptability.A.rank },
       B: { acceptable: acceptability.B.acceptable === true, rank: acceptability.B.rank },
@@ -546,7 +556,7 @@
       </label>
 
       <div class="actions">
-        <button on:click={submit} disabled={!canSubmit()}>Submit judgment</button>
+        <button on:click={submit} disabled={!canSubmit}>Submit judgment</button>
       </div>
     </div>
   {:else}
