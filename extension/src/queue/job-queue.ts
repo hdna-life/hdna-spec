@@ -118,6 +118,20 @@ export class JobQueue {
     return counts;
   }
 
+  /**
+   * Every persisted job of `type`, sorted oldest-to-newest (by `sequence`,
+   * the actual FIFO order — see `Job.sequence`'s docstring). Read-only —
+   * for a UI to surface a job's real status/lastError to the operator (a
+   * FAILED job with a clear error message is silent otherwise: it simply
+   * never runs again on its own, and nothing else in this class exposes
+   * why). Not filtered by status; callers that only want the latest
+   * outcome should take the last element.
+   */
+  async listByType(type: string): Promise<Job[]> {
+    const jobs = await this.storage.query<Job>(JOB_STORE);
+    return jobs.filter((j) => j.type === type).sort((a, b) => a.sequence - b.sequence);
+  }
+
   /** Runs the next pending job (optionally restricted to `allowedPriorities`), if any, using its registered processor. Returns the job outcome, or undefined if there was nothing eligible. */
   async runNext(allowedPriorities?: JobPriority[]): Promise<Job | undefined> {
     const job = await this.next(allowedPriorities);

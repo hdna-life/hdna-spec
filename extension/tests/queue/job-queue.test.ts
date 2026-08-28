@@ -279,3 +279,38 @@ describe('JobQueue priority-gated dispatch', () => {
     await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1, P2: 0 });
   });
 });
+
+describe('JobQueue.listByType — surfacing a job\'s real status/lastError to a UI', () => {
+  it('returns only jobs of the requested type, oldest-to-newest by sequence', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('noop', noopProcessor);
+    await queue.enqueue('other_type', 'P0', {});
+    const first = await queue.enqueue('noop', 'P0', { n: 1 });
+    const second = await queue.enqueue('noop', 'P0', { n: 2 });
+
+    const jobs = await queue.listByType('noop');
+    expect(jobs.map((j) => j.id)).toEqual([first.id, second.id]);
+  });
+
+  it('returns an empty array when no job of that type has ever been enqueued', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await expect(queue.listByType('never_enqueued')).resolves.toEqual([]);
+  });
+
+  it('reflects a FAILED job with its lastError — a processor throwing before doing any work must remain visible, not silently swallowed', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('always_throws', async () => {
+      throw new Error('not enabled/configured');
+    });
+    await queue.enqueue('always_throws', 'P1', {});
+
+    await queue.runNext();
+
+    const [job] = await queue.listByType('always_throws');
+    expect(job.status).toBe('FAILED');
+    expect(job.lastError).toBe('not enabled/configured');
+  });
+});

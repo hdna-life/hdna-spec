@@ -3,6 +3,7 @@
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
   import type { BehaviorDimension, BehaviorDimensionChange, BehaviorDirection, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
+  import type { Job } from '@spec/protocol/job';
   import type { Trial4BenchmarkConfig } from '../persona/trial4-benchmark-config-store';
   import { computeTrial4BenchmarkStats } from '../persona/trial4-benchmark-stats';
   import type { Trial4BenchmarkImportMode } from '../persona/trial4-benchmark-case-import';
@@ -17,6 +18,15 @@
   export let cases: Trial4BenchmarkCase[] = [];
   export let results: Trial4BenchmarkResult[] = [];
   export let config: Trial4BenchmarkConfig = { enabled: false };
+  /**
+   * The most recent run_trial4_benchmark_case job's own record (status +
+   * lastError), if any — surfaced so a job that throws before ever calling
+   * a provider (e.g. missing config) or a real provider/network failure is
+   * visible to the operator, instead of "Run next case" silently doing
+   * nothing with no explanation. Undefined until the button has been
+   * clicked at least once.
+   */
+  export let lastJob: Job | undefined = undefined;
 
   interface AcceptabilityEntry {
     acceptable: boolean | null;
@@ -493,6 +503,17 @@
   <button on:click={() => dispatch('runNextCase')} disabled={readyToRunCases <= 0}>
     Run next case ({readyToRunCases} locked case(s) ready)
   </button>
+  {#if lastJob}
+    <p class="note job-status" class:job-status-error={lastJob.status === 'FAILED'}>
+      Last run job: <strong>{lastJob.status}</strong>
+      {#if lastJob.attempts > 1}(attempt {lastJob.attempts}){/if}
+      {#if lastJob.status === 'FAILED' && lastJob.lastError}
+        — {lastJob.lastError}
+      {:else if lastJob.status === 'RUNNING'}
+        — in progress, calling Base/Trained/DeepSeek now
+      {/if}
+    </p>
+  {/if}
 
   {#if unjudged}
     {@const unjudgedCase = casesById.get(unjudged.caseId)}
@@ -997,5 +1018,11 @@
   .note {
     color: #888;
     font-size: 13px;
+  }
+  .job-status {
+    margin-top: 6px;
+  }
+  .job-status-error {
+    color: #b00;
   }
 </style>

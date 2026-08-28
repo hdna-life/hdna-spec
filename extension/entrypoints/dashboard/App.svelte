@@ -16,7 +16,8 @@
     Trial4BenchmarkConfigStore,
     type Trial4BenchmarkConfig,
   } from '../../src/persona/trial4-benchmark-config-store';
-  import { enqueueTrial4BenchmarkCase } from '../../src/queue/processors/trial4-benchmark-job';
+  import { enqueueTrial4BenchmarkCase, RUN_TRIAL4_BENCHMARK_CASE_JOB } from '../../src/queue/processors/trial4-benchmark-job';
+  import type { Job } from '@spec/protocol/job';
   import { DISPATCH_TRIGGER_MESSAGE_TYPE } from '../../src/runtime/dispatch-trigger';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
@@ -59,6 +60,14 @@
   let trial4BenchmarkCases: Trial4BenchmarkCase[] = [];
   let trial4BenchmarkResults: Trial4BenchmarkResult[] = [];
   let trial4BenchmarkConfig: Trial4BenchmarkConfig = { enabled: false };
+  // The most recent run_trial4_benchmark_case job's own status/lastError —
+  // a job that throws (e.g. "Trial 4 benchmark is not enabled/configured",
+  // or a real provider failure) is otherwise completely silent: it simply
+  // never runs again on its own, and no Trial4BenchmarkResult is ever
+  // created for it, so the operator sees "Run next case" do nothing with
+  // no indication why. Surfaced in the panel so a config/network problem
+  // is visible instead of looking like a hang.
+  let trial4BenchmarkLastJob: Job | undefined;
 
   async function refresh() {
     controlsState = await controls.get();
@@ -66,6 +75,8 @@
     trial4BenchmarkCases = await trial4BenchmarkCaseStore.list();
     trial4BenchmarkResults = await trial4BenchmarkResultStore.list();
     trial4BenchmarkConfig = await trial4BenchmarkConfigStore.get();
+    const trial4Jobs = await queue.listByType(RUN_TRIAL4_BENCHMARK_CASE_JOB);
+    trial4BenchmarkLastJob = trial4Jobs[trial4Jobs.length - 1];
   }
 
   // --- Training Review -------------------------------------------------
@@ -283,6 +294,7 @@
         cases={trial4BenchmarkCases}
         results={trial4BenchmarkResults}
         config={trial4BenchmarkConfig}
+        lastJob={trial4BenchmarkLastJob}
         on:importCases={importTrial4BenchmarkCases}
         on:clearBenchmarkData={clearTrial4BenchmarkData}
         on:lockGroundTruth={lockGroundTruthCase}
