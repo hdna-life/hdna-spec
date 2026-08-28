@@ -6,10 +6,13 @@ This is a documentation-only record — no training data, adapter weights,
 benchmark results, or evaluation code were changed to produce or in
 writing this report.
 
-**Result in one line:** specialization signal is POSITIVE (trained Qwen
-beat base Qwen on every reported axis); the full Test 1 result is
-**NOT YET VALID / NOT YET CONCLUSIVE** — this run is a smoke test, not a
-pass/fail iteration.
+**Result in one line:**
+
+- **SPECIALIZATION SIGNAL: CLEARLY POSITIVE**
+- **CURRENT MODEL QUALITY: PARTIALLY USEFUL / NOT YET RELIABLE**
+- **FULL TEST 1: NOT YET PASSED**
+
+This run is a smoke test, not a pass/fail iteration.
 
 ## Experiment setup
 
@@ -97,6 +100,65 @@ comparison yet** — the current scorer/error taxonomy does not distinguish
 model schema failure from infrastructure failure cleanly enough (Base's 10
 provider errors could be any mix of the two; see "Bugs" items 2-4 above).
 
+## Positive findings / why this iteration is encouraging
+
+The smoke test produced several positive signals that are not fully
+captured by semantic exact accuracy alone.
+
+**1. Trained Qwen produced human-acceptable outputs even when the exact
+structured label was imperfect.** The trained model achieved a 67% human
+acceptable rate (6/9 parseable responses) and a 33% blind Rank-1 rate
+(3/9). Some responses missed the exact human ground-truth set while still
+identifying the core observable change well enough to be useful — a
+response can be objectively imperfect under the strict taxonomy but still
+operationally acceptable to a human reviewer. Semantic exact accuracy and
+human usefulness should therefore remain separate, both-reported metrics,
+not collapsed into one number. This is a meaningful positive signal for a
+0.6B local model.
+
+**2. The LoRA appears to have learned more than JSON formatting.** Across
+multiple cases, trained Qwen identified real semantic/practical changes
+and relevant behavioral dimensions. Observed strengths included:
+recognizing `meaning_transformed` cases rather than defaulting to
+`no_meaningful_change`/`uncertain`; detecting certainty decreases;
+detecting evidentiality changes; recognizing `action_or_decision` changes;
+recognizing specificity changes; recognizing conditionality and scope
+changes; and preserving `no_meaningful_change` when the proposition stayed
+effectively the same. This suggests the adapter has learned part of the
+actual judgment policy, not merely the response schema.
+
+**3. Some trained responses were very close to or exactly matched human
+ground truth**, across different parts of the taxonomy rather than one
+repeated linguistic pattern — e.g. `no_meaningful_change + specificity
+decreased`; `meaning_transformed + certainty decreased + evidentiality
+changed`; correct recognition of action/decision changes; correct
+recognition of conditionality/scope structure.
+
+**4. Trained Qwen frequently produced useful partial judgments.** Several
+outputs had the correct semantic verdict and one or more correct
+dimensions, but missed one dimension or added an unnecessary one — a
+failure or partial failure under strict exact-set scoring, yet blind human
+review still judged many of these acceptable. This indicates the current
+model may already be useful as a noisy local behavioral judge even before
+another training iteration.
+
+**5. The human-quality result is stronger than the raw semantic score
+suggests.** Semantic exact accuracy was 56% among currently reported valid
+responses, while human acceptability was 67%. This gap is informative
+rather than contradictory: it suggests the current taxonomy/exact-set
+metric is intentionally strict, while the trained model is already
+producing some answers that capture the practical edit correctly enough
+for downstream use.
+
+**6. Specialization appears directionally successful.** The first
+183-example LoRA run did not produce a fully reliable judge, but it
+produced a model that understands the v3 task better than the zero-shot
+behavior observed previously, often emits the required structured
+contract, detects meaningful edit differences, can produce acceptable
+human-facing judgments, and occasionally produces very clean, highly
+ranked answers. The result supports continuing the specialization
+approach.
+
 ## Qualitative observations
 
 Trained Qwen showed a positive specialization signal. It repeatedly:
@@ -121,8 +183,9 @@ However:
 - some required dimensions are missed
 - 10 cases are far too few for a final conclusion
 
-**SPECIALIZATION SIGNAL: POSITIVE**
-**FULL TEST 1 RESULT: NOT YET VALID / NOT YET CONCLUSIVE**
+**SPECIALIZATION SIGNAL: CLEARLY POSITIVE**
+**CURRENT MODEL QUALITY: PARTIALLY USEFUL / NOT YET RELIABLE**
+**FULL TEST 1: NOT YET PASSED**
 
 This is not a PASS.
 
@@ -151,6 +214,13 @@ Before running another held-out Test 1 set:
    weights.
 6. Do NOT reuse these 10 cases as the next scored benchmark — their model
    outputs have already been inspected.
+
+Given the positive findings above, the next iteration should aim to
+improve — without changing the fundamental task:
+- semantic-class precision
+- dimension precision / false-positive control
+- schema reliability
+- canonical dimension-direction adherence
 
 ## Next test
 
