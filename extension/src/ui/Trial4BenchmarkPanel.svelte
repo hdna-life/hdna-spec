@@ -132,6 +132,12 @@
   $: lockedCases = cases.filter((c) => c.groundTruthLocked);
   $: readyToRunCases = lockedCases.filter((c) => !benchmarkedCaseIds.has(c.id)).length;
   $: judgedResults = results.filter((r) => r.judged).slice().reverse();
+  // Looks up the benchmark case behind a result's caseId, so the operator
+  // can see WHICH revision they're grading without navigating back to the
+  // ground-truth section — never used to look up or display anything about
+  // which system (base/trained/deepseek) produced a response; that stays
+  // gated on `result.revealed` exactly as before.
+  $: casesById = new Map(cases.map((c) => [c.id, c]));
 
   // --- Ground truth entry + lock (Test 1 evaluation-stage addendum). A
   // model must never run against, and the operator must never blind-grade
@@ -489,9 +495,27 @@
   </button>
 
   {#if unjudged}
+    {@const unjudgedCase = casesById.get(unjudged.caseId)}
     <div class="result">
+      <div class="case-context">
+        <p class="case-context-label">Case: {unjudged.caseId}</p>
+        {#if unjudgedCase}
+          <p class="context-label">BEFORE:</p>
+          <p class="context-text">{unjudgedCase.originalText}</p>
+          <p class="context-label">AFTER:</p>
+          <p class="context-text">{unjudgedCase.finalText}</p>
+          {#if unjudgedCase.beforeContext || unjudgedCase.afterContext}
+            <p class="note context-surrounding">
+              {#if unjudgedCase.beforeContext}…{unjudgedCase.beforeContext}…{/if}
+              {#if unjudgedCase.afterContext}&nbsp;…{unjudgedCase.afterContext}…{/if}
+            </p>
+          {/if}
+        {:else}
+          <p class="note error">Case data not found for {unjudged.caseId} (it may have been cleared).</p>
+        {/if}
+      </div>
       <p class="note">
-        Case: {unjudged.caseId} — mark each response acceptable or unacceptable, then rank the
+        Mark each response acceptable or unacceptable, then rank the
         acceptable ones (1 = best). An unacceptable response gets no rank. If none are acceptable,
         submit with all three marked unacceptable — that is itself a valid, meaningful result.
       </p>
@@ -574,15 +598,35 @@
   {:else}
     <ul class="judged-list">
       {#each judgedResults as judgedResult}
+        {@const judgedCase = casesById.get(judgedResult.caseId)}
         <li class="judged-item">
-          <span class="judged-case">{judgedResult.caseId}</span>
-          {#if judgedResult.note}<span class="note"> — {judgedResult.note}</span>{/if}
-          {#if judgedResult.revealed}
-            <span class="role">
-              ({LABELS.map((l) => `${l}: ${roleLabel(judgedResult.labelMapping[l].role)}`).join(', ')})
-            </span>
-          {:else}
-            <button on:click={() => revealResult(judgedResult.id)}>Reveal models</button>
+          <div class="judged-item-row">
+            <span class="judged-case">{judgedResult.caseId}</span>
+            {#if judgedResult.note}<span class="note"> — {judgedResult.note}</span>{/if}
+            {#if judgedResult.revealed}
+              <span class="role">
+                ({LABELS.map((l) => `${l}: ${roleLabel(judgedResult.labelMapping[l].role)}`).join(', ')})
+              </span>
+            {:else}
+              <button on:click={() => revealResult(judgedResult.id)}>Reveal models</button>
+            {/if}
+          </div>
+          {#if judgedCase}
+            <details class="case-context-details">
+              <summary>Show case text</summary>
+              <div class="case-context">
+                <p class="context-label">BEFORE:</p>
+                <p class="context-text">{judgedCase.originalText}</p>
+                <p class="context-label">AFTER:</p>
+                <p class="context-text">{judgedCase.finalText}</p>
+                {#if judgedCase.beforeContext || judgedCase.afterContext}
+                  <p class="note context-surrounding">
+                    {#if judgedCase.beforeContext}…{judgedCase.beforeContext}…{/if}
+                    {#if judgedCase.afterContext}&nbsp;…{judgedCase.afterContext}…{/if}
+                  </p>
+                {/if}
+              </div>
+            </details>
           {/if}
         </li>
       {/each}
@@ -857,8 +901,52 @@
     border-bottom: 1px solid #eee;
     font-size: 14px;
   }
+  .judged-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
   .judged-case {
     font-weight: 600;
+  }
+  .case-context-details {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .case-context-details summary {
+    cursor: pointer;
+    color: #888;
+  }
+  .case-context {
+    margin-top: 6px;
+  }
+  .context-label {
+    margin: 6px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #999;
+  }
+  .context-text {
+    margin: 2px 0 0;
+    font-size: 15px;
+    line-height: 1.5;
+    background: #fff3c4;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .context-surrounding {
+    margin-top: 6px;
+    font-style: italic;
+  }
+  .case-context-label {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
   }
   .note-field {
     display: block;
