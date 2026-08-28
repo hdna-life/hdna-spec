@@ -17,6 +17,7 @@
     type Trial4BenchmarkConfig,
   } from '../../src/persona/trial4-benchmark-config-store';
   import { enqueueTrial4BenchmarkCase } from '../../src/queue/processors/trial4-benchmark-job';
+  import { DISPATCH_TRIGGER_MESSAGE_TYPE } from '../../src/runtime/dispatch-trigger';
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
@@ -152,6 +153,19 @@
 
   async function runTrial4BenchmarkCase() {
     await enqueueTrial4BenchmarkCase(queue);
+    // Ask the background service worker to dispatch this job right now,
+    // instead of leaving it PENDING for up to 30s until the next
+    // `hdna-dispatch` alarm tick — see DISPATCH_TRIGGER_MESSAGE_TYPE's
+    // docstring for why "Run next case" needs this. Best-effort: if the
+    // message fails (e.g. the service worker is mid-restart), the job is
+    // already durably enqueued and the next alarm tick still picks it up —
+    // this is strictly a latency improvement, never a correctness
+    // dependency.
+    try {
+      await chrome.runtime.sendMessage({ type: DISPATCH_TRIGGER_MESSAGE_TYPE });
+    } catch {
+      // Ignored — see comment above.
+    }
     await refresh();
   }
 

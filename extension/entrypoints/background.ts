@@ -6,6 +6,7 @@ import { RuntimeControls } from '../src/runtime/controls';
 import { RuntimeStatusStore } from '../src/runtime/status';
 import { ForegroundTracker } from '../src/runtime/foreground-tracker';
 import { computeForegroundInactivity } from '../src/runtime/foreground-inactivity';
+import { DISPATCH_TRIGGER_MESSAGE_TYPE } from '../src/runtime/dispatch-trigger';
 import { EditEventStore } from '../src/persona/edit-event-store';
 import { EditMetricsStore } from '../src/persona/edit-metrics-store';
 import { EditProfileStore } from '../src/persona/edit-profile-store';
@@ -199,9 +200,14 @@ export default defineBackground(() => {
 
   chrome.alarms.create(DISPATCH_ALARM, { periodInMinutes: 0.5 });
 
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== DISPATCH_ALARM) return;
-
+  // Extracted so both the periodic alarm AND an explicit
+  // DISPATCH_TRIGGER_MESSAGE_TYPE message (sent by a foreground surface
+  // right after enqueueing a job it wants to see start immediately — e.g.
+  // Trial 4's "Run next case" button) run the exact same tick. Nothing
+  // about the governor's mode/priority gating or the processing-paused
+  // control changes; a message trigger only removes the up-to-30s wait for
+  // the next scheduled alarm, it does not bypass any safety check below.
+  async function dispatchTick(): Promise<void> {
     const state = await controls.get();
     if (state.processingPaused) return;
 
@@ -271,5 +277,24 @@ export default defineBackground(() => {
       lastEvictionBytesFreed: lastEviction?.bytesFreed ?? previousStatus?.lastEvictionBytesFreed,
       foregroundInactiveSince,
     });
+  }
+
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== DISPATCH_ALARM) return;
+    await dispatchTick();
+  });
+
+  // Fires an immediate dispatchTick() on request — see DISPATCH_TRIGGER_MESSAGE_TYPE's
+  // docstring. `sendResponse` is called once the tick completes (success or
+  // error) purely so the sender's `chrome.runtime.sendMessage` promise
+  // resolves instead of timing out; the caller does not need to act on the
+  // response. Returning `true` keeps the message channel open for that
+  // async `sendResponse` (required by the extension messaging API).
+  chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+    if ((message as { type?: unknown })?.type !== DISPATCH_TRIGGER_MESSAGE_TYPE) return undefined;
+    dispatchTick()
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) }));
+    return true;
   });
 });
