@@ -46,6 +46,12 @@
     type SemanticRevisionJudgeConfig,
   } from '../../src/persona/semantic-revision-judge-config-store';
   import { enqueueSemanticRevisionJudge } from '../../src/queue/processors/semantic-revision-judge-job';
+  import { Trial4TrainingCandidateStore } from '../../src/persona/trial4-training-candidate-store';
+  import { Trial4BenchmarkResultStore } from '../../src/persona/trial4-benchmark-result-store';
+  import { computeReviewStats } from '../../src/persona/trial4-review-state';
+  import { computeTrial4BenchmarkStats } from '../../src/persona/trial4-benchmark-stats';
+  import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
+  import type { Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
   import type { JobPriority } from '@spec/protocol/job';
   import type { StorageClass } from '@spec/schema/storage-classes';
   import type { ExpressionSheet } from '@spec/schema/expression-sheet';
@@ -91,6 +97,12 @@
   const semanticDeltaExtractionReceiptStore = new SemanticDeltaExtractionReceiptStore(storage);
   const semanticDeltaExtractorConfigStore = new SemanticDeltaExtractorConfigStore();
   const semanticRevisionJudgeConfigStore = new SemanticRevisionJudgeConfigStore();
+  // Only enough Trial 4 read access for the popup's compact status summary
+  // — the full review/benchmark workflows live in the Dashboard tab now
+  // (docs/decisions/0017's Dashboard addendum). No Trial 4 write handlers
+  // exist in this file anymore.
+  const trial4TrainingCandidateStore = new Trial4TrainingCandidateStore(storage);
+  const trial4BenchmarkResultStore = new Trial4BenchmarkResultStore(storage);
 
   let counts: Record<JobPriority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   let usage: Record<StorageClass, number> = { CANONICAL: 0, DERIVED: 0, CACHE: 0, RAW: 0 };
@@ -111,6 +123,10 @@
   let semanticDeltaReceipts: SemanticDeltaExtractionReceipt[] = [];
   let semanticDeltaExtractorConfig: SemanticDeltaExtractorConfig = { enabled: false };
   let semanticRevisionJudgeConfig: SemanticRevisionJudgeConfig = { enabled: false };
+  let trial4TrainingCandidates: Trial4TrainingCandidate[] = [];
+  let trial4BenchmarkResults: Trial4BenchmarkResult[] = [];
+  $: trial4ReviewStats = computeReviewStats(trial4TrainingCandidates);
+  $: trial4BenchmarkStats = computeTrial4BenchmarkStats(trial4BenchmarkResults);
   // Same pure gate PersonaInterpreterService.interpret() itself checks
   // before ever calling the provider — computed here so the panel can show
   // *before* the user clicks "Interpret" whether this run will make any
@@ -142,6 +158,8 @@
     semanticDeltaReceipts = await semanticDeltaExtractionReceiptStore.list();
     semanticDeltaExtractorConfig = await semanticDeltaExtractorConfigStore.get();
     semanticRevisionJudgeConfig = await semanticRevisionJudgeConfigStore.get();
+    trial4TrainingCandidates = await trial4TrainingCandidateStore.list();
+    trial4BenchmarkResults = await trial4BenchmarkResultStore.list();
   }
 
   async function addSample(event: CustomEvent<string>) {
@@ -204,6 +222,17 @@
   async function saveSemanticRevisionJudgeConfig(event: CustomEvent<SemanticRevisionJudgeConfig>) {
     await semanticRevisionJudgeConfigStore.set(event.detail);
     await refresh();
+  }
+
+  // Trial 4 (docs/decisions/0017): the popup only reads enough state for
+  // the compact status summary below — all review/benchmark actions
+  // (import, decide, run, grade, reveal, configure) live in the Dashboard
+  // tab now, which owns its own full set of handlers against the same
+  // shared storage. Opening it needs no "tabs" permission — chrome.tabs.create
+  // with an extension-owned URL works without it (only reading another
+  // tab's url/title/favIconUrl requires the permission).
+  function openDashboard() {
+    chrome.tabs.create({ url: chrome.runtime.getURL('/dashboard.html') });
   }
 
   async function saveSemanticDeltaExtractorConfig(event: CustomEvent<SemanticDeltaExtractorConfig>) {
@@ -275,6 +304,17 @@
     on:saveConfig={saveSemanticDeltaExtractorConfig}
     on:saveJudgeConfig={saveSemanticRevisionJudgeConfig}
   />
+  <section class="trial4-summary">
+    <h2>Trial 4 (human-filtered specialization)</h2>
+    <p class="status">
+      {trial4ReviewStats.reviewed} / {trial4ReviewStats.total} reviewed ·
+      {trial4ReviewStats.includedInTraining} included · {trial4ReviewStats.excluded} excluded
+      {#if trial4BenchmarkStats.judgedResultCount > 0}
+        · {trial4BenchmarkStats.judgedResultCount} benchmark case(s) graded
+      {/if}
+    </p>
+    <button on:click={openDashboard}>Open HDNA Dashboard</button>
+  </section>
   <VectorIndex
     {embeddingCount}
     extractorId={embeddingProvider.extractorId}
@@ -306,5 +346,23 @@
   h1 {
     font-size: 16px;
     margin: 0 0 8px;
+  }
+  .trial4-summary {
+    margin-bottom: 10px;
+  }
+  .trial4-summary h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #666;
+    margin: 0 0 4px;
+  }
+  .trial4-summary .status {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: #555;
+  }
+  .trial4-summary button {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 </style>

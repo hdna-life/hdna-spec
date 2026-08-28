@@ -6,6 +6,7 @@ import { RuntimeControls } from '../src/runtime/controls';
 import { RuntimeStatusStore } from '../src/runtime/status';
 import { ForegroundTracker } from '../src/runtime/foreground-tracker';
 import { computeForegroundInactivity } from '../src/runtime/foreground-inactivity';
+import { DISPATCH_TRIGGER_MESSAGE_TYPE } from '../src/runtime/dispatch-trigger';
 import { EditEventStore } from '../src/persona/edit-event-store';
 import { EditMetricsStore } from '../src/persona/edit-metrics-store';
 import { EditProfileStore } from '../src/persona/edit-profile-store';
@@ -60,6 +61,15 @@ import {
   JUDGE_SEMANTIC_REVISIONS_JOB,
   createJudgeSemanticRevisionsProcessor,
 } from '../src/queue/processors/semantic-revision-judge-job';
+import { Trial4BenchmarkCaseStore } from '../src/persona/trial4-benchmark-case-store';
+import { Trial4BenchmarkResultStore } from '../src/persona/trial4-benchmark-result-store';
+import { Trial4BenchmarkConfigStore } from '../src/persona/trial4-benchmark-config-store';
+import { OpenRouterSemanticRevisionJudge } from '../src/persona/openrouter-semantic-revision-judge';
+import { Trial4BenchmarkService } from '../src/persona/trial4-benchmark-service';
+import {
+  RUN_TRIAL4_BENCHMARK_CASE_JOB,
+  createTrial4BenchmarkProcessor,
+} from '../src/queue/processors/trial4-benchmark-job';
 import { decide, decideMode } from '../src/governor/resource-governor';
 import { ALLOWED_PRIORITIES_BY_MODE } from '../src/governor/mode-priorities';
 import type { GovernorSignals } from '../src/governor/types';
@@ -149,6 +159,33 @@ export default defineBackground(() => {
     createJudgeSemanticRevisionsProcessor(semanticRevisionJudge),
   );
 
+  // Trial 4 (docs/decisions/0017) — human-filtered specialization +
+  // blind benchmark. This service does NOT do training-data generation
+  // or LoRA training itself (those are external, `training/phase5a/`
+  // Python scripts, per Operator Decision 8's scope-control rule) — it
+  // only orchestrates the blind three-way comparison: base Qwen3-0.6B and
+  // trained Qwen3-0.6B are both `LocalMlxSemanticRevisionJudge` instances
+  // (the same provider class, pointed at two different local MLX-LM
+  // server ports — one serving the base model, one serving it with
+  // `--adapter-path` loaded), and DeepSeek is the frontier reference
+  // reached via OpenRouter — NOT DeepSeek's own direct API (Test 1
+  // evaluation-stage addendum) — using the same `OpenRouterSemanticRevisionJudge`
+  // class Trial 3's OpenRouter transport already uses, reused as-is rather
+  // than a second networking implementation. Providers are constructed
+  // fresh from `Trial4BenchmarkConfigStore` on every run — never a stale
+  // endpoint/key.
+  const trial4Benchmark = new Trial4BenchmarkService(
+    (config) => ({
+      base: new LocalMlxSemanticRevisionJudge(config.baseModelUrl!, config.localModelId!),
+      trained: new LocalMlxSemanticRevisionJudge(config.trainedModelUrl!, config.localModelId!),
+      deepseek: new OpenRouterSemanticRevisionJudge(config.openRouterApiKey!, config.deepSeekModelId!),
+    }),
+    new Trial4BenchmarkCaseStore(storage),
+    new Trial4BenchmarkResultStore(storage),
+    new Trial4BenchmarkConfigStore(),
+  );
+  queue.registerProcessor(RUN_TRIAL4_BENCHMARK_CASE_JOB, createTrial4BenchmarkProcessor(trial4Benchmark));
+
   const controls = new RuntimeControls(storage);
   const runtimeStatus = new RuntimeStatusStore(storage);
   const foregroundTracker = new ForegroundTracker();
@@ -163,9 +200,14 @@ export default defineBackground(() => {
 
   chrome.alarms.create(DISPATCH_ALARM, { periodInMinutes: 0.5 });
 
-  chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== DISPATCH_ALARM) return;
-
+  // Extracted so both the periodic alarm AND an explicit
+  // DISPATCH_TRIGGER_MESSAGE_TYPE message (sent by a foreground surface
+  // right after enqueueing a job it wants to see start immediately — e.g.
+  // Trial 4's "Run next case" button) run the exact same tick. Nothing
+  // about the governor's mode/priority gating or the processing-paused
+  // control changes; a message trigger only removes the up-to-30s wait for
+  // the next scheduled alarm, it does not bypass any safety check below.
+  async function dispatchTick(): Promise<void> {
     const state = await controls.get();
     if (state.processingPaused) return;
 
@@ -235,5 +277,24 @@ export default defineBackground(() => {
       lastEvictionBytesFreed: lastEviction?.bytesFreed ?? previousStatus?.lastEvictionBytesFreed,
       foregroundInactiveSince,
     });
+  }
+
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== DISPATCH_ALARM) return;
+    await dispatchTick();
+  });
+
+  // Fires an immediate dispatchTick() on request — see DISPATCH_TRIGGER_MESSAGE_TYPE's
+  // docstring. `sendResponse` is called once the tick completes (success or
+  // error) purely so the sender's `chrome.runtime.sendMessage` promise
+  // resolves instead of timing out; the caller does not need to act on the
+  // response. Returning `true` keeps the message channel open for that
+  // async `sendResponse` (required by the extension messaging API).
+  chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+    if ((message as { type?: unknown })?.type !== DISPATCH_TRIGGER_MESSAGE_TYPE) return undefined;
+    dispatchTick()
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) }));
+    return true;
   });
 });

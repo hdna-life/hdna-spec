@@ -4,6 +4,7 @@ import type {
   SemanticRevisionJudgmentDraft,
 } from '@spec/protocol/semantic-revision-judge';
 import { SEMANTIC_REVISION_JUDGE_VERSION } from './semantic-revision-judge-identity';
+import { buildNarrowJudgePrompt, parseUntrustedJudgmentText } from './semantic-revision-judge-wire';
 
 /**
  * Thrown when the local MLX-LM server could not be reached at all (the
@@ -58,91 +59,20 @@ export class LocalMlxUnreachableError extends Error {}
  *   3 §11: "harmless transport formatting only"), not an attempt to
  *   interpret or repair the model's reasoning. The stripped block itself
  *   is never persisted, logged, or returned to the caller.
+ *
+ * The judge prompt and untrusted-JSON parsing live in
+ * `semantic-revision-judge-wire.ts` (`buildNarrowJudgePrompt`/
+ * `parseUntrustedJudgmentText`), shared with this class's own `base`/
+ * `trained` local-MLX role usage in Trial 4's blind benchmark. Trial 4's
+ * `deepseek` frontier-reference role uses `OpenRouterSemanticRevisionJudge`
+ * instead (reached via OpenRouter, not DeepSeek's own API — Test 1
+ * evaluation-stage addendum) — that provider keeps an independently
+ * maintained but semantically-equivalent v3 two-axis prompt/schema (see
+ * that file's own docstring for why it does not share this module).
+ * `<think>`-stripping and Markdown-fence tolerance live in this shared
+ * module, not duplicated here.
  */
 const CHAT_COMPLETIONS_PATH = '/v1/chat/completions';
-
-const THINK_BLOCK_PATTERN = /<think>[\s\S]*?<\/think>/i;
-const MARKDOWN_JSON_FENCE_PATTERN = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
-
-/** Strips one leading `<think>...</think>` reasoning block, if present. Never persisted/logged — see this file's top-level docstring. */
-function stripThinkingBlock(content: string): string {
-  return content.replace(THINK_BLOCK_PATTERN, '').trim();
-}
-
-/** Strips a single surrounding Markdown code fence (```` ```json ... ``` ````), if the entire trimmed content is wrapped in exactly one. Does not attempt to recover a fence embedded in surrounding prose. */
-function stripMarkdownFence(content: string): string {
-  const match = content.match(MARKDOWN_JSON_FENCE_PATTERN);
-  return match ? match[1] : content;
-}
-
-const VALID_VERDICTS = new Set([
-  'no_meaningful_change',
-  'meaning_added',
-  'meaning_removed',
-  'meaning_transformed',
-  'uncertain',
-]);
-
-/**
- * Structural validation only — identical acceptance criteria to
- * `openrouter-semantic-revision-judge.ts`'s `isValidJudgmentWireShape`.
- * Never repairs, guesses, or infers a missing/malformed field (Trial 3
- * §11): a response that fails this check is a judge failure, not
- * degraded evidence.
- */
-function isValidJudgmentWireShape(value: unknown): value is SemanticRevisionJudgmentDraft {
-  if (typeof value !== 'object' || value === null) return false;
-  const draft = value as Record<string, unknown>;
-  if (typeof draft.verdict !== 'string' || !VALID_VERDICTS.has(draft.verdict)) return false;
-  if (draft.description !== null && typeof draft.description !== 'string') return false;
-  if (typeof draft.confidence !== 'number') return false;
-  return true;
-}
-
-/**
- * Trial 3's narrow judge prompt (docs/decisions/0016's Trial 3 §8), sent
- * unchanged from the OpenRouter provider in spirit but restated here as a
- * plain literal (not shared code) since the two providers' wire contracts
- * differ (structured `response_format` vs. plain in-prompt JSON
- * instruction) — deliberately NOT made larger to compensate for
- * Qwen3-0.6B's smaller capacity (Trial 3 §8: "do not make the prompt
- * larger to compensate... we want to test the architecture, not hide
- * model weakness with a huge reasoning prompt").
- */
-function buildPrompt(input: SemanticRevisionJudgeInput): string {
-  return [
-    'You are judging one localized human text revision.\n\n',
-    `Operation: ${input.kind}\n`,
-    `Context before: "${input.beforeContext}"\n`,
-    `Original span: "${input.originalText}"\n`,
-    `Final span: "${input.finalText}"\n`,
-    `Context after: "${input.afterContext}"\n\n`,
-    'Decide whether this revision changes meaning in a directly observable ',
-    'way.\n\n',
-    'Do not infer personality, motivation, psychology, identity, or stable ',
-    'preferences. Do not discuss anything beyond this one localized ',
-    'revision — no other part of the text, no aggregation, no repeated ',
-    'patterns.\n\n',
-    'A textual change may preserve meaning. If meaning is essentially ',
-    'preserved, verdict is "no_meaningful_change" and description is ',
-    'null.\n\n',
-    'If meaning is added, removed, or transformed, verdict is ',
-    '"meaning_added", "meaning_removed", or "meaning_transformed", and ',
-    'description is one short sentence describing only that narrow ',
-    'semantic change, grounded only in the original span, the final span, ',
-    'and the given context.\n\n',
-    'If unsure, verdict is "uncertain" and description is null.\n\n',
-    'This applies regardless of language; reason about the underlying ',
-    'meaning shift itself, not language-specific wording, suffixes, or ',
-    'grammar.\n\n',
-    'Respond with EXACTLY one JSON object and nothing else — no ',
-    'explanation, no Markdown, no extra text before or after it. The JSON ',
-    'object must have exactly these three keys:\n',
-    '{"verdict": "<one of: no_meaningful_change, meaning_added, ',
-    'meaning_removed, meaning_transformed, uncertain>", "description": ',
-    '<string or null>, "confidence": <number between 0 and 1>}',
-  ].join('');
-}
 
 /**
  * Concrete `SemanticRevisionJudgeProvider` backed by a local MLX-LM HTTP
@@ -179,7 +109,7 @@ export class LocalMlxSemanticRevisionJudge implements SemanticRevisionJudgeProvi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: this.modelId,
-          messages: [{ role: 'user', content: buildPrompt(input) }],
+          messages: [{ role: 'user', content: buildNarrowJudgePrompt(input) }],
           temperature: 0,
         }),
       });
@@ -201,20 +131,6 @@ export class LocalMlxSemanticRevisionJudge implements SemanticRevisionJudgeProvi
       throw new Error('Local MLX response missing message content');
     }
 
-    const withoutThinking = stripThinkingBlock(content);
-    const jsonText = stripMarkdownFence(withoutThinking);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      throw new Error('Local MLX response content is not valid JSON');
-    }
-
-    if (!isValidJudgmentWireShape(parsed)) {
-      throw new Error('Local MLX response did not match the expected semantic revision judgment schema');
-    }
-
-    return parsed;
+    return parseUntrustedJudgmentText(content);
   }
 }

@@ -4,6 +4,7 @@ import type {
   SemanticRevisionJudgmentDraft,
 } from '@spec/protocol/semantic-revision-judge';
 import { SEMANTIC_REVISION_JUDGE_VERSION } from './semantic-revision-judge-identity';
+import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from './behavior-dimension';
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -29,10 +30,27 @@ const JUDGMENT_JSON_SCHEMA = {
       type: 'string',
       enum: ['no_meaningful_change', 'meaning_added', 'meaning_removed', 'meaning_transformed', 'uncertain'],
     },
+    // Test 1 addendum (docs/decisions/0017) — the orthogonal observable-
+    // behavior axis. Strict structured outputs require every nested object
+    // to also declare `additionalProperties: false` and list every one of
+    // its own properties in its own `required` array (the same rule that
+    // already governs the top-level schema below).
+    dimensions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          dimension: { type: 'string', enum: BEHAVIOR_DIMENSIONS },
+          direction: { type: 'string', enum: BEHAVIOR_DIRECTIONS },
+        },
+        required: ['dimension', 'direction'],
+        additionalProperties: false,
+      },
+    },
     description: { type: ['string', 'null'] },
     confidence: { type: 'number' },
   },
-  required: ['verdict', 'description', 'confidence'],
+  required: ['verdict', 'dimensions', 'description', 'confidence'],
   additionalProperties: false,
 } as const;
 
@@ -54,24 +72,41 @@ function buildPrompt(input: SemanticRevisionJudgeInput): string {
     `Original span: "${input.originalText}"\n`,
     `Final span: "${input.finalText}"\n`,
     `Context after: "${input.afterContext}"\n\n`,
-    'Decide whether this revision changes meaning in a directly observable ',
-    'way.\n\n',
+    'There are TWO SEPARATE questions to answer.\n\n',
+    '(1) SEMANTIC/PRACTICAL VERDICT — did this revision change the ',
+    'underlying proposition or practical meaning, in a directly ',
+    'observable way?\n\n',
     'Do not infer personality, motivation, psychology, identity, or stable ',
     'preferences. Do not discuss anything beyond this one localized ',
     'revision — no other part of the text, no aggregation, no repeated ',
     'patterns.\n\n',
-    'A textual change may preserve meaning. If meaning is essentially ',
-    'preserved, return verdict "no_meaningful_change" and description ',
-    'null.\n\n',
+    'A textual change may preserve meaning. If the proposition/practical ',
+    'meaning is essentially preserved, return verdict "no_meaningful_change".\n\n',
     'If meaning is added, removed, or transformed, return the matching ',
     'verdict ("meaning_added", "meaning_removed", or ',
     '"meaning_transformed") and describe only that narrow semantic change ',
     'in "description" — one short sentence, grounded only in the original ',
-    'span, the final span, and the given context.\n\n',
+    'span, the final span, and the given context. Otherwise description is ',
+    'null.\n\n',
     'If unsure, return verdict "uncertain" and description null.\n\n',
+    '(2) OBSERVABLE BEHAVIORAL DIMENSIONS — separately from the verdict ',
+    'above, did the EXPRESSED wording change along any of these ',
+    'dimensions, regardless of whether the proposition itself changed? A ',
+    'change here does NOT require a semantic verdict other than ',
+    '"no_meaningful_change" — many genuine dimension changes happen while ',
+    'the underlying proposition stays exactly the same.\n\n',
+    `Allowed dimensions: ${BEHAVIOR_DIMENSIONS.join(', ')}.\n`,
+    `Allowed directions: ${BEHAVIOR_DIRECTIONS.join(', ')}.\n\n`,
+    'Only describe DIRECTLY OBSERVABLE changes in expressed wording/stance ',
+    '— never infer the human\'s actual internal emotion, mood, or ',
+    'psychological state.\n\n',
+    'dimensions is an array of {"dimension": ..., "direction": ...} pairs, ',
+    'possibly empty (meaning "no observable behavioral shift"). Never ',
+    'include the same dimension twice. If verdict is "uncertain", ',
+    'dimensions must be an empty array.\n\n',
     'This applies regardless of language; reason about the underlying ',
-    'meaning shift itself, not language-specific wording, suffixes, or ',
-    'grammar.',
+    'meaning/behavior shift itself, not language-specific wording, ',
+    'suffixes, or grammar.',
   ].join('');
 }
 
@@ -88,6 +123,8 @@ function isValidJudgmentWireShape(value: unknown): value is SemanticRevisionJudg
   if (typeof draft.verdict !== 'string' || !validVerdicts.has(draft.verdict)) return false;
   if (draft.description !== null && typeof draft.description !== 'string') return false;
   if (typeof draft.confidence !== 'number') return false;
+  if (!isValidDimensionsArray(draft.dimensions)) return false;
+  if (draft.verdict === 'uncertain' && (draft.dimensions as unknown[]).length > 0) return false;
   return true;
 }
 

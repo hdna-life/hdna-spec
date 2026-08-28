@@ -30,7 +30,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
 
   describe('request construction', () => {
     it('POSTs to {baseUrl}/v1/chat/completions', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
       await judge.judge(input);
@@ -41,7 +41,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
     });
 
     it('sends the exact configured model id, never a hardcoded/stronger fallback', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
       await judge.judge(input);
@@ -54,7 +54,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
     });
 
     it('sends no Authorization header at all — no API key exposed to localhost', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
       await judge.judge(input);
@@ -65,7 +65,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
     });
 
     it('does not send a response_format field — the verified local server contract does not support one', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
       await judge.judge(input);
@@ -75,8 +75,8 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       expect(body).not.toHaveProperty('response_format');
     });
 
-    it('instructs the model in-prompt to return exactly one JSON object with the three expected keys', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+    it('instructs the model in-prompt to return exactly one JSON object with all four v3 keys — verdict, dimensions, description, confidence (never the old three-key Trial 3 shape)', async () => {
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
 
       await judge.judge(input);
@@ -85,8 +85,10 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       const body = JSON.parse(init.body);
       const prompt = body.messages[0].content as string;
       expect(prompt).toContain('"verdict"');
+      expect(prompt).toContain('"dimensions"');
       expect(prompt).toContain('"description"');
       expect(prompt).toContain('"confidence"');
+      expect(prompt).toMatch(/exactly these four keys/i);
     });
 
     it('uses the default fetch.bind(globalThis) binding when no fetchImpl is supplied', async () => {
@@ -99,7 +101,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
           status: 200,
           statusText: 'OK',
           json: async () => ({
-            choices: [{ message: { content: JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }) } }],
+            choices: [{ message: { content: JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }) } }],
           }),
         });
       }
@@ -111,10 +113,11 @@ describe('LocalMlxSemanticRevisionJudge', () => {
 
   describe('valid judgment parsing', () => {
     it('parses a valid no_meaningful_change response', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.95 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.95 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).resolves.toEqual({
         verdict: 'no_meaningful_change',
+        dimensions: [],
         description: null,
         confidence: 0.95,
       });
@@ -122,39 +125,39 @@ describe('LocalMlxSemanticRevisionJudge', () => {
 
     it('parses a valid meaning_transformed response', async () => {
       const fetchImpl = fakeFetchReturning(
-        JSON.stringify({ verdict: 'meaning_transformed', description: 'Shifted specificity.', confidence: 0.6 }),
+        JSON.stringify({ verdict: 'meaning_transformed', dimensions: [], description: 'Shifted specificity.', confidence: 0.6 }),
       );
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).resolves.toMatchObject({ verdict: 'meaning_transformed' });
     });
 
     it('parses a valid uncertain response', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'uncertain', description: null, confidence: 0.3 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'uncertain', dimensions: [], description: null, confidence: 0.3 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).resolves.toMatchObject({ verdict: 'uncertain' });
     });
 
     it('tolerates surrounding whitespace around the JSON', async () => {
       const fetchImpl = fakeFetchReturning(
-        `\n\n  ${JSON.stringify({ verdict: 'meaning_added', description: 'x', confidence: 0.5 })}  \n`,
+        `\n\n  ${JSON.stringify({ verdict: 'meaning_added', dimensions: [], description: 'x', confidence: 0.5 })}  \n`,
       );
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).resolves.toMatchObject({ verdict: 'meaning_added' });
     });
 
     it('tolerates a single surrounding ```json Markdown fence', async () => {
-      const raw = JSON.stringify({ verdict: 'meaning_removed', description: 'x', confidence: 0.5 });
+      const raw = JSON.stringify({ verdict: 'meaning_removed', dimensions: [], description: 'x', confidence: 0.5 });
       const fetchImpl = fakeFetchReturning('```json\n' + raw + '\n```');
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).resolves.toMatchObject({ verdict: 'meaning_removed' });
     });
 
     it('strips a well-formed <think>...</think> block before parsing, and does not persist/return it', async () => {
-      const raw = JSON.stringify({ verdict: 'meaning_transformed', description: 'x', confidence: 0.5 });
+      const raw = JSON.stringify({ verdict: 'meaning_transformed', dimensions: [], description: 'x', confidence: 0.5 });
       const fetchImpl = fakeFetchReturning(`<think>reasoning about the revision at length</think>${raw}`);
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       const result = await judge.judge(input);
-      expect(result).toEqual({ verdict: 'meaning_transformed', description: 'x', confidence: 0.5 });
+      expect(result).toEqual({ verdict: 'meaning_transformed', dimensions: [], description: 'x', confidence: 0.5 });
       expect(JSON.stringify(result)).not.toContain('reasoning about the revision');
     });
   });
@@ -167,26 +170,26 @@ describe('LocalMlxSemanticRevisionJudge', () => {
     });
 
     it('throws on an unrecognized verdict value', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'trait_inferred', description: 'x', confidence: 0.5 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'trait_inferred', dimensions: [], description: 'x', confidence: 0.5 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
     });
 
     it('throws on an invalid (non-numeric) confidence rather than inventing one', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'uncertain', description: null, confidence: 'high' }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'uncertain', dimensions: [], description: null, confidence: 'high' }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
     });
 
     it('throws when description is wrong-typed (not string, not null)', async () => {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'meaning_added', description: 42, confidence: 0.5 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'meaning_added', dimensions: [], description: 42, confidence: 0.5 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
     });
 
     it('throws when the model returns prose plus JSON rather than exactly one JSON object (not silently extracted)', async () => {
       const fetchImpl = fakeFetchReturning(
-        `Sure, here is my answer: ${JSON.stringify({ verdict: 'meaning_added', description: 'x', confidence: 0.5 })}`,
+        `Sure, here is my answer: ${JSON.stringify({ verdict: 'meaning_added', dimensions: [], description: 'x', confidence: 0.5 })}`,
       );
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).rejects.toThrow(/not valid JSON/);
@@ -238,6 +241,39 @@ describe('LocalMlxSemanticRevisionJudge', () => {
     });
   });
 
+  describe('dimensions (Test 1 / v3 addendum, docs/decisions/0017) — via the shared wire module', () => {
+    it('parses a judgment carrying a non-empty dimensions array end-to-end', async () => {
+      const fetchImpl = fakeFetchReturning(
+        JSON.stringify({
+          verdict: 'no_meaningful_change',
+          dimensions: [{ dimension: 'certainty', direction: 'decreased' }],
+          description: null,
+          confidence: 0.8,
+        }),
+      );
+      const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
+      await expect(judge.judge(input)).resolves.toMatchObject({
+        dimensions: [{ dimension: 'certainty', direction: 'decreased' }],
+      });
+    });
+
+    it('rejects a response with a duplicate dimension end-to-end', async () => {
+      const fetchImpl = fakeFetchReturning(
+        JSON.stringify({
+          verdict: 'meaning_transformed',
+          dimensions: [
+            { dimension: 'certainty', direction: 'increased' },
+            { dimension: 'certainty', direction: 'decreased' },
+          ],
+          description: 'x',
+          confidence: 0.5,
+        }),
+      );
+      const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
+      await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
+    });
+  });
+
   describe('provider identity', () => {
     it('providerId is local-mlx/<shared Trial 3 version>, distinct from the OpenRouter transport', () => {
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B');
@@ -254,7 +290,7 @@ describe('LocalMlxSemanticRevisionJudge', () => {
 
   describe('prompt contract — narrow, unchanged in spirit from the OpenRouter transport', () => {
     async function capturedPromptContent(): Promise<string> {
-      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', description: null, confidence: 0.9 }));
+      const fetchImpl = fakeFetchReturning(JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }));
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await judge.judge(input);
       const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -262,9 +298,13 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       return body.messages[0].content as string;
     }
 
-    it('is short: not enlarged to compensate for a smaller model', async () => {
+    it('is compact: not enlarged to compensate for a smaller model, even after adding the second (dimensions) axis', async () => {
       const prompt = await capturedPromptContent();
-      expect(prompt.length).toBeLessThan(2200);
+      // Raised from 2200 to 3500 when Test 1's second axis (dimensions)
+      // was added — a real, necessary increase for a real second
+      // question, not model-weakness compensation. See the identical note
+      // in openrouter-semantic-revision-judge.test.ts.
+      expect(prompt.length).toBeLessThan(3500);
     });
 
     it('prohibits inferring personality/motivation/psychology/identity/stable preferences', async () => {

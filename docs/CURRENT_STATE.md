@@ -475,21 +475,33 @@ three scores are recorded as the official Phase 5A zero-shot tiny-model
 baseline for future comparison. Trial 3 is marked COMPLETE; **Phase 5A
 overall remains ITERATE**, not validated, not abandoned.
 
-**Trial 4 (planned — external, not implemented; docs/decisions/0016's
-"Trial 4" section) is the next research direction, documentation only:**
-distillation/specialization (large-model teacher → filtered/versioned
-training dataset → `Qwen3-0.6B` LoRA/SFT → held-out falsification →
-failure-driven iteration), targeting the exact same `Qwen3-0.6B` model
-Trial 3 measured (not a different/smaller model), so the effect of
-training can be isolated against the Trial 3 baseline. Held-out
-falsification-benchmark examples must never leak into training data;
-failure categories may only inform new teacher-generated examples. No
-training scripts, dataset generators/files, LoRA configs, model
-artifacts, teacher calls, evaluation-harness changes, new extraction
-architecture, new UI, or new extension runtime behavior exist in this
-repository for Trial 4 as of this writing.
+**Trial 4 (`docs/decisions/0017`) — human-filtered specialization + blind
+benchmark: INFRASTRUCTURE IMPLEMENTED, NO RUN YET.** Twelve explicit
+operator decisions are recorded in `docs/decisions/0017`, most notably:
+DeepSeek generates candidate training examples but is never the
+ground-truth authority (human accept/reject is); `Qwen3-0.6B` remains the
+sole student model, isolating the specialization effect against Trial 3's
+frozen baseline (52.9% / 51% / 14.9%); the three-way benchmark
+(untrained Qwen / trained Qwen / DeepSeek) is blind (A/B/C, randomized,
+revealed only after judging, reveal never mutates the recorded judgment);
+training/falsification separation is structural, not just a rule (the
+generation script has no code path that reads any benchmark file). What
+exists: a versioned task/lore contract
+(`training/phase5a/lore/task-contract.v1.md`); standalone Python scripts
+for DeepSeek candidate generation, dataset export/split, and an
+`mlx_lm.lora` training wrapper (`training/phase5a/`, verified against the
+installed `mlx-lm==0.29.1` CLI/data-format contract); new extension
+schemas/stores/provider/service (`DeepSeekSemanticRevisionJudge`,
+`Trial4BenchmarkService`, reusing Trial 3's exact
+`SemanticRevisionJudgeProvider` interface for all three benchmarked
+systems); and two new popup panels
+(`Trial4TrainingReviewPanel.svelte`/`Trial4BenchmarkPanel.svelte`) for
+Accept/Reject review and blind grading. **No dataset has been generated,
+no training run has happened, no adapter exists, and no benchmark case
+has been run** — this is exactly "the pipeline is ready," not a result.
+Phase 5A overall status is unaffected: still **ITERATE**.
 
-Sixteen operator decisions to date are recorded in `docs/decisions/`.
+Seventeen operator decisions to date are recorded in `docs/decisions/`.
 One decision (`0005`) is a scope boundary awaiting a future explicit operator
 call: whether/how to add content-script-based live capture. Future work, each
 `PLANNED` pending its own decision: a real neural embedding provider

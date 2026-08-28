@@ -47,6 +47,71 @@ export type SemanticChangeVerdict =
   | 'uncertain';
 
 /**
+ * Test 1's second, orthogonal output axis (docs/decisions/0017's
+ * "SEMANTIC/PRACTICAL vs. OBSERVABLE BEHAVIOR axes" addendum). Deliberately
+ * NOT a sixth `SemanticChangeVerdict` value — `verdict` answers "what
+ * happened to the proposition/practical meaning?"; a `BehaviorDimension`
+ * answers "how did the observable expression/stance change?" The two axes
+ * are independent: a `'no_meaningful_change'` verdict may carry one or
+ * more dimensions (a same-topic tone/stance shift), and
+ * `meaning_added`/`meaning_removed`/`meaning_transformed` may ALSO carry
+ * dimensions (a semantic change is very often accompanied by an expression
+ * change, e.g. "Maybe I'll come." -> "I will come." is both
+ * `meaning_transformed` AND `certainty: increased` + `commitment:
+ * increased`).
+ *
+ * A small, closed, versioned taxonomy for Test 1 — not a general ontology.
+ * Every dimension name is `expressed_*`/observable-textual-stance framed
+ * (never `emotion`, `mood`, or any hidden-psychology term) because the
+ * judge may only describe directly observable changes in EXPRESSED
+ * behavior, never infer the human's actual internal emotional/
+ * psychological state — see `training/phase5a/lore/task-contract.v3.md`
+ * for the full rationale and worked examples this taxonomy is grounded in.
+ */
+export type BehaviorDimension =
+  | 'expressed_affect_valence'
+  | 'expressed_affect_intensity'
+  | 'directness'
+  | 'politeness'
+  | 'formality'
+  | 'certainty'
+  | 'evidentiality'
+  | 'commitment'
+  | 'directive_force'
+  | 'conditionality'
+  | 'scope'
+  | 'specificity'
+  | 'rationale'
+  | 'factual_content'
+  | 'action_or_decision';
+
+/**
+ * Direction/change value for one `BehaviorDimensionChange`. Not every
+ * direction is a sensible pairing for every dimension (e.g.
+ * `expressed_affect_valence` pairs with `more_positive`/`more_negative`,
+ * not `increased`/`decreased`) — the sensible combinations are documented
+ * in `training/phase5a/lore/task-contract.v3.md`, not enforced here as a
+ * closed per-dimension mapping, to avoid building a rigid ontology
+ * platform for a first Test 1 pass.
+ */
+export type BehaviorDirection =
+  | 'increased'
+  | 'decreased'
+  | 'more_positive'
+  | 'more_negative'
+  | 'added'
+  | 'removed'
+  | 'narrowed'
+  | 'expanded'
+  | 'changed';
+
+/** One observed shift on one dimension. A judgment's `dimensions` array must never contain two entries with the same `dimension` (see `validateJudgmentDraft`/`extension/src/persona/semantic-revision-judge-wire.ts`). */
+export interface BehaviorDimensionChange {
+  dimension: BehaviorDimension;
+  direction: BehaviorDirection;
+}
+
+/**
  * A single narrow semantic judgment, before HDNA's deterministic admission
  * gate (`extension/src/persona/semantic-revision-admission.ts`) decides
  * whether it becomes persona evidence. `description` is `null` whenever no
@@ -56,10 +121,21 @@ export type SemanticChangeVerdict =
  * JSON Schema property, same wire-vs-domain discipline
  * `openrouter-semantic-delta-extractor.ts` already established for
  * `preferred`/`rejected` (docs/decisions/0016's "Post-implementation fix"
- * section) — reused here rather than reinvented.
+ * section) — reused here rather than reinvented. `description` is
+ * secondary to the structured `verdict`/`dimensions` pair (Test 1's
+ * addendum) — it is never used as training ground truth on its own; see
+ * `training/phase5a/dataset/split_dataset.py`.
+ *
+ * `dimensions` is always an array (never omitted/undefined) — empty is a
+ * valid, meaningful answer ("no observable behavioral shift"), not "not
+ * asked." Per Test 1's rules: `'uncertain'` MUST have `dimensions: []`
+ * (kept simple for this first pass — no uncertain-with-dimensions case
+ * yet); every other verdict MAY have zero, one, or several dimensions, and
+ * a dimension may never repeat within one judgment.
  */
 export interface SemanticRevisionJudgmentDraft {
   verdict: SemanticChangeVerdict;
+  dimensions: BehaviorDimensionChange[];
   description: string | null;
   confidence: number;
 }

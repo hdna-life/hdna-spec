@@ -166,6 +166,16 @@ describe('JobQueue stale-RUNNING reclaim', () => {
 
     await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1 });
   });
+
+  it('countsByPriority() reclaims a stale RUNNING job on its own, WITHOUT next() being called first — the deadlock this fixes: background.ts\'s dispatch tick early-returns based solely on countsByPriority()\'s total, so a job invisible to it (RUNNING, not PENDING) could never be reclaimed because next() was never reached', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    let clock = '2026-01-01T00:00:00.000Z';
+    const queue = new JobQueue(adapter, 1000, () => clock);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob(), 'CANONICAL');
+
+    clock = '2026-01-01T00:00:02.000Z'; // past the 1000ms stale timeout
+    await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1 });
+  });
 });
 
 describe('JobQueue.enqueueSingleton — rebuild-job coalescing (docs/decisions/0014)', () => {
@@ -241,6 +251,86 @@ describe('JobQueue.enqueueSingleton — rebuild-job coalescing (docs/decisions/0
     expect(t2.id).not.toBe(vectorIndex.id);
     await expect(queue.countsByPriority()).resolves.toMatchObject({ P3: 2 });
   });
+
+  it('reclaims a stale RUNNING job before checking "outstanding", instead of treating a dead job as outstanding forever — this is the deadlock a stuck Trial 4 benchmark run hit: every "Run next case" click kept returning the same dead job, and no new one was ever created', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    let clock = '2026-01-01T00:00:00.000Z';
+    const queue = new JobQueue(adapter, 1000, () => clock);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob({ type: 'run_trial4_benchmark_case' }), 'CANONICAL');
+
+    clock = '2026-01-01T00:00:02.000Z'; // past the 1000ms stale timeout
+    const retried = await queue.enqueueSingleton('run_trial4_benchmark_case', 'P1', {});
+
+    // The stale job was reclaimed to PENDING and is the one returned — not
+    // a second, duplicate job (enqueueSingleton's normal coalescing still
+    // applies once the reclaimed job is visible as outstanding-but-PENDING).
+    expect(retried.id).toBe('stuck-job');
+    expect(retried.status).toBe('PENDING');
+    const jobs = await adapter.query('jobs');
+    expect(jobs).toHaveLength(1);
+  });
+});
+
+describe('JobQueue.cancelOutstanding — manual operator unstick', () => {
+  it('marks an outstanding RUNNING job FAILED with the given reason, immediately, without waiting for the stale-lease timeout', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await adapter.put(JOB_STORE, 'stuck-job', stuckRunningJob({ type: 'run_trial4_benchmark_case' }), 'CANONICAL');
+
+    const affected = await queue.cancelOutstanding('run_trial4_benchmark_case', 'Manually reset by operator');
+    expect(affected).toBe(1);
+
+    const jobs = await adapter.query<Job>('jobs');
+    expect(jobs[0].status).toBe('FAILED');
+    expect(jobs[0].lastError).toBe('Manually reset by operator');
+    expect(jobs[0].startedAt).toBeUndefined();
+  });
+
+  it('marks an outstanding PENDING job FAILED too', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await queue.enqueue('run_trial4_benchmark_case', 'P1', {});
+
+    const affected = await queue.cancelOutstanding('run_trial4_benchmark_case', 'reset');
+    expect(affected).toBe(1);
+    const [job] = await queue.listByType('run_trial4_benchmark_case');
+    expect(job.status).toBe('FAILED');
+  });
+
+  it('unblocks enqueueSingleton immediately after cancelling — a fresh job can be created without waiting for reclaim', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    const first = await adapter.put(
+      JOB_STORE,
+      'stuck-job',
+      stuckRunningJob({ type: 'run_trial4_benchmark_case' }),
+      'CANONICAL',
+    );
+    void first;
+
+    await queue.cancelOutstanding('run_trial4_benchmark_case', 'reset');
+    const fresh = await queue.enqueueSingleton('run_trial4_benchmark_case', 'P1', {});
+
+    expect(fresh.id).not.toBe('stuck-job');
+    expect(fresh.status).toBe('PENDING');
+  });
+
+  it('is a no-op (returns 0) when nothing of that type is outstanding', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await expect(queue.cancelOutstanding('run_trial4_benchmark_case', 'reset')).resolves.toBe(0);
+  });
+
+  it('does not touch a different job type', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await queue.enqueue('other_type', 'P1', {});
+
+    await queue.cancelOutstanding('run_trial4_benchmark_case', 'reset');
+
+    const [other] = await queue.listByType('other_type');
+    expect(other.status).toBe('PENDING');
+  });
 });
 
 describe('JobQueue priority-gated dispatch', () => {
@@ -277,5 +367,40 @@ describe('JobQueue priority-gated dispatch', () => {
     expect(job?.id).toBe(allowedJob.id);
 
     await expect(queue.countsByPriority()).resolves.toMatchObject({ P0: 1, P2: 0 });
+  });
+});
+
+describe('JobQueue.listByType — surfacing a job\'s real status/lastError to a UI', () => {
+  it('returns only jobs of the requested type, oldest-to-newest by sequence', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('noop', noopProcessor);
+    await queue.enqueue('other_type', 'P0', {});
+    const first = await queue.enqueue('noop', 'P0', { n: 1 });
+    const second = await queue.enqueue('noop', 'P0', { n: 2 });
+
+    const jobs = await queue.listByType('noop');
+    expect(jobs.map((j) => j.id)).toEqual([first.id, second.id]);
+  });
+
+  it('returns an empty array when no job of that type has ever been enqueued', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    await expect(queue.listByType('never_enqueued')).resolves.toEqual([]);
+  });
+
+  it('reflects a FAILED job with its lastError — a processor throwing before doing any work must remain visible, not silently swallowed', async () => {
+    const adapter = new IndexedDbStorageAdapter(`hdna-test-${Math.random()}`);
+    const queue = new JobQueue(adapter);
+    queue.registerProcessor('always_throws', async () => {
+      throw new Error('not enabled/configured');
+    });
+    await queue.enqueue('always_throws', 'P1', {});
+
+    await queue.runNext();
+
+    const [job] = await queue.listByType('always_throws');
+    expect(job.status).toBe('FAILED');
+    expect(job.lastError).toBe('not enabled/configured');
   });
 });

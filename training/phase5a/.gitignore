@@ -1,0 +1,22 @@
+# Phase 5A Trial 4 generated data and model artifacts
+
+# Generated candidates and prepared training data
+dataset/generated/
+dataset/prepared/
+
+# Trained adapters and model weights
+adapters/
+*.safetensors
+*.npz
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Do NOT ignore:
+# - dataset/sample_candidate.json (format fixture)
+# - benchmark/sample_case.json (format fixture)
+# - lore/ (task contract and documentation)
+# - README.md, requirements.txt, *.py, *.sh (scripts and documentation)
