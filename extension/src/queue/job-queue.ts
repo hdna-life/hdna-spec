@@ -66,8 +66,18 @@ export class JobQueue {
    * fresh trigger after completion (or after a failure) always creates a
    * new job normally. Keyed by job `type` alone, generic across any job
    * type — not specific to any one rebuild job. See docs/decisions/0014.
+   *
+   * Reclaims stale RUNNING jobs FIRST (same lease check `next()` uses) —
+   * without this, a job whose processor never got to flip it to
+   * COMPLETE/FAILED (the MV3 service worker was terminated mid-`await`,
+   * which real Chrome does to long-running event handlers) stays
+   * "outstanding" forever: every future click of the button that calls
+   * this method would keep returning that same dead job, never creating a
+   * new one, and the operator would see the button silently do nothing —
+   * indistinguishable from a real deadlock, because it is one.
    */
   async enqueueSingleton<TPayload>(type: string, priority: JobPriority, payload: TPayload): Promise<Job<TPayload>> {
+    await this.reclaimStaleJobs();
     const jobs = await this.storage.query<Job>(JOB_STORE);
     const outstanding = jobs.find((j) => j.type === type && (j.status === 'PENDING' || j.status === 'RUNNING'));
     if (outstanding) return outstanding as Job<TPayload>;
@@ -109,7 +119,19 @@ export class JobQueue {
     return pending[0];
   }
 
+  /**
+   * Reclaims stale RUNNING jobs first — `background.ts`'s dispatch tick
+   * uses this count's total to decide whether there is anything to do at
+   * all, and early-returns without ever calling `next()`/`runNext()` when
+   * it's zero. A job stuck RUNNING past its lease (service worker killed
+   * mid-`await`) is invisible to a status filter that only counts PENDING,
+   * so without this reclaim call here, that dispatch tick's early-return
+   * would silently skip the ONE place that would otherwise reclaim it
+   * (`next()`) — permanently, since a zero-backlog tick never gets there.
+   * See `enqueueSingleton`'s docstring for the matching half of this fix.
+   */
   async countsByPriority(): Promise<Record<JobPriority, number>> {
+    await this.reclaimStaleJobs();
     const jobs = await this.storage.query<Job>(JOB_STORE);
     const counts = Object.fromEntries(JOB_PRIORITY_ORDER.map((p) => [p, 0])) as Record<JobPriority, number>;
     for (const job of jobs) {
@@ -130,6 +152,30 @@ export class JobQueue {
   async listByType(type: string): Promise<Job[]> {
     const jobs = await this.storage.query<Job>(JOB_STORE);
     return jobs.filter((j) => j.type === type).sort((a, b) => a.sequence - b.sequence);
+  }
+
+  /**
+   * Marks every currently outstanding (`PENDING` or `RUNNING`) job of
+   * `type` as `FAILED` with `lastError` set to `reason`, immediately —
+   * an explicit operator escape hatch for the case `reclaimStaleJobs`
+   * already fixes automatically but only after
+   * `staleRunningTimeoutMs` (5 minutes by default) has elapsed. Without
+   * this, an operator staring at a job legitimately stuck RUNNING (the
+   * service worker was killed mid-`await` — long local-model inference
+   * calls are exactly the kind of work that can outlive a single MV3
+   * event-handler execution window) has no way to unblock
+   * `enqueueSingleton` sooner than that timeout; every retry click keeps
+   * returning the same dead job. Returns the number of jobs affected.
+   * Does not touch `COMPLETE`/`FAILED` jobs — nothing to cancel there.
+   */
+  async cancelOutstanding(type: string, reason: string): Promise<number> {
+    const jobs = await this.storage.query<Job>(JOB_STORE);
+    const outstanding = jobs.filter((j) => j.type === type && (j.status === 'PENDING' || j.status === 'RUNNING'));
+    for (const job of outstanding) {
+      const cancelled: Job = { ...job, status: 'FAILED', lastError: reason, startedAt: undefined };
+      await this.storage.put(JOB_STORE, cancelled.id, cancelled, 'CANONICAL');
+    }
+    return outstanding.length;
   }
 
   /** Runs the next pending job (optionally restricted to `allowedPriorities`), if any, using its registered processor. Returns the job outcome, or undefined if there was nothing eligible. */

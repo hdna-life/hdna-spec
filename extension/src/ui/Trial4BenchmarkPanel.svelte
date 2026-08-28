@@ -38,6 +38,7 @@
     clearBenchmarkData: void;
     lockGroundTruth: { caseId: string; humanVerdict: SemanticChangeVerdict; humanDimensions: BehaviorDimensionChange[] };
     runNextCase: void;
+    resetStuckJob: void;
     submitJudgment: {
       resultId: string;
       acceptability: Record<Trial4BenchmarkLabel, { acceptable: boolean; rank: Trial4BenchmarkRank | null }>;
@@ -513,6 +514,15 @@
         — in progress, calling Base/Trained/DeepSeek now
       {/if}
     </p>
+    {#if lastJob.status === 'RUNNING'}
+      <p class="note">
+        If this has been RUNNING for more than a minute or two with no
+        result appearing, the background service worker likely died
+        mid-request (real Chrome behavior for long-running local-model
+        calls) — the job is stuck, not actually in progress.
+        <button on:click={() => dispatch('resetStuckJob')}>Reset stuck job</button>
+      </p>
+    {/if}
   {/if}
 
   {#if unjudged}

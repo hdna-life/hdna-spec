@@ -180,6 +180,20 @@
     await refresh();
   }
 
+  // Operator escape hatch for a job legitimately stuck RUNNING (the
+  // service worker was killed mid-`await` — long local-model inference is
+  // exactly the kind of work that can outlive one MV3 event-handler
+  // execution window). Without this, JobQueue.enqueueSingleton() keeps
+  // returning that same dead job on every click, and the automatic
+  // stale-RUNNING reclaim only kicks in after 5 minutes
+  // (DEFAULT_STALE_RUNNING_TIMEOUT_MS) — see JobQueue.cancelOutstanding's
+  // docstring. Marks it FAILED immediately so the next "Run next case"
+  // click creates a fresh job instead.
+  async function resetStuckTrial4BenchmarkJob() {
+    await queue.cancelOutstanding(RUN_TRIAL4_BENCHMARK_CASE_JOB, 'Manually reset by operator (stuck job)');
+    await refresh();
+  }
+
   const TRIAL4_LABELS: Trial4BenchmarkLabel[] = ['A', 'B', 'C'];
 
   async function submitTrial4Judgment(
@@ -299,6 +313,7 @@
         on:clearBenchmarkData={clearTrial4BenchmarkData}
         on:lockGroundTruth={lockGroundTruthCase}
         on:runNextCase={runTrial4BenchmarkCase}
+        on:resetStuckJob={resetStuckTrial4BenchmarkJob}
         on:submitJudgment={submitTrial4Judgment}
         on:reveal={revealTrial4Result}
         on:saveConfig={saveTrial4BenchmarkConfig}
