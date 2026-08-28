@@ -36,22 +36,23 @@ export interface Trial4RoleStats {
   /** Failed provider calls, counted separately from acceptability (a distinct failure mode — see Trial4BenchmarkService's role-level error handling). */
   errors: number;
 
-  // --- Objective accuracy against frozen held-out ground truth
-  // (Trial4BenchmarkCase.expectedVerdict/expectedDimensions), only ever
-  // computed from a case's OWN frozen fields — never from another
-  // system's response, and never shown to the operator before grading
-  // (docs/decisions/0016's Trial 3 addendum on this). Both null when no
-  // matching case in this run carried the corresponding frozen field —
-  // "no ground truth available yet," not "0% accuracy."
-  /** Fraction of ground-truth-bearing cases where this role's verdict exactly matched expectedVerdict. Null if verdictAccuracyCount is 0. */
+  // --- Objective accuracy against frozen, LOCKED held-out ground truth
+  // (Trial4BenchmarkCase.humanVerdict/humanDimensions, only counted when
+  // groundTruthLocked === true), only ever computed from a case's OWN
+  // frozen fields — never from another system's response, and never shown
+  // to the operator before grading. Both null when no matching locked
+  // case in this run exists — "no ground truth available yet," not "0%
+  // accuracy." This is Test 1's PRIMARY metric (5-way semantic verdict
+  // exact accuracy).
+  /** Fraction of locked-ground-truth cases where this role's verdict exactly matched humanVerdict. Null if verdictAccuracyCount is 0. */
   verdictAccuracy: number | null;
-  /** Denominator for verdictAccuracy: cases with expectedVerdict set AND a non-error response from this role. */
+  /** Denominator for verdictAccuracy: locked-ground-truth cases with a non-error response from this role. */
   verdictAccuracyCount: number;
-  /** Fraction of ground-truth-bearing cases where this role's dimension SET (dimension+direction pairs, order-independent) exactly matched expectedDimensions. Null if dimensionGroundTruthCount is 0. */
+  /** Fraction of locked-ground-truth cases where this role's dimension SET (dimension+direction pairs, order-independent) exactly matched humanDimensions. Null if dimensionGroundTruthCount is 0. */
   dimensionExactSetAccuracy: number | null;
-  /** Micro-averaged F1 over (dimension, direction) pairs across every ground-truth-bearing case. Null if dimensionGroundTruthCount is 0. */
+  /** Micro-averaged F1 over (dimension, direction) pairs across every locked-ground-truth case. Null if dimensionGroundTruthCount is 0. */
   dimensionMicroF1: number | null;
-  /** Denominator for both dimension metrics: cases with expectedDimensions set AND a non-error response from this role. */
+  /** Denominator for both dimension metrics: locked-ground-truth cases with a non-error response from this role. */
   dimensionGroundTruthCount: number;
 }
 
@@ -214,16 +215,18 @@ export function computeTrial4BenchmarkStats(
         }
       }
 
-      // Objective accuracy against frozen ground truth, when present.
-      if (benchmarkCase?.expectedVerdict !== undefined) {
+      // Objective accuracy against frozen, LOCKED ground truth only — an
+      // in-progress/unlocked draft on the case must never be scored
+      // against, matching the same "not committed, doesn't count" rule
+      // applied to humanAcceptable/humanRank above.
+      if (benchmarkCase?.groundTruthLocked) {
         roleStats.verdictAccuracyCount += 1;
-        if (response.verdict === benchmarkCase.expectedVerdict) acc.verdictCorrect += 1;
-      }
-      if (benchmarkCase?.expectedDimensions !== undefined) {
-        roleStats.dimensionGroundTruthCount += 1;
-        if (dimensionSetsEqual(response.dimensions, benchmarkCase.expectedDimensions)) acc.dimensionExactMatches += 1;
+        if (response.verdict === benchmarkCase.humanVerdict) acc.verdictCorrect += 1;
 
-        const expectedKeys = new Set(benchmarkCase.expectedDimensions.map(dimensionKey));
+        roleStats.dimensionGroundTruthCount += 1;
+        if (dimensionSetsEqual(response.dimensions, benchmarkCase.humanDimensions)) acc.dimensionExactMatches += 1;
+
+        const expectedKeys = new Set(benchmarkCase.humanDimensions.map(dimensionKey));
         const predictedKeys = new Set(response.dimensions.map(dimensionKey));
         for (const key of predictedKeys) {
           if (expectedKeys.has(key)) acc.dimensionTruePositives += 1;

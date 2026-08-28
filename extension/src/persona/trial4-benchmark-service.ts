@@ -6,10 +6,19 @@ import type {
   Trial4BenchmarkResult,
   Trial4BenchmarkRole,
 } from '@spec/schema/trial4-benchmark-result';
-import type { SemanticRevisionJudgeProvider } from '@spec/protocol/semantic-revision-judge';
+import type { BehaviorDimensionChange, SemanticChangeVerdict, SemanticRevisionJudgeProvider } from '@spec/protocol/semantic-revision-judge';
+import { isValidDimensionsArray } from './behavior-dimension';
 import type { Trial4BenchmarkCaseStore } from './trial4-benchmark-case-store';
 import type { Trial4BenchmarkResultStore } from './trial4-benchmark-result-store';
 import type { Trial4BenchmarkConfig, Trial4BenchmarkConfigStore } from './trial4-benchmark-config-store';
+
+const VALID_GROUND_TRUTH_VERDICTS = new Set([
+  'no_meaningful_change',
+  'meaning_added',
+  'meaning_removed',
+  'meaning_transformed',
+  'uncertain',
+]);
 
 /** Fixed evaluation order — randomization happens in which LABEL each role lands on, never in which roles are evaluated. */
 const ROLES: Trial4BenchmarkRole[] = ['base', 'trained', 'deepseek'];
@@ -66,9 +75,14 @@ export class Trial4BenchmarkService {
    * Runs the next not-yet-benchmarked held-out case (a case with no
    * existing `Trial4BenchmarkResult`, judged or not — a case is only ever
    * benchmarked once, matching the "do not repeatedly optimize against
-   * the held-out benchmark" evaluation-integrity rule). Returns `undefined`
-   * when every imported case already has a result — a valid, expected
-   * terminal state, not a failure.
+   * the held-out benchmark" evaluation-integrity rule). **Only considers
+   * cases with `groundTruthLocked === true`** (Test 1 evaluation-stage
+   * addendum) — a case whose ground truth the operator has not yet locked
+   * is skipped entirely; models must never run against, and the operator
+   * must never blind-grade, a case whose answer key could still change.
+   * Returns `undefined` when every locked case already has a result (or
+   * no case is locked yet) — a valid, expected terminal state, not a
+   * failure.
    */
   async runNextCase(): Promise<Trial4BenchmarkResult | undefined> {
     const config = await this.configStore.get();
@@ -77,7 +91,7 @@ export class Trial4BenchmarkService {
       !config.baseModelUrl ||
       !config.trainedModelUrl ||
       !config.localModelId ||
-      !config.deepSeekApiKey ||
+      !config.openRouterApiKey ||
       !config.deepSeekModelId
     ) {
       throw new Error('Trial 4 benchmark is not enabled/configured');
@@ -85,7 +99,9 @@ export class Trial4BenchmarkService {
 
     const [cases, results] = await Promise.all([this.caseStore.list(), this.resultStore.list()]);
     const benchmarkedCaseIds = new Set(results.map((result) => result.caseId));
-    const nextCase = cases.find((benchmarkCase) => !benchmarkedCaseIds.has(benchmarkCase.id));
+    const nextCase = cases.find(
+      (benchmarkCase) => benchmarkCase.groundTruthLocked && !benchmarkedCaseIds.has(benchmarkCase.id),
+    );
     if (!nextCase) return undefined;
 
     const providers = this.createProviders(config);
@@ -119,7 +135,7 @@ export class Trial4BenchmarkService {
   ): Promise<Trial4BenchmarkResponse> {
     try {
       // Deliberately destructures only the five SemanticRevisionJudgeInput
-      // fields — benchmarkCase.expectedVerdict/expectedDimensions (frozen
+      // fields — benchmarkCase.humanVerdict/humanDimensions (frozen
       // ground truth, Test 1 addendum) are never forwarded to a model,
       // enforced structurally here, not just by convention.
       const judgment = await provider.judge({
@@ -223,13 +239,62 @@ export class Trial4BenchmarkService {
   }
 
   /**
-   * Flips `revealed` only. Deliberately cannot be reached before
-   * `submitJudgment()` has any structural dependency on it, and touches no
-   * other field — see this class's docstring.
+   * Records the operator's frozen ground truth for one held-out case and
+   * locks it (Test 1 evaluation-stage addendum, docs/decisions/0017). Once
+   * locked, `humanVerdict`/`humanDimensions` cannot be changed through this
+   * method again — it throws if the case is already locked, same
+   * "committed, not editable" discipline as `submitJudgment`. Validates the
+   * draft with the same rules as a judge's own output (`isValidDimensionsArray`,
+   * `'uncertain'` verdict must carry `dimensions: []`) — a malformed ground
+   * truth is rejected here, never silently repaired. Locking a case makes
+   * it eligible for `runNextCase`; before locking, `runNextCase` will never
+   * select it.
+   */
+  async lockGroundTruth(
+    caseId: string,
+    humanVerdict: SemanticChangeVerdict,
+    humanDimensions: BehaviorDimensionChange[],
+  ): Promise<Trial4BenchmarkCase> {
+    const benchmarkCase = await this.caseStore.get(caseId);
+    if (!benchmarkCase) throw new Error(`No Trial 4 benchmark case with id "${caseId}"`);
+    if (benchmarkCase.groundTruthLocked) {
+      throw new Error('This Trial 4 benchmark case\'s ground truth is already locked');
+    }
+    if (!VALID_GROUND_TRUTH_VERDICTS.has(humanVerdict)) {
+      throw new Error(`Invalid ground truth verdict "${humanVerdict}"`);
+    }
+    if (!isValidDimensionsArray(humanDimensions)) {
+      throw new Error('Invalid ground truth dimensions array');
+    }
+    if (humanVerdict === 'uncertain' && humanDimensions.length > 0) {
+      throw new Error('An "uncertain" ground truth verdict must carry dimensions: []');
+    }
+
+    const updated: Trial4BenchmarkCase = {
+      ...benchmarkCase,
+      humanVerdict,
+      humanDimensions,
+      groundTruthLocked: true,
+      groundTruthLockedAt: this.now(),
+    };
+    await this.caseStore.put(updated);
+    return updated;
+  }
+
+  /**
+   * Flips `revealed` only. Deliberately cannot be reached before the blind
+   * evaluation has been committed — throws if the result is not yet
+   * `judged` (Test 1 evaluation-stage addendum: model identities must
+   * remain hidden until ground truth is locked, models have run, and the
+   * operator's acceptable/rank judgment for every label is committed).
+   * Never touches any other field — see this class's docstring.
    */
   async reveal(resultId: string): Promise<Trial4BenchmarkResult> {
     const result = await this.resultStore.get(resultId);
     if (!result) throw new Error(`No Trial 4 benchmark result with id "${resultId}"`);
+    if (!result.judged) {
+      throw new Error('Cannot reveal model identities before the blind evaluation is committed');
+    }
     const updated: Trial4BenchmarkResult = { ...result, revealed: true };
     await this.resultStore.put(updated);
     return updated;

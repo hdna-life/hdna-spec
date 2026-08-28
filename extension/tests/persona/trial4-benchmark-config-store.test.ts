@@ -32,23 +32,23 @@ describe('Trial4BenchmarkConfigStore', () => {
       baseModelUrl: 'http://127.0.0.1:8080',
       trainedModelUrl: 'http://127.0.0.1:8081',
       localModelId: 'Qwen/Qwen3-0.6B',
-      deepSeekApiKey: 'sk-test',
-      deepSeekModelId: 'deepseek-v4-flash',
+      openRouterApiKey: 'sk-or-test',
+      deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
     };
 
     await store.set(config);
     await expect(store.get()).resolves.toEqual(config);
   });
 
-  it('never has baseModelUrl/trainedModelUrl/localModelId/deepSeekApiKey/deepSeekModelId fields when disabled', async () => {
+  it('never has baseModelUrl/trainedModelUrl/localModelId/openRouterApiKey/deepSeekModelId fields when disabled', async () => {
     const store = new Trial4BenchmarkConfigStore();
     await store.set({
       enabled: true,
       baseModelUrl: 'http://127.0.0.1:8080',
       trainedModelUrl: 'http://127.0.0.1:8081',
       localModelId: 'Qwen/Qwen3-0.6B',
-      deepSeekApiKey: 'sk-test',
-      deepSeekModelId: 'deepseek-v4-flash',
+      openRouterApiKey: 'sk-or-test',
+      deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
     });
     await store.set({ enabled: false });
     const stored = await store.get();
@@ -56,7 +56,7 @@ describe('Trial4BenchmarkConfigStore', () => {
     expect(stored).not.toHaveProperty('baseModelUrl');
     expect(stored).not.toHaveProperty('trainedModelUrl');
     expect(stored).not.toHaveProperty('localModelId');
-    expect(stored).not.toHaveProperty('deepSeekApiKey');
+    expect(stored).not.toHaveProperty('openRouterApiKey');
     expect(stored).not.toHaveProperty('deepSeekModelId');
   });
 
@@ -67,8 +67,8 @@ describe('Trial4BenchmarkConfigStore', () => {
       baseModelUrl: 'http://127.0.0.1:8080',
       trainedModelUrl: 'http://127.0.0.1:8081',
       localModelId: 'Qwen/Qwen3-0.6B',
-      deepSeekApiKey: 'sk-test',
-      deepSeekModelId: 'deepseek-v4-flash',
+      openRouterApiKey: 'sk-or-test',
+      deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
     });
 
     const backgroundInstance = new Trial4BenchmarkConfigStore();
@@ -77,8 +77,8 @@ describe('Trial4BenchmarkConfigStore', () => {
       baseModelUrl: 'http://127.0.0.1:8080',
       trainedModelUrl: 'http://127.0.0.1:8081',
       localModelId: 'Qwen/Qwen3-0.6B',
-      deepSeekApiKey: 'sk-test',
-      deepSeekModelId: 'deepseek-v4-flash',
+      openRouterApiKey: 'sk-or-test',
+      deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
     });
   });
 
@@ -95,19 +95,19 @@ describe('Trial4BenchmarkConfigStore', () => {
     await expect(store.get()).resolves.toEqual({ enabled: false });
   });
 
-  it('stores deepSeekApiKey only in Trial 4 config, never conflated with OpenRouter api key', async () => {
+  it('stores openRouterApiKey only in Trial 4 config — the DeepSeek reference role is reached via OpenRouter, not a separate DeepSeek API key', async () => {
     const store = new Trial4BenchmarkConfigStore();
     await store.set({
       enabled: true,
       baseModelUrl: 'http://127.0.0.1:8080',
       trainedModelUrl: 'http://127.0.0.1:8081',
       localModelId: 'Qwen/Qwen3-0.6B',
-      deepSeekApiKey: 'sk-deepseek-secret',
-      deepSeekModelId: 'deepseek-v4-flash',
+      openRouterApiKey: 'sk-or-secret',
+      deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
     });
 
     const stored = await store.get();
-    expect(stored.deepSeekApiKey).toBe('sk-deepseek-secret');
-    expect(JSON.stringify(stored)).not.toMatch(/openrouter/i);
+    expect(stored.openRouterApiKey).toBe('sk-or-secret');
+    expect(JSON.stringify(stored)).not.toMatch(/deepseek.*apikey|deepseekapikey/i);
   });
 });

@@ -1095,3 +1095,190 @@ No real LoRA training run or real DeepSeek/OpenRouter API call was made
 under the v3 contract — the generator/split-pipeline changes are verified
 structurally and via the smoke test above, not against a real generated
 corpus.
+
+## Addendum: Test 1 evaluation-stage upgrade (frozen ground truth + lock, objective metrics, reveal gating, OpenRouter-only DeepSeek)
+
+**Status: DECIDED design change, NOT YET VALIDATED result.** LoRA training
+completed (183-example frozen human-reviewed training dataset,
+`training/phase5a/dataset/frozen/trial4-v3-human-183.json`); this addendum
+upgrades the EXISTING Trial 4 benchmark implementation so it correctly
+measures the frozen v3 contract ahead of a 10-case smoke benchmark. It
+reuses the existing benchmark architecture end-to-end (Dashboard Benchmark
+page, `Trial4BenchmarkCaseStore`/`Trial4BenchmarkResultStore`/
+`Trial4BenchmarkConfigStore`, `Trial4BenchmarkService`, the P3 queue
+processor, base/trained/DeepSeek three-way execution, per-case randomized
+A/B/C, local MLX server support) — no parallel benchmark system was
+created. No training dataset, LoRA adapter, hyperparameter, `split_dataset.py`
+prompt-building logic, or v3 taxonomy was touched.
+
+**Primary question and metric (restated for this stage):** can the
+LoRA-specialized Qwen3-0.6B become a substantially better v3 localized
+edit judge than the exact same untrained/base Qwen3-0.6B? Primary metric
+is 5-way semantic verdict exact accuracy (`no_meaningful_change`/
+`meaning_added`/`meaning_removed`/`meaning_transformed`/`uncertain`),
+reported per role plus the absolute trained-vs-base point improvement.
+Target: >=80% strong PASS, 60-79% promising, <60% FAIL/reconsider.
+DeepSeek is a frontier reference only — never a pass condition and never
+the arbiter of correctness.
+
+### 1. Frozen ground truth + lock (`spec/schema/trial4-benchmark-case.ts`)
+
+`Trial4BenchmarkCase` replaces the earlier, never-wired-to-a-UI optional
+`expectedVerdict`/`expectedDimensions` fields with `humanVerdict:
+SemanticChangeVerdict | null`, `humanDimensions: BehaviorDimensionChange[]`,
+`groundTruthLocked: boolean`, and `groundTruthLockedAt?: string` — the
+same canonical `SemanticChangeVerdict`/`BehaviorDimensionChange` types
+used everywhere else in the v3 contract, not a duplicated shape. A newly
+imported case starts unlocked (`humanVerdict: null`, `humanDimensions:
+[]`, `groundTruthLocked: false`) — `applyTrial4BenchmarkCaseDefaults`
+(`trial4-benchmark-case-store.ts`) fills this in on import so the import
+format never requires generated/proposed verdicts (`benchmark/sample_case.json`
+now carries only the bare `id`/`kind`/`originalText`/`finalText`/
+`beforeContext`/`afterContext`/`language` fields).
+
+The Dashboard's Benchmark page gained a "Ground truth" section
+(`Trial4BenchmarkPanel.svelte`) presenting each unlocked case's
+BEFORE/AFTER reconstruction, a 5-way verdict choice, and the SAME
+dimension-selection contract (closed 15-dimension/9-direction taxonomy,
+grouped checkboxes + direction dropdowns) Training Review's "NE DEĞİŞTİ?"
+section already uses — reusing `behavior-dimension.ts`'s
+`BEHAVIOR_DIMENSIONS`/`BEHAVIOR_DIRECTIONS` and `trial4-review-state.ts`'s
+`DIMENSION_GROUPS_TR` grouping structure (English-labeled locally, since
+this panel is English-only, but the same closed taxonomy and grouping).
+No proposed/model label is ever shown at this stage — the schema never
+carried one for benchmark cases. Nothing is saved until "LOCK GROUND
+TRUTH" is pressed. `Trial4BenchmarkService.lockGroundTruth(caseId,
+humanVerdict, humanDimensions)` validates (known verdict, well-formed
+duplicate-free dimensions via `isValidDimensionsArray`, `'uncertain'`
+must carry `dimensions: []`) and locks atomically; it throws if the case
+is already locked — the normal UI path cannot change locked ground truth
+again, matching the same "committed, not editable" discipline
+`submitJudgment` already established for blind judgments.
+
+### 2. Models cannot run before ground truth is locked
+
+`Trial4BenchmarkService.runNextCase()` now filters to `benchmarkCase =>
+benchmarkCase.groundTruthLocked && !benchmarkedCaseIds.has(benchmarkCase.id)`
+— an unlocked case is skipped entirely, never selected, never sent to any
+provider. This is the structural enforcement of "models must not run
+before groundTruthLocked=true," not a UI-only convention.
+
+### 3. v3 dimensions already persist end-to-end — verified, not re-implemented
+
+Inspection confirmed `Trial4BenchmarkResponse` (`spec/schema/trial4-benchmark-result.ts`)
+already carries `dimensions: BehaviorDimensionChange[]` from an earlier
+addendum, `Trial4BenchmarkService.judgeWithRole` already persists
+`judgment.dimensions` end-to-end, and `Trial4BenchmarkPanel.svelte`
+already displays a response's dimensions during blind grading. The task
+list item "dimensions are lost from Trial4BenchmarkResponse" did not
+apply to the current local branch state — left unchanged. Verified that
+`OpenRouterSemanticRevisionJudge` (see §6 below) and the shared
+`buildNarrowJudgePrompt` (used by both local-MLX roles) both implement
+the full v3 two-axis (`verdict` + `dimensions`) contract — no provider
+reaching Trial 4's benchmark uses a legacy verdict-only Trial 3 prompt.
+
+### 4. Objective metrics computed automatically from locked ground truth
+
+`computeTrial4BenchmarkStats` (`trial4-benchmark-stats.ts`) now scores a
+role's response against a case's ground truth only when
+`benchmarkCase.groundTruthLocked` is true (an unlocked case's fields,
+even if accidentally non-null, are never scored against — mirrors the
+existing "not committed, doesn't count" rule already applied to
+`humanAcceptable`/`humanRank`). No operator "mark as Correct/Partial/
+Wrong" step exists for this axis — `verdictAccuracy`/`verdictAccuracyCount`
+(Test 1's primary metric) and `dimensionExactSetAccuracy`/`dimensionMicroF1`/
+`dimensionGroundTruthCount` (secondary) are pure derived aggregates. An
+`'uncertain'` ground truth is evaluated on the verdict axis exactly like
+any other value, expecting `humanDimensions: []` per the v3 contract —
+no special-cased branch was needed since a locked `'uncertain'` case's
+`humanDimensions` is enforced empty at lock time.
+
+### 5. Human quality evaluation (Acceptable/Unacceptable + ranking) — already correct, verified not re-implemented
+
+Inspection confirmed `Trial4BenchmarkPanel.svelte`'s judging form already
+used Acceptable/Unacceptable + rank-1..3 (not Correct/Partial/Wrong, not
+a free-choice Best-A/B/C/Tie field) from an earlier addendum — this task
+list item also did not apply to the current local branch state, left
+unchanged. `submitJudgment` continues to enforce: unacceptable responses
+never carry a rank, acceptable responses form a dense unique 1..N
+permutation, zero-acceptable is a valid explicit outcome, `bestResponse`
+is derived (rank-1) rather than separately chosen.
+
+### 6. Reveal gating fixed — this WAS a real bug
+
+`Trial4BenchmarkPanel.svelte`'s "Reveal models" button previously
+appeared next to the judging form for `unjudged` (i.e., NOT-yet-judged)
+results — an operator could reveal identities before committing their
+blind acceptable/rank evaluation. Fixed at both the service and UI layer:
+`Trial4BenchmarkService.reveal()` now throws `'Cannot reveal model
+identities before the blind evaluation is committed'` if `!result.judged`;
+`entrypoints/dashboard/App.svelte`'s duplicated `revealTrial4Result`
+handler gained the matching guard. The reveal button was moved out of
+the judging form entirely into a new "Judged cases" history list
+(`Trial4BenchmarkPanel.svelte`) that only ever shows already-`judged`
+results — structurally, the button can no longer render before judging,
+not just be disabled. Reveal continues to touch only `revealed`; ground
+truth, acceptability, ranking, and objective metrics are all computed
+from fields reveal never writes.
+
+### 7. DeepSeek reference reached via OpenRouter, not DeepSeek's direct API
+
+`DeepSeekSemanticRevisionJudge` (direct `https://api.deepseek.com` calls)
+is deleted, along with its test file. Trial 4's `deepseek` role now
+constructs an `OpenRouterSemanticRevisionJudge` — the SAME class Trial 3's
+OpenRouter transport already uses, reused as-is rather than a second
+networking implementation, per explicit instruction to prefer reuse over
+a parallel client. `Trial4BenchmarkConfig.deepSeekApiKey` is renamed to
+`openRouterApiKey`; `deepSeekModelId` is kept (now documented as an
+OpenRouter model id, e.g. `deepseek/deepseek-chat-v3.1`, never baked in
+or defaulted — configurable in the benchmark settings form, which now
+reads "OpenRouter API key" / "DeepSeek/OpenRouter model id"). The key is
+sent only to `https://openrouter.ai/api/v1/chat/completions`
+(`OpenRouterSemanticRevisionJudge`'s existing, already-tested transport)
+and stored only in `Trial4BenchmarkConfigStore`'s existing
+`chrome.storage.local` mechanism — no new storage surface.
+
+### 8. Benchmark import — already correct, verified not re-implemented
+
+The import path (`Trial4BenchmarkPanel.svelte`'s file input,
+`App.svelte`'s `importTrial4BenchmarkCases`) already accepted a bare JSON
+array without requiring any generated/proposed field; the only change
+needed was routing raw imports through `applyTrial4BenchmarkCaseDefaults`
+so the new ground-truth-lock fields default correctly (see §1).
+
+### Migration / backward compatibility
+
+This is a local, in-progress experiment with no real benchmark corpus
+imported yet under the old shape — no formal data migration was written.
+`applyTrial4BenchmarkCaseDefaults` is defensive against a stale
+object still carrying the removed `expectedVerdict`/`expectedDimensions`
+fields (they are simply dropped, never silently treated as locked ground
+truth), and is exercised by a dedicated test. `Trial4BenchmarkResponse`'s
+legacy `grade`/`Trial4ResponseGrade` field (superseded before this
+addendum) is untouched.
+
+### Tests and validation
+
+New: `lockGroundTruth` (valid lock; reject re-lock; reject invalid
+verdict; reject uncertain-with-dimensions; reject duplicate dimension;
+accept `no_meaningful_change` with non-empty dimensions),
+`runNextCase` ground-truth lock gating (skips unlocked, runs only
+locked-and-unrun), `reveal` throws before `judged` / succeeds and never
+mutates after, `computeTrial4BenchmarkStats` locked-vs-unlocked ground
+truth (an unlocked case's stray `humanVerdict` must not be scored),
+`'uncertain'` ground truth evaluated normally, `applyTrial4BenchmarkCaseDefaults`
+(unlabeled import, preserves already-locked, ignores legacy
+`expectedVerdict`-shaped input), `Trial4BenchmarkConfigStore` rewritten
+for `openRouterApiKey`. **763/763 tests pass** (778 prior − 30 deleted
+DeepSeek-direct-API provider tests + ~15 net new), clean `tsc --noEmit`,
+clean `wxt build`.
+
+**Not done as part of automated validation:** no real browser click-through
+of the new Ground Truth entry UI or the Judged Cases reveal list (same
+limitation as every prior Dashboard addendum in this document — this
+session's tooling cannot drive a real unpacked-extension Chrome session).
+No real LoRA-trained-model inference call or real OpenRouter/DeepSeek API
+call was made against the upgraded contract — verified structurally and
+via the existing `OpenRouterSemanticRevisionJudge` test coverage, not a
+live smoke run. The upcoming 10-case smoke benchmark itself was not run
+as part of this change.

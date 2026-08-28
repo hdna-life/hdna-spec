@@ -27,10 +27,13 @@ const VALID_CONFIG = {
   baseModelUrl: 'http://127.0.0.1:8080',
   trainedModelUrl: 'http://127.0.0.1:8081',
   localModelId: 'Qwen/Qwen3-0.6B',
-  deepSeekApiKey: 'sk-deepseek-test',
-  deepSeekModelId: 'deepseek-v4-flash',
+  openRouterApiKey: 'sk-or-test',
+  deepSeekModelId: 'deepseek/deepseek-chat-v3.1',
 };
 
+// Locked by default — most tests in this file exercise running/judging/
+// revealing, not the lock gate itself (see the dedicated
+// "ground truth lock gating" describe block below for that).
 const CASE_1: Trial4BenchmarkCase = {
   id: 'case-1',
   kind: 'replaced',
@@ -38,6 +41,10 @@ const CASE_1: Trial4BenchmarkCase = {
   finalText: 'Y',
   beforeContext: 'A',
   afterContext: 'B',
+  humanVerdict: 'meaning_transformed',
+  humanDimensions: [],
+  groundTruthLocked: true,
+  groundTruthLockedAt: '2026-01-01T00:00:00.000Z',
 };
 
 function fakeProvider(judgeFn: () => Promise<SemanticRevisionJudgmentDraft>): SemanticRevisionJudgeProvider {
@@ -393,7 +400,7 @@ describe('Trial4BenchmarkService', () => {
       expect(revealed.labelMapping.C.humanAcceptable).toBe(false);
     });
 
-    it('can be called even before judging (revealed and judged are independent flags)', async () => {
+    it('throws when called before the blind evaluation is committed (judged=false) — Test 1 evaluation-stage addendum', async () => {
       const ctx = setup();
       await ctx.configStore.set(VALID_CONFIG);
       await ctx.caseStore.put(CASE_1);
@@ -403,9 +410,167 @@ describe('Trial4BenchmarkService', () => {
         deepseek: fakeProvider(ALWAYS_TRANSFORMED),
       });
       const result = await service.runNextCase();
-      const revealed = await service.reveal(result!.id);
+      await expect(service.reveal(result!.id)).rejects.toThrow(/before the blind evaluation is committed/);
+    });
+
+    it('succeeds once judged, and reveal never mutates the already-committed judgment fields', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      await ctx.caseStore.put(CASE_1);
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+      const result = await service.runNextCase();
+      const judged = await service.submitJudgment(
+        result!.id,
+        { A: { acceptable: true, rank: 1 }, B: { acceptable: false, rank: null }, C: { acceptable: false, rank: null } },
+        'before reveal',
+      );
+
+      const revealed = await service.reveal(judged.id);
+
       expect(revealed.revealed).toBe(true);
-      expect(revealed.judged).toBe(false);
+      expect(revealed.bestResponse).toBe(judged.bestResponse);
+      expect(revealed.note).toBe(judged.note);
+      expect(revealed.labelMapping).toEqual(judged.labelMapping);
+    });
+  });
+
+  describe('lockGroundTruth (Test 1 evaluation-stage addendum)', () => {
+    it('locks a case with a valid verdict + dimensions, setting groundTruthLockedAt', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      const locked = await service.lockGroundTruth('case-1', 'meaning_added', [
+        { dimension: 'certainty', direction: 'increased' },
+      ]);
+
+      expect(locked.groundTruthLocked).toBe(true);
+      expect(locked.humanVerdict).toBe('meaning_added');
+      expect(locked.humanDimensions).toEqual([{ dimension: 'certainty', direction: 'increased' }]);
+      expect(locked.groundTruthLockedAt).toBeTruthy();
+    });
+
+    it('throws when re-locking an already-locked case', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put(CASE_1); // already locked in the fixture
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      await expect(service.lockGroundTruth(CASE_1.id, 'meaning_added', [])).rejects.toThrow(/already locked/);
+    });
+
+    it('throws on an invalid verdict', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      // @ts-expect-error deliberately invalid for this test
+      await expect(service.lockGroundTruth(CASE_1.id, 'not_a_real_verdict', [])).rejects.toThrow(/Invalid ground truth verdict/);
+    });
+
+    it('throws when uncertain carries non-empty dimensions', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      await expect(
+        service.lockGroundTruth(CASE_1.id, 'uncertain', [{ dimension: 'certainty', direction: 'increased' }]),
+      ).rejects.toThrow(/must carry dimensions: \[\]/);
+    });
+
+    it('throws on a duplicate dimension', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      await expect(
+        service.lockGroundTruth(CASE_1.id, 'meaning_added', [
+          { dimension: 'certainty', direction: 'increased' },
+          { dimension: 'certainty', direction: 'decreased' },
+        ]),
+      ).rejects.toThrow(/Invalid ground truth dimensions/);
+    });
+
+    it('accepts no_meaningful_change with non-empty dimensions (expression-only shift)', async () => {
+      const ctx = setup();
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      const locked = await service.lockGroundTruth('case-1', 'no_meaningful_change', [
+        { dimension: 'certainty', direction: 'increased' },
+      ]);
+      expect(locked.groundTruthLocked).toBe(true);
+    });
+  });
+
+  describe('ground truth lock gating on runNextCase (models must not run before groundTruthLocked=true)', () => {
+    it('skips a case whose ground truth is not locked', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      await ctx.caseStore.put({ ...CASE_1, humanVerdict: null, humanDimensions: [], groundTruthLocked: false });
+      const base = fakeProvider(ALWAYS_TRANSFORMED);
+      const { service } = buildService(ctx, {
+        base,
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      const result = await service.runNextCase();
+      expect(result).toBeUndefined();
+      expect(base.judge).not.toHaveBeenCalled();
+    });
+
+    it('runs a locked case and skips an unlocked one that was imported alongside it', async () => {
+      const ctx = setup();
+      await ctx.configStore.set(VALID_CONFIG);
+      const unlocked: Trial4BenchmarkCase = {
+        ...CASE_1,
+        id: 'case-unlocked',
+        humanVerdict: null,
+        humanDimensions: [],
+        groundTruthLocked: false,
+      };
+      await ctx.caseStore.put(unlocked);
+      await ctx.caseStore.put(CASE_1); // locked
+      const { service } = buildService(ctx, {
+        base: fakeProvider(ALWAYS_TRANSFORMED),
+        trained: fakeProvider(ALWAYS_TRANSFORMED),
+        deepseek: fakeProvider(ALWAYS_TRANSFORMED),
+      });
+
+      const result = await service.runNextCase();
+      expect(result).toBeDefined();
+      expect(result!.caseId).toBe(CASE_1.id);
+
+      const second = await service.runNextCase();
+      expect(second).toBeUndefined(); // only unlocked case left
     });
   });
 

@@ -126,17 +126,19 @@ mlx_lm.server --model Qwen/Qwen3-0.6B --host 127.0.0.1 --port 8081 \
   --chat-template-args '{"enable_thinking": false}'
 ```
 
-Both servers will serve the narrow semantic-change judge prompt and return verdict/description/confidence.
+Both servers will serve the narrow semantic-change judge prompt and return verdict/dimensions/description/confidence.
 
 ### 6. Blind Benchmark (Browser Extension)
 
-The extension's Dashboard **Benchmark** page runs the held-out benchmark, using an acceptability-gate + ranking methodology (docs/decisions/0017's "acceptability gate + ranking" addendum — DeepSeek is a frontier reference/ceiling, not a success condition; the central question is whether trained Qwen materially improves over base Qwen and reaches acceptable local-judge quality):
+The extension's Dashboard **Benchmark** page runs the held-out benchmark (Test 1 evaluation-stage addendum, docs/decisions/0017 — DeepSeek is a frontier reference, not a success condition; Test 1's primary metric is 5-way semantic verdict exact accuracy, trained vs. base):
 
-1. Configure both server URLs (8080, 8081) in the extension
-2. Configure DeepSeek API credentials (for a reference model)
-3. Import the held-out benchmark cases (operator-supplied, separate from training data; optionally with frozen `expectedVerdict`/`expectedDimensions` for objective accuracy scoring)
-4. Run blind comparisons; for each response mark acceptable/unacceptable, then rank the acceptable ones (1 = best) — an unacceptable response is never ranked
-5. Analyze aggregate results: acceptability rate, unacceptable rate, rank-1 rate, mean rank among acceptable, trained-vs-base improvement, and (when frozen ground truth is present) verdict exact accuracy and dimension exact-set/micro-F1
+1. Configure both server URLs (8080, 8081) and an **OpenRouter API key** in the extension — DeepSeek's frontier-reference role is reached via OpenRouter (`https://openrouter.ai/api/v1/chat/completions`), never DeepSeek's own direct API; the model id (e.g. `deepseek/deepseek-chat-v3.1`) is configurable
+2. Import the held-out benchmark cases (operator-supplied, separate from training data). Cases do **not** need ground truth in the import file — see `benchmark/sample_case.json`
+3. For each imported case, enter its semantic verdict + observable-behavior dimensions under "Ground truth" and click **LOCK GROUND TRUTH**. Locked ground truth cannot be changed afterward through the normal UI, and only locked cases become eligible to run
+4. Click "Run next case" to run base/trained/DeepSeek against the next locked case
+5. Blind-grade the A/B/C responses: mark each acceptable/unacceptable, then rank the acceptable ones (1 = best) — an unacceptable response is never ranked. Submitting commits the judgment
+6. Only after a case is judged does "Reveal models" become available for it, under "Judged cases" — revealing never changes any recorded judgment
+7. Analyze aggregate results: semantic exact accuracy (primary metric, trained vs. base), dimension exact-set accuracy / micro-F1, acceptable rate, rank-1 count/rate, and provider error counts, per role
 
 **Evaluation-integrity requirement:** The held-out benchmark must remain completely separate from the training data pipeline. See `benchmark/sample_case.README.md` for the strict requirements.
 

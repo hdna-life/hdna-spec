@@ -2,8 +2,11 @@
   import { createEventDispatcher } from 'svelte';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
+  import type { BehaviorDimension, BehaviorDimensionChange, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
   import type { Trial4BenchmarkConfig } from '../persona/trial4-benchmark-config-store';
   import { computeTrial4BenchmarkStats } from '../persona/trial4-benchmark-stats';
+  import { BEHAVIOR_DIRECTIONS } from '../persona/behavior-dimension';
+  import { DIMENSION_GROUPS_TR } from '../persona/trial4-review-state';
 
   export let cases: Trial4BenchmarkCase[] = [];
   export let results: Trial4BenchmarkResult[] = [];
@@ -16,6 +19,7 @@
 
   const dispatch = createEventDispatcher<{
     importCases: Trial4BenchmarkCase[];
+    lockGroundTruth: { caseId: string; humanVerdict: SemanticChangeVerdict; humanDimensions: BehaviorDimensionChange[] };
     runNextCase: void;
     submitJudgment: {
       resultId: string;
@@ -28,14 +32,89 @@
 
   const LABELS: Trial4BenchmarkLabel[] = ['A', 'B', 'C'];
 
+  // Reuses the SAME closed dimension taxonomy + grouping structure Training
+  // Review's "NE DEĞİŞTİ?" section uses (behavior-dimension.ts,
+  // trial4-review-state.ts's DIMENSION_GROUPS_TR) — this panel is
+  // English-labeled throughout, so only the grouping (which dimensions
+  // belong together) is reused, not the Turkish label text.
+  const VERDICT_OPTIONS: { verdict: SemanticChangeVerdict; label: string }[] = [
+    { verdict: 'meaning_added', label: 'Meaning added' },
+    { verdict: 'meaning_removed', label: 'Meaning removed' },
+    { verdict: 'meaning_transformed', label: 'Meaning transformed' },
+    { verdict: 'no_meaningful_change', label: 'No meaningful change' },
+    { verdict: 'uncertain', label: 'Uncertain' },
+  ];
+  const DIMENSION_GROUP_LABELS_EN = ['Expression / tone', 'Stance', 'Meaning / practical content'];
+  const DIMENSION_LABELS_EN: Record<BehaviorDimension, string> = {
+    expressed_affect_valence: 'Expressed affect valence',
+    expressed_affect_intensity: 'Expressed affect intensity',
+    directness: 'Directness',
+    politeness: 'Politeness',
+    formality: 'Formality',
+    certainty: 'Certainty',
+    evidentiality: 'Evidentiality',
+    commitment: 'Commitment',
+    directive_force: 'Directive force',
+    conditionality: 'Conditionality',
+    scope: 'Scope',
+    specificity: 'Specificity',
+    rationale: 'Rationale',
+    factual_content: 'Factual content',
+    action_or_decision: 'Action / decision',
+  };
+
   // Test 1's central question is not "does trained Qwen beat DeepSeek" — it
   // is base->trained improvement and acceptable-local-judge quality under
   // the v3 contract (docs/decisions/0017's "acceptability gate + ranking"
-  // addendum). `cases` is passed through for frozen expectedVerdict/
-  // expectedDimensions ground-truth accuracy, when present.
+  // addendum). `cases` is passed through for frozen humanVerdict/
+  // humanDimensions ground-truth accuracy, when locked.
   $: stats = computeTrial4BenchmarkStats(results, cases);
   $: unjudged = results.find((r) => !r.judged);
-  $: remainingCases = cases.length - results.length;
+  $: benchmarkedCaseIds = new Set(results.map((r) => r.caseId));
+  $: unlockedCases = cases.filter((c) => !c.groundTruthLocked);
+  $: remainingCases = cases.filter((c) => c.groundTruthLocked && !benchmarkedCaseIds.has(c.id)).length;
+  $: judgedResults = results.filter((r) => r.judged).slice().reverse();
+
+  // --- Ground truth entry + lock (Test 1 evaluation-stage addendum). A
+  // model must never run against, and the operator must never blind-grade
+  // against, a case whose ground truth isn't locked yet — see
+  // Trial4BenchmarkService.runNextCase/lockGroundTruth. Nothing here is
+  // saved until "LOCK GROUND TRUTH" is pressed; DeepSeek/model proposed
+  // labels are never shown at this stage (this schema never carries any). ---
+  let gtIndex = 0;
+  $: groundTruthCase = unlockedCases[Math.min(gtIndex, Math.max(unlockedCases.length - 1, 0))];
+  let gtVerdict: SemanticChangeVerdict | null = null;
+  let gtDimensions: BehaviorDimensionChange[] = [];
+  let lastGtCaseId: string | undefined;
+  $: {
+    if (groundTruthCase?.id !== lastGtCaseId) {
+      lastGtCaseId = groundTruthCase?.id;
+      gtVerdict = null;
+      gtDimensions = [];
+    }
+  }
+
+  function selectGtVerdict(verdict: SemanticChangeVerdict) {
+    gtVerdict = verdict;
+    if (verdict === 'uncertain') gtDimensions = [];
+  }
+
+  function toggleGtDimension(dimension: BehaviorDimension) {
+    const has = gtDimensions.some((d) => d.dimension === dimension);
+    gtDimensions = has ? gtDimensions.filter((d) => d.dimension !== dimension) : [...gtDimensions, { dimension, direction: 'changed' as const }];
+  }
+
+  function setGtDimensionDirection(dimension: BehaviorDimension, direction: (typeof BEHAVIOR_DIRECTIONS)[number]) {
+    gtDimensions = gtDimensions.map((d) => (d.dimension === dimension ? { ...d, direction } : d));
+  }
+
+  $: canLockGroundTruth = gtVerdict !== null;
+
+  function lockGroundTruth() {
+    if (!groundTruthCase || gtVerdict === null) return;
+    dispatch('lockGroundTruth', { caseId: groundTruthCase.id, humanVerdict: gtVerdict, humanDimensions: gtDimensions });
+    if (gtIndex < unlockedCases.length - 1) gtIndex += 1;
+  }
 
   // --- settings form (same hydration-safety discipline as every other
   // experimental settings block in this codebase — see
@@ -43,19 +122,19 @@
   let baseModelUrlInput = '';
   let trainedModelUrlInput = '';
   let localModelIdInput = '';
-  let deepSeekApiKeyInput = '';
+  let openRouterApiKeyInput = '';
   let deepSeekModelIdInput = '';
   let enabledInput = false;
   let dirty = false;
 
-  $: hasDeepSeekApiKey = Boolean(config.deepSeekApiKey);
+  $: hasOpenRouterApiKey = Boolean(config.openRouterApiKey);
 
   $: {
     if (!dirty) {
       baseModelUrlInput = config.baseModelUrl ?? '';
       trainedModelUrlInput = config.trainedModelUrl ?? '';
       localModelIdInput = config.localModelId ?? '';
-      deepSeekApiKeyInput = '';
+      openRouterApiKeyInput = '';
       deepSeekModelIdInput = config.deepSeekModelId ?? '';
       enabledInput = config.enabled;
     }
@@ -71,10 +150,10 @@
       baseModelUrl: baseModelUrlInput.trim() || undefined,
       trainedModelUrl: trainedModelUrlInput.trim() || undefined,
       localModelId: localModelIdInput.trim() || undefined,
-      deepSeekApiKey: deepSeekApiKeyInput.trim() || config.deepSeekApiKey,
+      openRouterApiKey: openRouterApiKeyInput.trim() || config.openRouterApiKey,
       deepSeekModelId: deepSeekModelIdInput.trim() || undefined,
     });
-    deepSeekApiKeyInput = '';
+    openRouterApiKeyInput = '';
   }
 
   async function handleImportFile(event: Event) {
@@ -173,12 +252,76 @@
 
   <label class="file-label">
     Import held-out benchmark cases (JSON array — operator-supplied real
-    held-out corpus, never generator output)
+    held-out corpus, never generator output). Cases may be imported without
+    ground truth; label and lock them below before running models.
     <input type="file" accept="application/json" on:change={handleImportFile} />
   </label>
 
+  <h3>Ground truth ({unlockedCases.length} unlocked)</h3>
+  <p class="note">
+    Enter the semantic verdict and observable-behavior dimensions for this
+    case, then lock it. Once locked, ground truth cannot be changed through
+    this UI, and only locked cases become eligible to run.
+  </p>
+  {#if groundTruthCase}
+    <div class="result gt-block">
+      <p class="note">Case: {groundTruthCase.id} ({gtIndex + 1} / {unlockedCases.length})</p>
+      <div class="reconstruction">
+        <p><strong>BEFORE:</strong> {groundTruthCase.beforeContext} <span class="highlight">{groundTruthCase.originalText}</span> {groundTruthCase.afterContext}</p>
+        <p><strong>AFTER:</strong> {groundTruthCase.beforeContext} <span class="highlight">{groundTruthCase.finalText}</span> {groundTruthCase.afterContext}</p>
+      </div>
+
+      <p class="note"><strong>Semantic verdict:</strong></p>
+      <div class="grade-buttons">
+        {#each VERDICT_OPTIONS as { verdict, label }}
+          <label>
+            <input type="radio" name="gt-verdict" checked={gtVerdict === verdict} on:change={() => selectGtVerdict(verdict)} />
+            {label}
+          </label>
+        {/each}
+      </div>
+
+      <p class="note"><strong>Behavioral dimensions:</strong></p>
+      {#each DIMENSION_GROUPS_TR as group, groupIndex}
+        <div class="dimension-group">
+          <p class="dimension-group-label">{DIMENSION_GROUP_LABELS_EN[groupIndex]}</p>
+          <div class="dimension-grid">
+            {#each group.dimensions as dimension}
+              {@const active = gtDimensions.find((d) => d.dimension === dimension)}
+              <div class="dimension-item">
+                <label>
+                  <input type="checkbox" checked={Boolean(active)} on:change={() => toggleGtDimension(dimension)} />
+                  {DIMENSION_LABELS_EN[dimension]}
+                </label>
+                {#if active}
+                  <select
+                    value={active.direction}
+                    on:change={(e) => setGtDimensionDirection(dimension, (e.target as HTMLSelectElement).value as typeof BEHAVIOR_DIRECTIONS[number])}
+                  >
+                    {#each BEHAVIOR_DIRECTIONS as direction}
+                      <option value={direction}>{direction}</option>
+                    {/each}
+                  </select>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/each}
+
+      <div class="actions">
+        <button on:click={lockGroundTruth} disabled={!canLockGroundTruth}>LOCK GROUND TRUTH</button>
+        {#if unlockedCases.length > 1}
+          <button on:click={() => (gtIndex = (gtIndex + 1) % unlockedCases.length)}>Skip to next unlocked case</button>
+        {/if}
+      </div>
+    </div>
+  {:else}
+    <p>No unlocked cases. Import cases, or all imported cases already have locked ground truth.</p>
+  {/if}
+
   <button on:click={() => dispatch('runNextCase')} disabled={remainingCases <= 0}>
-    Run next case ({Math.max(remainingCases, 0)} remaining)
+    Run next case ({Math.max(remainingCases, 0)} remaining, ground-truth-locked only)
   </button>
 
   {#if unjudged}
@@ -250,65 +393,104 @@
 
       <div class="actions">
         <button on:click={submit} disabled={!canSubmit()}>Submit judgment</button>
-        {#if !unjudged.revealed}
-          <button on:click={() => revealResult(unjudged.id)}>Reveal models</button>
-        {/if}
       </div>
     </div>
   {:else}
     <p>No in-progress case. Click "Run next case" to benchmark the next held-out case.</p>
   {/if}
 
+  <h3>Judged cases ({judgedResults.length})</h3>
+  <p class="note">
+    Model identities stay hidden until the blind evaluation above is
+    committed — reveal only becomes available here, after judging, and
+    never changes any recorded judgment.
+  </p>
+  {#if judgedResults.length === 0}
+    <p>No judged cases yet.</p>
+  {:else}
+    <ul class="judged-list">
+      {#each judgedResults as judgedResult}
+        <li class="judged-item">
+          <span class="judged-case">{judgedResult.caseId}</span>
+          {#if judgedResult.note}<span class="note"> — {judgedResult.note}</span>{/if}
+          {#if judgedResult.revealed}
+            <span class="role">
+              ({LABELS.map((l) => `${l}: ${roleLabel(judgedResult.labelMapping[l].role)}`).join(', ')})
+            </span>
+          {:else}
+            <button on:click={() => revealResult(judgedResult.id)}>Reveal models</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
   <h3>Aggregate results</h3>
   <p class="note">
-    DeepSeek is a frontier reference/ceiling, not a success condition — trained Qwen does not need
-    to beat it. The central result is trained-vs-base improvement and whether trained Qwen reaches
-    an acceptable local-judge quality level.
+    DeepSeek is a <strong>frontier reference</strong>, not a success condition — trained Qwen does
+    not need to beat it. The central result is the trained-vs-base semantic-accuracy improvement and
+    whether trained Qwen reaches an acceptable local-judge quality level.
   </p>
-  <ul class="stats">
-    <li>
-      Base Qwen: {(stats.base.acceptableRate * 100).toFixed(0)}% acceptable ({stats.base.acceptableCount}/{stats.base
-        .acceptabilityJudgedCount}), rank-1 {(stats.base.rank1Rate * 100).toFixed(0)}%, mean rank
-      {stats.base.meanRankAmongAcceptable !== null ? stats.base.meanRankAmongAcceptable.toFixed(2) : '—'}
-      ({stats.base.errors} errors)
-    </li>
-    <li>
-      Trained Qwen: {(stats.trained.acceptableRate * 100).toFixed(0)}% acceptable ({stats.trained
-        .acceptableCount}/{stats.trained.acceptabilityJudgedCount}), rank-1
-      {(stats.trained.rank1Rate * 100).toFixed(0)}%, mean rank
-      {stats.trained.meanRankAmongAcceptable !== null ? stats.trained.meanRankAmongAcceptable.toFixed(2) : '—'}
-      ({stats.trained.errors} errors)
-    </li>
-    <li>
-      DeepSeek: {(stats.deepseek.acceptableRate * 100).toFixed(0)}% acceptable ({stats.deepseek
-        .acceptableCount}/{stats.deepseek.acceptabilityJudgedCount}), rank-1
-      {(stats.deepseek.rank1Rate * 100).toFixed(0)}%, mean rank
-      {stats.deepseek.meanRankAmongAcceptable !== null ? stats.deepseek.meanRankAmongAcceptable.toFixed(2) : '—'}
-      ({stats.deepseek.errors} errors)
-    </li>
-    <li><strong>Trained vs. base improvement (acceptability rate): {(stats.trainedVsBaseImprovement * 100).toFixed(1)} points</strong></li>
-    <li>
-      Blind rank-1 wins — base: {stats.winCounts.base}, trained: {stats.winCounts.trained}, DeepSeek:
-      {stats.winCounts.deepseek}; no acceptable response: {stats.noAcceptableResponseCount}
-    </li>
-    {#if stats.base.verdictAccuracyCount > 0}
-      <li>
-        Verdict accuracy vs. frozen ground truth — base: {((stats.base.verdictAccuracy ?? 0) * 100).toFixed(0)}%,
-        trained: {((stats.trained.verdictAccuracy ?? 0) * 100).toFixed(0)}%, DeepSeek:
-        {((stats.deepseek.verdictAccuracy ?? 0) * 100).toFixed(0)}% ({stats.base.verdictAccuracyCount} cases)
-      </li>
-    {/if}
-    {#if stats.base.dimensionGroundTruthCount > 0}
-      <li>
-        Dimension exact-set accuracy / micro-F1 vs. frozen ground truth — base:
-        {((stats.base.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% / {(stats.base.dimensionMicroF1 ?? 0).toFixed(2)},
-        trained: {((stats.trained.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% /
-        {(stats.trained.dimensionMicroF1 ?? 0).toFixed(2)}, DeepSeek:
-        {((stats.deepseek.dimensionExactSetAccuracy ?? 0) * 100).toFixed(0)}% /
-        {(stats.deepseek.dimensionMicroF1 ?? 0).toFixed(2)} ({stats.base.dimensionGroundTruthCount} cases)
-      </li>
-    {/if}
-  </ul>
+  <div class="table-wrap">
+    <table class="agg-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Base</th>
+          <th>Trained</th>
+          <th>DeepSeek (frontier ref.)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Semantic exact accuracy</td>
+          <td>{stats.base.verdictAccuracyCount > 0 ? (stats.base.verdictAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+          <td>{stats.trained.verdictAccuracyCount > 0 ? (stats.trained.verdictAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+          <td>{stats.deepseek.verdictAccuracyCount > 0 ? (stats.deepseek.verdictAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+        </tr>
+        <tr>
+          <td>Dimension exact-set accuracy</td>
+          <td>{stats.base.dimensionGroundTruthCount > 0 ? (stats.base.dimensionExactSetAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+          <td>{stats.trained.dimensionGroundTruthCount > 0 ? (stats.trained.dimensionExactSetAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+          <td>{stats.deepseek.dimensionGroundTruthCount > 0 ? (stats.deepseek.dimensionExactSetAccuracy! * 100).toFixed(0) + '%' : '—'}</td>
+        </tr>
+        <tr>
+          <td>Dimension micro-F1</td>
+          <td>{stats.base.dimensionGroundTruthCount > 0 ? stats.base.dimensionMicroF1!.toFixed(2) : '—'}</td>
+          <td>{stats.trained.dimensionGroundTruthCount > 0 ? stats.trained.dimensionMicroF1!.toFixed(2) : '—'}</td>
+          <td>{stats.deepseek.dimensionGroundTruthCount > 0 ? stats.deepseek.dimensionMicroF1!.toFixed(2) : '—'}</td>
+        </tr>
+        <tr>
+          <td>Acceptable rate (human)</td>
+          <td>{(stats.base.acceptableRate * 100).toFixed(0)}% ({stats.base.acceptableCount}/{stats.base.acceptabilityJudgedCount})</td>
+          <td>{(stats.trained.acceptableRate * 100).toFixed(0)}% ({stats.trained.acceptableCount}/{stats.trained.acceptabilityJudgedCount})</td>
+          <td>{(stats.deepseek.acceptableRate * 100).toFixed(0)}% ({stats.deepseek.acceptableCount}/{stats.deepseek.acceptabilityJudgedCount})</td>
+        </tr>
+        <tr>
+          <td>Rank-1 count / rate</td>
+          <td>{stats.base.rank1Count} ({(stats.base.rank1Rate * 100).toFixed(0)}%)</td>
+          <td>{stats.trained.rank1Count} ({(stats.trained.rank1Rate * 100).toFixed(0)}%)</td>
+          <td>{stats.deepseek.rank1Count} ({(stats.deepseek.rank1Rate * 100).toFixed(0)}%)</td>
+        </tr>
+        <tr>
+          <td>Provider errors</td>
+          <td>{stats.base.errors}</td>
+          <td>{stats.trained.errors}</td>
+          <td>{stats.deepseek.errors}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">
+    <strong>Trained vs. base semantic accuracy improvement:</strong>
+    {stats.base.verdictAccuracyCount > 0 && stats.trained.verdictAccuracyCount > 0
+      ? ((stats.trained.verdictAccuracy! - stats.base.verdictAccuracy!) * 100).toFixed(1) + ' points'
+      : 'not yet available (needs locked ground truth for both roles)'}
+    · <strong>Trained vs. base acceptability improvement:</strong> {(stats.trainedVsBaseImprovement * 100).toFixed(1)} points
+  </p>
+  <p class="note">
+    No acceptable response in {stats.noAcceptableResponseCount} judged case(s).
+  </p>
 
   <details>
     <summary>Trial 4 benchmark settings</summary>
@@ -325,17 +507,22 @@
       <input type="text" bind:value={localModelIdInput} on:input={markDirty} placeholder="Qwen/Qwen3-0.6B" />
     </label>
     <label>
-      DeepSeek API key{#if hasDeepSeekApiKey}<span class="note"> (already saved — leave blank to keep it)</span>{/if}
+      OpenRouter API key{#if hasOpenRouterApiKey}<span class="note"> (already saved — leave blank to keep it)</span>{/if}
       <input
         type="password"
-        bind:value={deepSeekApiKeyInput}
+        bind:value={openRouterApiKeyInput}
         on:input={markDirty}
-        placeholder={hasDeepSeekApiKey ? '•••••••• (saved)' : 'sk-...'}
+        placeholder={hasOpenRouterApiKey ? '•••••••• (saved)' : 'sk-or-...'}
       />
+      <span class="note">
+        Used only for the DeepSeek/frontier-reference role, sent only to
+        https://openrouter.ai/api/v1/chat/completions — never DeepSeek's own
+        API.
+      </span>
     </label>
     <label>
-      DeepSeek model id
-      <input type="text" bind:value={deepSeekModelIdInput} on:input={markDirty} placeholder="deepseek-v4-flash" />
+      DeepSeek/OpenRouter model id
+      <input type="text" bind:value={deepSeekModelIdInput} on:input={markDirty} placeholder="deepseek/deepseek-chat-v3.1" />
     </label>
     <label>
       <input type="checkbox" bind:checked={enabledInput} on:change={markDirty} />
@@ -384,9 +571,6 @@
     font-size: 15px;
     line-height: 1.6;
   }
-  ul.stats {
-    list-style: none;
-  }
   .status {
     color: #555;
   }
@@ -427,6 +611,75 @@
     gap: 14px;
     font-size: 14px;
     margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .gt-block {
+    background: #fffef5;
+    border-color: #e0d9a0;
+  }
+  .reconstruction p {
+    margin: 6px 0 0;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .highlight {
+    background: #fff3c4;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .dimension-group {
+    margin-top: 10px;
+  }
+  .dimension-group-label {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+  }
+  .dimension-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px;
+  }
+  .dimension-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .dimension-item select {
+    font-size: 12px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    margin-top: 10px;
+  }
+  .agg-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+  }
+  .agg-table th,
+  .agg-table td {
+    border: 1px solid #e0e0e0;
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .agg-table th {
+    background: #f5f5f5;
+  }
+  .judged-list {
+    list-style: none;
+    padding: 0;
+  }
+  .judged-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
+  .judged-case {
+    font-weight: 600;
   }
   .note-field {
     display: block;

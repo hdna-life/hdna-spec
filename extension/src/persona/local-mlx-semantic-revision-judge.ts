@@ -60,13 +60,17 @@ export class LocalMlxUnreachableError extends Error {}
  *   interpret or repair the model's reasoning. The stripped block itself
  *   is never persisted, logged, or returned to the caller.
  *
- * The judge prompt and untrusted-JSON parsing are shared with the Trial 4
- * `DeepSeekSemanticRevisionJudge` benchmark-reference provider via
+ * The judge prompt and untrusted-JSON parsing live in
  * `semantic-revision-judge-wire.ts` (`buildNarrowJudgePrompt`/
- * `parseUntrustedJudgmentText`) — extracted there specifically so a Trial
- * 4 benchmark comparing outputs across transports is not confounded by
- * prompt differences between them. `<think>`-stripping and Markdown-fence
- * tolerance live in that shared module now, not duplicated here.
+ * `parseUntrustedJudgmentText`), shared with this class's own `base`/
+ * `trained` local-MLX role usage in Trial 4's blind benchmark. Trial 4's
+ * `deepseek` frontier-reference role uses `OpenRouterSemanticRevisionJudge`
+ * instead (reached via OpenRouter, not DeepSeek's own API — Test 1
+ * evaluation-stage addendum) — that provider keeps an independently
+ * maintained but semantically-equivalent v3 two-axis prompt/schema (see
+ * that file's own docstring for why it does not share this module).
+ * `<think>`-stripping and Markdown-fence tolerance live in this shared
+ * module, not duplicated here.
  */
 const CHAT_COMPLETIONS_PATH = '/v1/chat/completions';
 

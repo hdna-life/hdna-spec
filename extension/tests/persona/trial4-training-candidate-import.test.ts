@@ -52,6 +52,9 @@ const benchmarkCase: Trial4BenchmarkCase = {
   finalText: 'y',
   beforeContext: '',
   afterContext: '',
+  humanVerdict: null,
+  humanDimensions: [],
+  groundTruthLocked: false,
 };
 
 const benchmarkResult: Trial4BenchmarkResult = {

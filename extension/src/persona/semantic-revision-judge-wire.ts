@@ -4,27 +4,23 @@ import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from
 /**
  * Shared "untrusted JSON wire protocol" for any `SemanticRevisionJudgeProvider`
  * transport that cannot rely on a provider-enforced structured-output
- * contract (`response_format`/JSON-Schema) — currently
+ * contract (`response_format`/JSON-Schema) — currently only
  * `LocalMlxSemanticRevisionJudge` (docs/decisions/0016's Trial 3 "local MLX
- * transport" addendum) and `DeepSeekSemanticRevisionJudge` (Trial 4's
- * benchmark reference provider, docs/decisions/0017). Both providers ask
- * the model, in-prompt, to return exactly one JSON object, then run the
- * exact same defensive parse/validate here — extracted to this module so
- * the "untrusted output, no repair, reject on malformed" discipline (Trial
- * 3 §10-11) is defined and tested in exactly one place rather than
- * duplicated per transport. Neither provider assumes the other's
- * transport-specific behavior (HTTP envelope, auth, error classification)
- * lives here — this module has no `fetch`/HTTP/API-key concept at all.
+ * transport" addendum), used for Trial 4's `base`/`trained` roles. It asks
+ * the model, in-prompt, to return exactly one JSON object, then runs the
+ * defensive parse/validate here — extracted to this module so the
+ * "untrusted output, no repair, reject on malformed" discipline (Trial
+ * 3 §10-11) is defined and tested in one place.
  *
  * **Test 1 / v3 addendum (docs/decisions/0017):** the prompt/parser here
  * now also cover the `dimensions` axis (`BehaviorDimensionChange[]`),
  * orthogonal to `verdict` — see `spec/protocol/semantic-revision-judge.ts`'s
  * `SemanticRevisionJudgmentDraft` docstring for the full semantic/behavior
- * axis split. This is the SAME prompt/output contract for every judge
- * transport that reaches Trial 4's blind benchmark (base Qwen, trained
- * Qwen, DeepSeek) — a deliberate requirement so the benchmark's three
- * systems are compared under identical instructions, never a prompt-
- * wording confound.
+ * axis split. Trial 4's `deepseek` frontier-reference role instead uses
+ * `OpenRouterSemanticRevisionJudge` (reached via OpenRouter, not DeepSeek's
+ * own API), which maintains its own semantically-equivalent v3 prompt/
+ * schema — see this module's next paragraph for why the two are not
+ * unified into one implementation.
  *
  * OpenRouter's provider (`openrouter-semantic-revision-judge.ts`) does NOT
  * use this module — it relies on OpenRouter's `response_format: json_schema`

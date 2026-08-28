@@ -44,8 +44,21 @@ function benchmarkCase(overrides: Partial<Trial4BenchmarkCase> = {}): Trial4Benc
     finalText: 'y',
     beforeContext: '',
     afterContext: '',
+    humanVerdict: null,
+    humanDimensions: [],
+    groundTruthLocked: false,
     ...overrides,
   };
+}
+
+/** Convenience for the ground-truth tests below — a locked case always has both humanVerdict and humanDimensions set. */
+function lockedCase(overrides: Partial<Trial4BenchmarkCase> = {}): Trial4BenchmarkCase {
+  return benchmarkCase({
+    humanVerdict: 'meaning_added',
+    humanDimensions: [],
+    groundTruthLocked: true,
+    ...overrides,
+  });
 }
 
 describe('computeTrial4BenchmarkStats', () => {
@@ -241,8 +254,8 @@ describe('computeTrial4BenchmarkStats', () => {
     });
   });
 
-  describe('ground-truth accuracy (frozen expectedVerdict/expectedDimensions)', () => {
-    it('stays null when no case in this run carries ground truth', () => {
+  describe('ground-truth accuracy (frozen, LOCKED humanVerdict/humanDimensions — Test 1 primary metric)', () => {
+    it('stays null when no case in this run carries locked ground truth', () => {
       const results = [result({ judged: true, caseId: 'c1' })];
       const cases = [benchmarkCase({ id: 'c1' })];
       const stats = computeTrial4BenchmarkStats(results, cases);
@@ -251,7 +264,28 @@ describe('computeTrial4BenchmarkStats', () => {
       expect(stats.base.dimensionMicroF1).toBeNull();
     });
 
-    it('computes verdictAccuracy against expectedVerdict, per role', () => {
+    it('does not count an UNLOCKED case even if humanVerdict/humanDimensions happen to be set', () => {
+      const results = [
+        result({
+          judged: true,
+          caseId: 'c1',
+          labelMapping: {
+            A: response('base', { verdict: 'meaning_added' }),
+            B: response('trained', { verdict: 'meaning_added' }),
+            C: response('deepseek', { verdict: 'meaning_added' }),
+          },
+        }),
+      ];
+      // groundTruthLocked: false, even though humanVerdict happens to be set —
+      // must not be scored against, mirroring the "not committed, doesn't
+      // count" rule for humanAcceptable/humanRank.
+      const cases = [benchmarkCase({ id: 'c1', humanVerdict: 'meaning_added', groundTruthLocked: false })];
+      const stats = computeTrial4BenchmarkStats(results, cases);
+      expect(stats.base.verdictAccuracyCount).toBe(0);
+      expect(stats.base.verdictAccuracy).toBeNull();
+    });
+
+    it('computes verdictAccuracy (5-way semantic exact accuracy) against a locked humanVerdict, per role', () => {
       const results = [
         result({
           judged: true,
@@ -263,7 +297,7 @@ describe('computeTrial4BenchmarkStats', () => {
           },
         }),
       ];
-      const cases = [benchmarkCase({ id: 'c1', expectedVerdict: 'meaning_added' })];
+      const cases = [lockedCase({ id: 'c1', humanVerdict: 'meaning_added' })];
       const stats = computeTrial4BenchmarkStats(results, cases);
       expect(stats.base.verdictAccuracyCount).toBe(1);
       expect(stats.base.verdictAccuracy).toBe(1);
@@ -296,9 +330,9 @@ describe('computeTrial4BenchmarkStats', () => {
         }),
       ];
       const cases = [
-        benchmarkCase({
+        lockedCase({
           id: 'c1',
-          expectedDimensions: [
+          humanDimensions: [
             { dimension: 'certainty', direction: 'increased' },
             { dimension: 'directness', direction: 'increased' },
           ],
@@ -333,9 +367,9 @@ describe('computeTrial4BenchmarkStats', () => {
         }),
       ];
       const cases = [
-        benchmarkCase({
+        lockedCase({
           id: 'c1',
-          expectedDimensions: [
+          humanDimensions: [
             { dimension: 'certainty', direction: 'increased' },
             { dimension: 'directness', direction: 'increased' },
           ],
@@ -350,7 +384,7 @@ describe('computeTrial4BenchmarkStats', () => {
       expect(stats.deepseek.dimensionMicroF1).toBe(1);
     });
 
-    it('treats a case with expectedDimensions: [] and no predicted dimensions as a vacuous perfect match', () => {
+    it('treats a locked case with humanDimensions: [] and no predicted dimensions as a vacuous perfect match', () => {
       const results = [
         result({
           judged: true,
@@ -362,10 +396,29 @@ describe('computeTrial4BenchmarkStats', () => {
           },
         }),
       ];
-      const cases = [benchmarkCase({ id: 'c1', expectedDimensions: [] })];
+      const cases = [lockedCase({ id: 'c1', humanDimensions: [] })];
       const stats = computeTrial4BenchmarkStats(results, cases);
       expect(stats.base.dimensionExactSetAccuracy).toBe(1);
       expect(stats.base.dimensionMicroF1).toBe(1);
+    });
+
+    it('evaluates an "uncertain" ground truth normally on the verdict axis, expecting empty dimensions', () => {
+      const results = [
+        result({
+          judged: true,
+          caseId: 'c1',
+          labelMapping: {
+            A: response('base', { verdict: 'uncertain', dimensions: [] }),
+            B: response('trained', { verdict: 'meaning_added', dimensions: [] }),
+            C: response('deepseek', { verdict: 'uncertain', dimensions: [] }),
+          },
+        }),
+      ];
+      const cases = [lockedCase({ id: 'c1', humanVerdict: 'uncertain', humanDimensions: [] })];
+      const stats = computeTrial4BenchmarkStats(results, cases);
+      expect(stats.base.verdictAccuracy).toBe(1);
+      expect(stats.trained.verdictAccuracy).toBe(0);
+      expect(stats.base.dimensionExactSetAccuracy).toBe(1);
     });
   });
 });

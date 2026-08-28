@@ -63,7 +63,7 @@ import {
 import { Trial4BenchmarkCaseStore } from '../src/persona/trial4-benchmark-case-store';
 import { Trial4BenchmarkResultStore } from '../src/persona/trial4-benchmark-result-store';
 import { Trial4BenchmarkConfigStore } from '../src/persona/trial4-benchmark-config-store';
-import { DeepSeekSemanticRevisionJudge } from '../src/persona/deepseek-semantic-revision-judge';
+import { OpenRouterSemanticRevisionJudge } from '../src/persona/openrouter-semantic-revision-judge';
 import { Trial4BenchmarkService } from '../src/persona/trial4-benchmark-service';
 import {
   RUN_TRIAL4_BENCHMARK_CASE_JOB,
@@ -166,14 +166,18 @@ export default defineBackground(() => {
   // trained Qwen3-0.6B are both `LocalMlxSemanticRevisionJudge` instances
   // (the same provider class, pointed at two different local MLX-LM
   // server ports — one serving the base model, one serving it with
-  // `--adapter-path` loaded), and DeepSeek is the frontier reference via
-  // `DeepSeekSemanticRevisionJudge`. Providers are constructed fresh from
-  // `Trial4BenchmarkConfigStore` on every run — never a stale endpoint/key.
+  // `--adapter-path` loaded), and DeepSeek is the frontier reference
+  // reached via OpenRouter — NOT DeepSeek's own direct API (Test 1
+  // evaluation-stage addendum) — using the same `OpenRouterSemanticRevisionJudge`
+  // class Trial 3's OpenRouter transport already uses, reused as-is rather
+  // than a second networking implementation. Providers are constructed
+  // fresh from `Trial4BenchmarkConfigStore` on every run — never a stale
+  // endpoint/key.
   const trial4Benchmark = new Trial4BenchmarkService(
     (config) => ({
       base: new LocalMlxSemanticRevisionJudge(config.baseModelUrl!, config.localModelId!),
       trained: new LocalMlxSemanticRevisionJudge(config.trainedModelUrl!, config.localModelId!),
-      deepseek: new DeepSeekSemanticRevisionJudge(config.deepSeekApiKey!, config.deepSeekModelId!),
+      deepseek: new OpenRouterSemanticRevisionJudge(config.openRouterApiKey!, config.deepSeekModelId!),
     }),
     new Trial4BenchmarkCaseStore(storage),
     new Trial4BenchmarkResultStore(storage),

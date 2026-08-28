@@ -20,6 +20,9 @@
   import type { Trial4TrainingCandidate } from '@spec/schema/trial4-training-candidate';
   import type { Trial4BenchmarkCase } from '@spec/schema/trial4-benchmark-case';
   import type { Trial4BenchmarkLabel, Trial4BenchmarkRank, Trial4BenchmarkResult } from '@spec/schema/trial4-benchmark-result';
+  import type { BehaviorDimensionChange, SemanticChangeVerdict } from '@spec/protocol/semantic-revision-judge';
+  import { applyTrial4BenchmarkCaseDefaults } from '../../src/persona/trial4-benchmark-case-store';
+  import { isValidDimensionsArray } from '../../src/persona/behavior-dimension';
 
   import DashboardOverview from '../../src/ui/dashboard/DashboardOverview.svelte';
   import DashboardTrainingReview from '../../src/ui/dashboard/DashboardTrainingReview.svelte';
@@ -93,8 +96,44 @@
     const existingIds = new Set(trial4BenchmarkCases.map((c) => c.id));
     for (const raw of event.detail) {
       if (!raw?.id || existingIds.has(raw.id)) continue;
-      await trial4BenchmarkCaseStore.put(raw);
+      // Ground truth is deliberately NOT required in an imported file — the
+      // operator labels and locks each case in the Dashboard afterward
+      // (Test 1 evaluation-stage addendum). Any missing/legacy field is
+      // defaulted to "not yet labeled," never inferred from the raw import.
+      await trial4BenchmarkCaseStore.put(applyTrial4BenchmarkCaseDefaults(raw));
     }
+    await refresh();
+  }
+
+  // Pure local-storage mutation, same "no model call, so no need to
+  // instantiate Trial4BenchmarkService here" reasoning as
+  // submitTrial4Judgment/revealTrial4Result below — mirrors
+  // Trial4BenchmarkService.lockGroundTruth's own validation exactly.
+  async function lockGroundTruthCase(
+    event: CustomEvent<{ caseId: string; humanVerdict: SemanticChangeVerdict; humanDimensions: BehaviorDimensionChange[] }>,
+  ) {
+    const { caseId, humanVerdict, humanDimensions } = event.detail;
+    const benchmarkCase = await trial4BenchmarkCaseStore.get(caseId);
+    if (!benchmarkCase || benchmarkCase.groundTruthLocked) return;
+
+    const validVerdicts: SemanticChangeVerdict[] = [
+      'no_meaningful_change',
+      'meaning_added',
+      'meaning_removed',
+      'meaning_transformed',
+      'uncertain',
+    ];
+    if (!validVerdicts.includes(humanVerdict)) return;
+    if (!isValidDimensionsArray(humanDimensions)) return;
+    if (humanVerdict === 'uncertain' && humanDimensions.length > 0) return;
+
+    await trial4BenchmarkCaseStore.put({
+      ...benchmarkCase,
+      humanVerdict,
+      humanDimensions,
+      groundTruthLocked: true,
+      groundTruthLockedAt: new Date().toISOString(),
+    });
     await refresh();
   }
 
@@ -147,7 +186,10 @@
 
   async function revealTrial4Result(event: CustomEvent<string>) {
     const result = await trial4BenchmarkResultStore.get(event.detail);
-    if (!result) return;
+    // Model identities must remain hidden until the blind evaluation is
+    // committed (Test 1 evaluation-stage addendum) — mirrors
+    // Trial4BenchmarkService.reveal's own guard.
+    if (!result || !result.judged) return;
     await trial4BenchmarkResultStore.put({ ...result, revealed: true });
     await refresh();
   }
@@ -215,6 +257,7 @@
         results={trial4BenchmarkResults}
         config={trial4BenchmarkConfig}
         on:importCases={importTrial4BenchmarkCases}
+        on:lockGroundTruth={lockGroundTruthCase}
         on:runNextCase={runTrial4BenchmarkCase}
         on:submitJudgment={submitTrial4Judgment}
         on:reveal={revealTrial4Result}

@@ -5,12 +5,15 @@ const CONFIG_KEY = 'hdna_trial4_benchmark_config';
  * for the three anonymized systems compared per case: two local MLX-LM
  * servers (base Qwen3-0.6B, and the same model with the trained LoRA
  * adapter loaded via a second `mlx_lm.server --adapter-path ...` instance
- * on a different port — see `training/phase5a/README.md`) plus DeepSeek's
- * cloud API as the frontier reference. Deliberately a separate store from
- * `SemanticRevisionJudgeConfigStore` (Trial 3's single-endpoint config):
- * Trial 4 needs three endpoints live simultaneously, and DeepSeek's API
- * key must never be conflated with, or accidentally reused as, an
- * OpenRouter/local config.
+ * on a different port — see `training/phase5a/README.md`) plus the
+ * DeepSeek frontier reference, reached via OpenRouter (Test 1 evaluation-
+ * stage addendum — we do NOT call DeepSeek's own direct API; see
+ * `extension/entrypoints/background.ts`'s Trial 4 wiring, which constructs
+ * an `OpenRouterSemanticRevisionJudge` for the `deepseek` role). Deliberately
+ * a separate store from `SemanticRevisionJudgeConfigStore` (Trial 3's
+ * single-endpoint config): Trial 4 needs three endpoints live
+ * simultaneously, and this OpenRouter key must never be conflated with, or
+ * accidentally reused as, a local-model config.
  */
 export interface Trial4BenchmarkConfig {
   /** Opt-in, defaults false — same discipline as every other experimental config store in this codebase. */
@@ -21,8 +24,9 @@ export interface Trial4BenchmarkConfig {
   trainedModelUrl?: string;
   /** Model id sent to both local MLX-LM servers — expected to be the same base model id for both (e.g. "Qwen/Qwen3-0.6B"), since only the adapter differs between them. */
   localModelId?: string;
-  deepSeekApiKey?: string;
-  /** e.g. "deepseek-v4-flash" — verify against the operator's actual DeepSeek account/available models; never defaulted by this store. */
+  /** OpenRouter API key — used ONLY for the `deepseek` reference role's requests, sent only to `https://openrouter.ai/api/v1/chat/completions`. Never DeepSeek's own API. */
+  openRouterApiKey?: string;
+  /** OpenRouter model id for the frontier-reference role, e.g. "deepseek/deepseek-chat-v3.1" — configurable, never defaulted/baked-in by this store or by any provider-construction code. */
   deepSeekModelId?: string;
 }
 
