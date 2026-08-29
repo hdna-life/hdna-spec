@@ -18,10 +18,10 @@ from pathlib import Path
 LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
 sys.path.insert(0, str(LIB_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
-from acceptance import VERIFIER_CONFIDENCE_THRESHOLD, decide_acceptance  # noqa: E402
+from acceptance import VERIFIER_CONFIDENCE_THRESHOLD, decide_acceptance, validate_verifier_output_structure  # noqa: E402
 from budget import BudgetConfig, BudgetExceeded, BudgetTracker  # noqa: E402
 from jsonl_io import append_jsonl, read_ids, read_jsonl  # noqa: E402
-from policy import is_valid_dimensions_list, load_policy  # noqa: E402
+from policy import load_policy  # noqa: E402
 from providers import VerifierProvider  # noqa: E402
 
 BLIND_INPUT_FIELDS = ("id", "kind", "originalText", "finalText", "beforeContext", "afterContext")
@@ -59,11 +59,10 @@ def run(
             errors += 1
             continue
 
-        if verifier_output["verdict"] not in policy["verdicts"] or not is_valid_dimensions_list(
-            verifier_output["dimensions"], policy
-        ):
-            append_jsonl(failures_path, {"id": record["id"], "reason": "verifier_output_invalid"})
-            rejection_reasons["verifier_output_invalid"] += 1
+        structural_reason = validate_verifier_output_structure(verifier_output, policy)
+        if structural_reason is not None:
+            append_jsonl(failures_path, {"id": record["id"], "reason": structural_reason})
+            rejection_reasons[structural_reason] += 1
             rejected += 1
             continue
 
@@ -102,8 +101,8 @@ def main() -> None:
     parser.add_argument("--provider", choices=["mock", "openrouter"], default="openrouter")
     parser.add_argument("--model-id", default=None, help="Required with --provider openrouter.")
     parser.add_argument("--budget-requests", type=int, default=None, help="Required with --provider openrouter.")
-    parser.add_argument("--budget-usd", type=float, default=None)
-    parser.add_argument("--cost-per-request-usd", type=float, default=0.0)
+    parser.add_argument("--max-budget-usd", type=float, default=None)
+    parser.add_argument("--max-cost-per-request-usd", type=float, default=0.0)
     parser.add_argument("--max-output-tokens", type=int, default=800)
     args = parser.parse_args()
 
@@ -119,7 +118,7 @@ def main() -> None:
             raise SystemExit("--budget-requests is required with --provider openrouter — every real run needs a spend cap.")
         from real_providers import OpenRouterVerifierProvider
 
-        budget = BudgetTracker(BudgetConfig(args.budget_requests, args.budget_usd, args.cost_per_request_usd))
+        budget = BudgetTracker(BudgetConfig(args.budget_requests, args.max_budget_usd, args.max_cost_per_request_usd))
         provider = OpenRouterVerifierProvider(api_key, args.model_id, budget, max_tokens=args.max_output_tokens)
     else:
         from providers import MockVerifierProvider

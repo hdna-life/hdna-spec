@@ -120,8 +120,8 @@ def main() -> None:
     parser.add_argument("--provider", choices=["mock", "openrouter"], default="openrouter")
     parser.add_argument("--model-id", default=None, help="Required with --provider openrouter.")
     parser.add_argument("--budget-requests", type=int, default=None, help="Required with --provider openrouter.")
-    parser.add_argument("--budget-usd", type=float, default=None)
-    parser.add_argument("--cost-per-request-usd", type=float, default=0.0)
+    parser.add_argument("--max-budget-usd", type=float, default=None)
+    parser.add_argument("--max-cost-per-request-usd", type=float, default=0.0)
     parser.add_argument("--max-output-tokens", type=int, default=800)
     args = parser.parse_args()
 
@@ -137,7 +137,7 @@ def main() -> None:
             raise SystemExit("--budget-requests is required with --provider openrouter — every real run needs a spend cap.")
         from real_providers import OpenRouterGeneratorProvider
 
-        budget = BudgetTracker(BudgetConfig(args.budget_requests, args.budget_usd, args.cost_per_request_usd))
+        budget = BudgetTracker(BudgetConfig(args.budget_requests, args.max_budget_usd, args.max_cost_per_request_usd))
         provider = OpenRouterGeneratorProvider(api_key, args.model_id, budget, max_tokens=args.max_output_tokens)
     else:
         from providers import MockGeneratorProvider

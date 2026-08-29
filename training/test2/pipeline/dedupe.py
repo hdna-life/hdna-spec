@@ -38,12 +38,18 @@ def run(
     write_jsonl(out_path, after_semantic)
     write_jsonl(report_path, [asdict(d) for d in (exact_drops + semantic_drops)])
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    # Real counts persisted here (not just enabled/disabled) so a later,
+    # separate build_dataset.py invocation can report true dedup counts in
+    # the frozen manifest instead of a hardcoded placeholder.
     config_path.write_text(
         json.dumps(
             {
                 "mode": mode,
                 "semantic_dedup": "enabled" if embedding_provider is not None else "disabled",
+                "semantic_dedup_provider_id": getattr(embedding_provider, "provider_id", None),
                 "semantic_dedup_threshold": threshold if embedding_provider is not None else None,
+                "exact_dedup_count": len(exact_drops),
+                "semantic_near_dedup_count": len(semantic_drops),
             },
             indent=2,
         ),

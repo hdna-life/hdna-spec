@@ -14,7 +14,7 @@ LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
 sys.path.insert(0, str(LIB_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
 
-from acceptance import decide_acceptance  # noqa: E402
+from acceptance import decide_acceptance, validate_verifier_output_structure  # noqa: E402
 from contamination import filter_contaminated, is_contaminated  # noqa: E402
 from dedup import exact_dedup, semantic_near_dedup  # noqa: E402
 from ids import candidate_id, normalized_pair_hash  # noqa: E402
@@ -22,11 +22,13 @@ from jsonl_io import read_jsonl, write_jsonl  # noqa: E402
 from policy import is_valid_dimensions_list, load_policy  # noqa: E402
 from providers import MockGeneratorProvider, MockVerifierProvider  # noqa: E402
 
-from budget import BudgetConfig, BudgetTracker, SharedSpend  # noqa: E402
+from budget import BudgetConfig, BudgetExceeded, BudgetTracker, SharedSpend, restore_tracker, shared_spend_from_persisted  # noqa: E402
+from run_state import build_run_config, load_or_create_run_config  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
 import build_dataset  # noqa: E402
 import dedupe as dedupe_stage  # noqa: E402
+import full_run  # noqa: E402
 import generate  # noqa: E402
 import smoke  # noqa: E402
 import validate  # noqa: E402
@@ -261,7 +263,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
         build_failures = self.data / "failures" / "build_dataset.jsonl"
         stats_build = build_dataset.run(
             deduped_path, plan_path, registry_path, out_dir, build_failures, run_id="test-run",
-            verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+            dedup_config_path=dedup_config,
         )
         self.assertEqual(stats_build["accepted"], 4)
         self.assertTrue((out_dir / "accepted.jsonl").exists())
@@ -349,7 +351,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
         with self.assertRaises(SystemExit):
             build_dataset.run(
                 deduped_path, plan_path, registry_path, self.tmp / "frozen", self.tmp / "build_failures.jsonl",
-                run_id="test-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                run_id="test-run", dedup_config_path=dedup_config,
             )
 
     def test_round_robin_coverage_no_single_bucket_dominates(self):
@@ -392,12 +394,12 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
 
     def test_budget_config_rejects_usd_cap_with_zero_cost_estimate(self):
         with self.assertRaises(ValueError):
-            BudgetConfig(max_requests=5, max_usd=1.0, cost_per_request_usd=0.0)
+            BudgetConfig(max_requests=5, max_budget_usd=1.0, max_cost_per_request_usd=0.0)
 
     def test_shared_spend_enforces_one_combined_usd_cap(self):
         shared = SharedSpend()
-        generator_budget = BudgetTracker(BudgetConfig(max_requests=10, max_usd=0.05, cost_per_request_usd=0.03), shared)
-        verifier_budget = BudgetTracker(BudgetConfig(max_requests=10, max_usd=0.05, cost_per_request_usd=0.03), shared)
+        generator_budget = BudgetTracker(BudgetConfig(max_requests=10, max_budget_usd=0.05, max_cost_per_request_usd=0.03), shared)
+        verifier_budget = BudgetTracker(BudgetConfig(max_requests=10, max_budget_usd=0.05, max_cost_per_request_usd=0.03), shared)
         generator_budget.charge()  # shared spend now 0.03, within 0.05
         from budget import BudgetExceeded
 
@@ -405,6 +407,139 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             verifier_budget.charge()  # would push shared spend to 0.06 > 0.05
         self.assertEqual(generator_budget.requests, 1)
         self.assertEqual(verifier_budget.requests, 0)  # the rejected charge never incremented its own tracker
+
+    def test_reserved_spend_is_the_pre_request_safety_cap_not_actual_cost(self):
+        # max_cost_per_request_usd=0.05 is the conservative worst-case
+        # reservation; max_budget_usd=0.10 allows exactly 2 requests worth
+        # of reservation.
+        tracker = BudgetTracker(BudgetConfig(max_requests=100, max_budget_usd=0.10, max_cost_per_request_usd=0.05))
+        tracker.charge()  # reserved 0.05
+        tracker.record_actual_cost(0.001)  # actual much CHEAPER than estimate
+        tracker.charge()  # reserved 0.10 — still allowed, cap is on reserved not actual
+        with self.assertRaises(BudgetExceeded):
+            tracker.charge()  # reserved would be 0.15 > 0.10 — blocked BEFORE the request
+        self.assertEqual(tracker.requests, 2)
+        # A cheaper-than-estimated actual cost never loosens the reserved cap.
+        self.assertAlmostEqual(tracker.reserved_spend_usd, 0.10)
+
+    def test_actual_cost_higher_than_estimate_cannot_unlock_later_unsafe_requests(self):
+        tracker = BudgetTracker(BudgetConfig(max_requests=100, max_budget_usd=0.10, max_cost_per_request_usd=0.05))
+        tracker.charge()  # reserved 0.05
+        tracker.record_actual_cost(5.00)  # actual FAR above the estimate
+        # Reserved total is untouched by the actual-cost report — it is
+        # provenance only and never feeds the pre-request safety check.
+        self.assertAlmostEqual(tracker.reserved_spend_usd, 0.05)
+        tracker.charge()  # reserved 0.10 — exactly at the cap, still safe
+        with self.assertRaises(BudgetExceeded):
+            tracker.charge()  # would be 0.15 — refused regardless of the earlier overrun
+
+    def test_resumed_run_cannot_exceed_original_request_cap(self):
+        config = BudgetConfig(max_requests=3)
+        shared = SharedSpend()
+        first = restore_tracker(config, shared, None)
+        first.charge()
+        first.charge()
+        first.charge()
+        persisted = first.state_for_persistence()
+        with self.assertRaises(BudgetExceeded):
+            first.charge()
+
+        # Simulates a process restart: a brand new tracker restored from the
+        # persisted state must inherit the exhausted cap, not reset it.
+        resumed = restore_tracker(config, SharedSpend(), persisted)
+        with self.assertRaises(BudgetExceeded):
+            resumed.charge()
+        self.assertEqual(resumed.requests, 3)
+
+    def test_resumed_run_cannot_exceed_original_usd_cap(self):
+        config = BudgetConfig(max_requests=100, max_budget_usd=0.10, max_cost_per_request_usd=0.05)
+        shared = SharedSpend()
+        first = restore_tracker(config, shared, None)
+        first.charge()
+        first.charge()  # reserved 0.10 — at cap
+        persisted = first.state_for_persistence()
+        shared_persisted = {"reserved_usd": shared.reserved_usd, "actual_usd": shared.actual_usd}
+
+        resumed_shared = SharedSpend(reserved_usd=shared_persisted["reserved_usd"], actual_usd=shared_persisted["actual_usd"])
+        resumed = restore_tracker(config, resumed_shared, persisted)
+        with self.assertRaises(BudgetExceeded):
+            resumed.charge()
+
+    def test_cumulative_generator_and_verifier_spend_shared_across_resume(self):
+        generator_state = {"requests": 2, "reserved_spend_usd": 0.06, "actual_spend_usd": 0.05}
+        verifier_state = {"requests": 1, "reserved_spend_usd": 0.03, "actual_spend_usd": 0.02}
+        shared = shared_spend_from_persisted(generator_state, verifier_state)
+        self.assertAlmostEqual(shared.reserved_usd, 0.09)
+        self.assertAlmostEqual(shared.actual_usd, 0.07)
+
+        config = BudgetConfig(max_requests=100, max_budget_usd=0.10, max_cost_per_request_usd=0.02)
+        verifier_tracker = restore_tracker(config, shared, verifier_state)
+        with self.assertRaises(BudgetExceeded):
+            # 0.09 (restored combined reserved spend) + 0.02 > 0.10 — the
+            # verifier's own persisted state (0.03) is smaller than the
+            # shared total, proving the cap is enforced against the SHARED
+            # cumulative reservation, not the component's own.
+            verifier_tracker.charge()
+
+    def test_run_config_persists_and_rejects_incompatible_resume(self):
+        path = self.tmp / "run_config.json"
+        base_kwargs = dict(
+            generator_model_id="gen/a", verifier_model_id="ver/a",
+            coverage_plan_path=self.build_plan(self.tmp), policy_spec_path=Path("training/phase5a/lore/policy-spec.v1.json"),
+            max_output_tokens=800, verifier_confidence_threshold=0.90,
+            generator_budget_requests=30, verifier_budget_requests=30,
+            max_budget_usd=None, max_cost_per_request_usd=0.0,
+            protected_registry_override_used=False,
+        )
+        config = build_run_config(**base_kwargs)
+        first = load_or_create_run_config(path, config)
+        self.assertEqual(first, config)
+
+        # Same config again — resumes cleanly.
+        second = load_or_create_run_config(path, config)
+        self.assertEqual(second, config)
+
+        # Different generator model — refused.
+        changed_kwargs = dict(base_kwargs, generator_model_id="gen/b")
+        with self.assertRaises(SystemExit):
+            load_or_create_run_config(path, build_run_config(**changed_kwargs))
+
+        # Different budget configuration — also refused.
+        changed_budget = dict(base_kwargs, max_budget_usd=5.0, max_cost_per_request_usd=0.01)
+        with self.assertRaises(SystemExit):
+            load_or_create_run_config(path, build_run_config(**changed_budget))
+
+    def test_cumulative_max_candidates_across_invocations(self):
+        import smoke
+
+        generated_path = self.tmp / "generated.jsonl"
+        self.assertEqual(smoke.compute_remaining_total(generated_path, max_candidates=30), 30)
+
+        write_jsonl(generated_path, [{"id": f"g{i}", "coverage_bucket": "basic"} for i in range(12)])
+        self.assertEqual(smoke.compute_remaining_total(generated_path, max_candidates=30), 18)
+
+        write_jsonl(generated_path, [{"id": f"g{i}", "coverage_bucket": "basic"} for i in range(30)])
+        # Already at (or past) the total — a resume must generate nothing more.
+        self.assertEqual(smoke.compute_remaining_total(generated_path, max_candidates=30), 0)
+
+    def test_verifier_output_structural_validation(self):
+        valid_other = {"verdict": "meaning_transformed", "dimensions": [{"dimension": "certainty", "direction": "increased"}], "confidence": 0.95}
+        self.assertIsNone(validate_verifier_output_structure(valid_other, POLICY))
+
+        valid_uncertain = {"verdict": "uncertain", "dimensions": [], "confidence": 0.5}
+        self.assertIsNone(validate_verifier_output_structure(valid_uncertain, POLICY))
+
+        with self.subTest("confidence below 0"):
+            bad = {"verdict": "no_meaningful_change", "dimensions": [], "confidence": -0.01}
+            self.assertEqual(validate_verifier_output_structure(bad, POLICY), "invalid_confidence")
+
+        with self.subTest("confidence above 1"):
+            bad = {"verdict": "no_meaningful_change", "dimensions": [], "confidence": 1.01}
+            self.assertEqual(validate_verifier_output_structure(bad, POLICY), "invalid_confidence")
+
+        with self.subTest("uncertain with non-empty dimensions"):
+            bad = {"verdict": "uncertain", "dimensions": [{"dimension": "certainty", "direction": "increased"}], "confidence": 0.5}
+            self.assertEqual(validate_verifier_output_structure(bad, POLICY), "uncertain_with_nonempty_dimensions")
 
     def test_run_dir_isolation_and_unsafe_run_id_rejection(self):
         root = self.tmp / "smoke_root"
@@ -474,7 +609,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             plan_path, deduped_path, dedup_config, registry_path = build_valid_run(tmp)
             stats = build_dataset.run(
                 deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                run_id="ok-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                run_id="ok-run", dedup_config_path=dedup_config,
             )
             self.assertEqual(stats["accepted"], 4)
 
@@ -486,7 +621,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             with self.assertRaises(SystemExit):
                 build_dataset.run(
                     deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                    run_id="quota-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                    run_id="quota-run", dedup_config_path=dedup_config,
                 )
 
         with self.subTest("verdict band violated"):
@@ -502,7 +637,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             with self.assertRaises(SystemExit):
                 build_dataset.run(
                     deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                    run_id="band-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                    run_id="band-run", dedup_config_path=dedup_config,
                 )
 
         with self.subTest("operation minimum violated"):
@@ -518,7 +653,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             with self.assertRaises(SystemExit):
                 build_dataset.run(
                     deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                    run_id="opmin-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                    run_id="opmin-run", dedup_config_path=dedup_config,
                 )
 
         with self.subTest("language mix violated"):
@@ -538,7 +673,7 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             with self.assertRaises(SystemExit):
                 build_dataset.run(
                     deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                    run_id="lang-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                    run_id="lang-run", dedup_config_path=dedup_config,
                 )
 
         with self.subTest("target not reached"):
@@ -554,30 +689,61 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             with self.assertRaises(SystemExit):
                 build_dataset.run(
                     deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
-                    run_id="target-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                    run_id="target-run", dedup_config_path=dedup_config,
                 )
 
-    def test_smoke_diagnostics_accounting_invariant(self):
-        generate_stats = {"generated": 10, "provider_errors": 1}
-        validate_stats = {"passed": 8, "rejected": 2}
-        verify_stats = {
-            "accepted": 5, "rejected": 3, "provider_errors": 0, "dimension_disagreements": 1,
-            "rejection_reasons": {"verdict_disagreement": 2, "low_verifier_confidence": 1},
-        }
-        dedupe_stats = {"exact_dedup_count": 1, "semantic_near_dedup_count": 0}
-        final_records = [
-            {"language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
-            {"language": "tr", "coverage_bucket": "boundary", "canonical_verdict": "meaning_added"},
-            {"language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
-        ]
+    def test_smoke_diagnostics_accounting_invariant_for_a_resumed_run(self):
+        # Artifacts as they'd exist on disk after TWO invocations of the same
+        # run_id — stage files are cumulative (append-only / full-recompute),
+        # so diagnostics built from them describe the whole run_id, not just
+        # the latest invocation.
         from smoke_report import build_smoke_diagnostics
 
-        diagnostics = build_smoke_diagnostics(
-            generate_stats, validate_stats, pre_verify_contamination_count=1, verify_stats=verify_stats,
-            dedupe_stats=dedupe_stats, post_dedup_contamination_count=1, final_records=final_records,
-            generator_budget={"spend_usd": 0.1}, verifier_budget={"spend_usd": 0.2},
-        )
-        # accepted_before_dedup - exact_dups - semantic_dups - post_dedup_contamination == final_accepted
+        out_dir = self.tmp / "smoke_artifacts"
+        write_jsonl(out_dir / "generated.jsonl", [{"id": f"g{i}"} for i in range(10)])
+        write_jsonl(out_dir / "failures" / "generate.jsonl", [{"coverage_bucket": "basic", "error": "boom"}])
+        write_jsonl(out_dir / "validated.jsonl", [{"id": f"g{i}"} for i in range(8)])
+        write_jsonl(out_dir / "failures" / "validate.jsonl", [{"id": "g8", "reason": "invalid_kind"}, {"id": "g9", "reason": "invalid_kind"}])
+        write_jsonl(out_dir / "failures" / "contamination.jsonl", [
+            {"id": "g_pre", "reason": "contamination_pre_verify"},
+            {"id": "g_post", "reason": "contamination_post_dedup"},
+        ])
+        write_jsonl(out_dir / "verified.jsonl", [
+            {"id": "v0", "language": "en", "canonical_verdict": "no_meaningful_change", "dimension_sets_equal": True},
+            {"id": "v1", "language": "tr", "canonical_verdict": "meaning_added", "dimension_sets_equal": False},
+            {"id": "v2", "language": "en", "canonical_verdict": "no_meaningful_change", "dimension_sets_equal": True},
+        ])
+        write_jsonl(out_dir / "failures" / "verify.jsonl", [
+            {"id": "g_a", "reason": "verdict_disagreement"},
+            {"id": "g_b", "reason": "verdict_disagreement"},
+            {"id": "g_c", "reason": "low_verifier_confidence"},
+            {"id": "g_d", "reason": "provider_error"},
+        ])
+        write_jsonl(out_dir / "deduped.jsonl", [
+            {"id": "v0", "language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
+            {"id": "v2", "language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
+        ])
+        dedupe_stats = {"exact_dedup_count": 0, "semantic_near_dedup_count": 0}
+        generator_budget = {"requests": 10, "reserved_spend_usd": 0.10, "actual_spend_usd": 0.08}
+        verifier_budget = {"requests": 7, "reserved_spend_usd": 0.07, "actual_spend_usd": 0.05}
+
+        diagnostics = build_smoke_diagnostics(out_dir, dedupe_stats, generator_budget, verifier_budget)
+
+        self.assertEqual(diagnostics["generated_count"], 10)
+        self.assertEqual(diagnostics["generator_provider_errors"], 1)
+        self.assertEqual(diagnostics["schema_valid_count"], 8)
+        self.assertEqual(diagnostics["schema_invalid_count"], 2)
+        self.assertEqual(diagnostics["pre_verify_contamination_dropped"], 1)
+        self.assertEqual(diagnostics["post_dedup_contamination_dropped"], 1)
+        self.assertEqual(diagnostics["contamination_dropped"], 2)
+        self.assertEqual(diagnostics["accepted_before_dedup_count"], 3)
+        self.assertEqual(diagnostics["verifier_request_count"], 3 + 4)  # accepted + failed verify attempts
+        self.assertEqual(diagnostics["verifier_provider_errors"], 1)
+        self.assertEqual(diagnostics["semantic_verdict_disagreement_count"], 2)
+        self.assertEqual(diagnostics["low_verifier_confidence_count"], 1)
+        self.assertEqual(diagnostics["dimension_disagreement_count"], 1)
+        self.assertEqual(diagnostics["final_accepted_count"], 2)
+        # accepted_before_dedup - exact - semantic - post_dedup_contamination == final_accepted
         self.assertEqual(
             diagnostics["accepted_before_dedup_count"]
             - diagnostics["exact_duplicates_dropped"]
@@ -585,8 +751,138 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             - diagnostics["post_dedup_contamination_dropped"],
             diagnostics["final_accepted_count"],
         )
-        self.assertEqual(diagnostics["contamination_dropped"], 2)
-        self.assertAlmostEqual(diagnostics["total_spend_usd"], 0.3)
+        self.assertAlmostEqual(diagnostics["total_reserved_spend_usd"], 0.17)
+        self.assertAlmostEqual(diagnostics["total_actual_spend_usd"], 0.13)
+
+        # Re-reading the same (unchanged) artifacts a second time — as a
+        # no-op resume would — yields identical cumulative diagnostics.
+        diagnostics_again = build_smoke_diagnostics(out_dir, dedupe_stats, generator_budget, verifier_budget)
+        self.assertEqual(diagnostics, diagnostics_again)
+
+    def test_full_run_refuses_with_empty_protected_registry_and_no_override(self):
+        plan = {"coverage_buckets": [{"bucket": "b1", "quota": 1}], "language_mix": {"en": 1.0}}
+
+        class UnusedProvider:
+            model_id = "unused"
+
+            def generate(self, coverage_item):
+                raise AssertionError("must never be called with an empty registry")
+
+        with self.assertRaises(SystemExit):
+            full_run.replenish_to_accepted_quota(
+                UnusedProvider(), UnusedProvider(), plan, protected_hashes=set(), policy=POLICY,
+                out_dir=self.data, max_total_requests=10, max_attempts_per_bucket=5,
+            )
+
+
+class ScriptedReplenishGenerator:
+    """Fails a bucket's first `fail_for` attempts with a schema-invalid
+    `kind`, then produces distinct valid candidates forever after — proves
+    replenishment recovers from upstream rejection instead of stalling."""
+
+    model_id = "mock/replenish-generator-v1"
+
+    def __init__(self, fail_for_by_bucket: dict[str, int]):
+        self.fail_for_by_bucket = fail_for_by_bucket
+        self.counters: Counter[str] = Counter()
+
+    def generate(self, coverage_item: dict) -> dict:
+        bucket = coverage_item["bucket"]
+        language = coverage_item["language"]
+        n = self.counters[bucket]
+        self.counters[bucket] += 1
+        fail_for = self.fail_for_by_bucket.get(bucket, 0)
+        if n < fail_for:
+            return candidate("invalid_kind_value", "", "x", "y", "", "no_meaningful_change", [], language=language)
+        unique = f"unique text {bucket} {n}"
+        return candidate("replaced", "", unique, unique + " revised", "", "no_meaningful_change", [], language=language)
+
+
+class AlwaysAgreesVerifier:
+    model_id = "mock/replenish-verifier-v1"
+
+    def verify(self, candidate_input: dict) -> dict:
+        return {"verdict": "no_meaningful_change", "dimensions": [], "confidence": 0.95}
+
+
+class TestFullRunReplenishment(unittest.TestCase):
+    def setUp(self):
+        self._tmp_ctx = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp_ctx.name)
+        self.out_dir = self.tmp / "full_run"
+
+    def tearDown(self):
+        self._tmp_ctx.cleanup()
+
+    def test_rejected_examples_are_replenished_until_bucket_reaches_quota(self):
+        plan = {
+            "coverage_buckets": [{"bucket": "b1", "quota": 3}],
+            "language_mix": {"en": 1.0},
+        }
+        generator = ScriptedReplenishGenerator(fail_for_by_bucket={"b1": 4})  # 4 schema-invalid, then all valid
+        verifier = AlwaysAgreesVerifier()
+        protected_hashes = {"unrelated-hash-not-matching-anything"}
+
+        result = full_run.replenish_to_accepted_quota(
+            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            max_total_requests=50, max_attempts_per_bucket=20,
+        )
+        self.assertEqual(result["missing_quotas"], {})
+        self.assertEqual(result["accepted_counts"]["b1"], 3)
+        self.assertGreater(result["total_attempts"], 3)  # more attempts than accepted, proving replenishment happened
+
+    def test_safety_ceiling_stops_an_impossible_bucket_without_infinite_loop(self):
+        plan = {
+            "coverage_buckets": [
+                {"bucket": "good", "quota": 2},
+                {"bucket": "impossible", "quota": 2},
+            ],
+            "language_mix": {"en": 1.0},
+        }
+        # "impossible" always fails schema validation — can never be satisfied.
+        generator = ScriptedReplenishGenerator(fail_for_by_bucket={"good": 0, "impossible": 10_000})
+        verifier = AlwaysAgreesVerifier()
+        protected_hashes = {"unrelated-hash-not-matching-anything"}
+
+        result = full_run.replenish_to_accepted_quota(
+            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            max_total_requests=200, max_attempts_per_bucket=5,
+        )
+        self.assertEqual(result["accepted_counts"].get("good"), 2)  # the satisfiable bucket still completes
+        self.assertIn("impossible", result["missing_quotas"])
+        self.assertEqual(result["missing_quotas"]["impossible"], 2)
+        self.assertEqual(result["attempts_by_bucket"]["impossible"], 5)  # stopped exactly at the ceiling, not beyond
+        self.assertIsNotNone(result["stopped_reason"])
+
+    def test_corpus_does_not_freeze_with_missing_accepted_quotas(self):
+        plan_path = self.tmp / "coverage-plan.json"
+        plan = {
+            "coverage_buckets": [{"bucket": "b1", "quota": 5}],
+            "language_mix": {"en": 1.0},
+            "policy_spec": "training/phase5a/lore/policy-spec.v1.json",
+            "verdict_bands": {v: {"min_fraction": 0.0, "max_fraction": 1.0} for v in POLICY["verdicts"]},
+            "operation_minimums": {"added": 0, "removed": 0, "replaced": 0, "reordered": 0},
+            "target_accepted_examples": 5,
+        }
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+        # A ceiling far too low to ever reach the quota of 5.
+        generator = ScriptedReplenishGenerator(fail_for_by_bucket={"b1": 0})
+        verifier = AlwaysAgreesVerifier()
+        protected_hashes = {"unrelated-hash-not-matching-anything"}
+        result = full_run.replenish_to_accepted_quota(
+            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            max_total_requests=2, max_attempts_per_bucket=2,
+        )
+        self.assertIn("b1", result["missing_quotas"])
+
+        registry_path = self.tmp / "protected-cases.json"
+        registry_path.write_text(json.dumps({"protected_pair_hashes": list(protected_hashes)}), encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            build_dataset.run(
+                self.out_dir / "deduped.jsonl", plan_path, registry_path, self.tmp / "frozen",
+                self.tmp / "build_failures.jsonl", run_id="incomplete-run", dedup_config_path=self.out_dir / "dedup_config.json",
+            )
 
 
 if __name__ == "__main__":

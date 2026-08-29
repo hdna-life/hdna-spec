@@ -5,6 +5,7 @@ judge prompt; does not duplicate the taxonomy."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import urllib.request
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a"
 from policy import format_dimension_direction_pairs, is_valid_dimensions_list, load_policy  # noqa: E402
 from split_dataset import build_judge_prompt  # noqa: E402
 
+from acceptance import validate_verifier_output_structure  # noqa: E402
 from budget import BudgetTracker  # noqa: E402
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -23,6 +25,36 @@ KINDS = ["added", "removed", "replaced", "reordered"]
 LANGUAGES = ["tr", "en"]
 LANGUAGE_NAMES = {"tr": "Turkish", "en": "English"}
 DEFAULT_MAX_TOKENS = 800
+
+# Bump whenever the generator/verifier prompt TEMPLATE (not the shared
+# taxonomy — that's versioned separately via policy-spec.v1.json) changes
+# in a way that could affect generated output.
+GENERATOR_PROMPT_VERSION = "gen-v1"
+VERIFIER_PROMPT_VERSION = "verify-v1"
+
+_CANONICAL_PROMPT_PROBE = {
+    "bucket": "__prompt_hash_probe__", "language": "en",
+    "kind": "replaced", "beforeContext": "", "originalText": "x", "finalText": "y", "afterContext": "",
+}
+
+
+def generator_prompt_sha256(policy: dict) -> str:
+    """SHA-256 of the effective generator prompt TEMPLATE, computed by
+    rendering it against a fixed probe input — reproducible provenance
+    without hand-duplicating the prompt text anywhere else."""
+    prompt = OpenRouterGeneratorProvider.render_prompt(_CANONICAL_PROMPT_PROBE, "en", policy)
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+
+def verifier_prompt_sha256(policy: dict) -> str:
+    """SHA-256 of the effective verifier prompt TEMPLATE (the same
+    build_judge_prompt the runtime judge trains against), via a fixed
+    probe input."""
+    prompt = build_judge_prompt(
+        kind=_CANONICAL_PROMPT_PROBE["kind"], before_context="", original_text="x", final_text="y",
+        after_context="", policy=policy,
+    )
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
 def _dimensions_json_schema(policy: dict) -> dict:
@@ -107,6 +139,10 @@ class OpenRouterGeneratorProvider:
         }
 
     def _prompt(self, coverage_item: dict, language: str) -> str:
+        return self.render_prompt(coverage_item, language, self.policy)
+
+    @staticmethod
+    def render_prompt(coverage_item: dict, language: str, policy: dict) -> str:
         language_name = LANGUAGE_NAMES[language]
         return (
             "You are constructing ONE training example for a localized text-revision judge.\n\n"
@@ -122,7 +158,7 @@ class OpenRouterGeneratorProvider:
             "Then judge your own invented example under the same contract a "
             "narrow revision judge uses: a semantic verdict plus zero or more "
             "behavioral dimension changes.\n\n"
-            f"Allowed dimension(direction) pairs — ONLY these pairings are valid: {format_dimension_direction_pairs(self.policy)}.\n\n"
+            f"Allowed dimension(direction) pairs — ONLY these pairings are valid: {format_dimension_direction_pairs(policy)}.\n\n"
             "Never infer hidden emotion, motivation, psychology, or personality. "
             "Do not force a dimension onto an example with no genuine observable "
             "shift — dimensions may be empty.\n\n"
@@ -138,7 +174,7 @@ class OpenRouterGeneratorProvider:
             self.api_key, self.model_id, self._prompt(coverage_item, language),
             "test2_candidate", self._schema(language), self.max_tokens,
         )
-        self.budget.reconcile_actual_cost(actual_cost)
+        self.budget.record_actual_cost(actual_cost)
         if candidate["language"] != language:
             raise ValueError(f"generator returned language {candidate['language']!r}, requested {language!r}")
         if candidate["proposedVerdict"] not in self.policy["verdicts"] or not is_valid_dimensions_list(
@@ -161,17 +197,36 @@ class OpenRouterVerifierProvider:
         self.policy = load_policy()
 
     def _schema(self) -> dict:
-        return {
+        """Structurally enforces the v3 contract at the schema level where
+        JSON Schema can express it: confidence in [0, 1], and
+        verdict == "uncertain" forces dimensions == []. anyOf splits the
+        "uncertain" branch (empty dimensions, no dimension enum needed)
+        from every other verdict (full dimension schema)."""
+        confidence_schema = {"type": "number", "minimum": 0, "maximum": 1}
+        other_verdicts = [v for v in self.policy["verdicts"] if v != "uncertain"]
+        uncertain_branch = {
             "type": "object",
             "properties": {
-                "verdict": {"type": "string", "enum": self.policy["verdicts"]},
-                "dimensions": _dimensions_json_schema(self.policy),
+                "verdict": {"type": "string", "enum": ["uncertain"]},
+                "dimensions": {"type": "array", "maxItems": 0},
                 "description": {"type": ["string", "null"]},
-                "confidence": {"type": "number"},
+                "confidence": confidence_schema,
             },
             "required": ["verdict", "dimensions", "description", "confidence"],
             "additionalProperties": False,
         }
+        other_branch = {
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string", "enum": other_verdicts},
+                "dimensions": _dimensions_json_schema(self.policy),
+                "description": {"type": ["string", "null"]},
+                "confidence": confidence_schema,
+            },
+            "required": ["verdict", "dimensions", "description", "confidence"],
+            "additionalProperties": False,
+        }
+        return {"anyOf": [uncertain_branch, other_branch]}
 
     def verify(self, candidate_input: dict) -> dict:
         for forbidden in ("proposedVerdict", "proposedDimensions", "proposedExplanation"):
@@ -190,10 +245,11 @@ class OpenRouterVerifierProvider:
         result, actual_cost = _post_structured(
             self.api_key, self.model_id, prompt, "semantic_revision_judgment", self._schema(), self.max_tokens
         )
-        self.budget.reconcile_actual_cost(actual_cost)
+        self.budget.record_actual_cost(actual_cost)
 
-        if result["verdict"] not in self.policy["verdicts"] or not is_valid_dimensions_list(
-            result["dimensions"], self.policy
-        ):
-            raise ValueError("verifier returned output outside the canonical policy")
+        # Local post-parse validation — never trust schema enforcement alone;
+        # malformed output is rejected here too, never repaired.
+        reason = validate_verifier_output_structure(result, self.policy)
+        if reason is not None:
+            raise ValueError(f"verifier returned output outside the canonical v3 contract: {reason}")
         return {"verdict": result["verdict"], "dimensions": result["dimensions"], "confidence": result["confidence"]}

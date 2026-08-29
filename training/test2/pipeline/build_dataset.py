@@ -26,9 +26,16 @@ from coverage import (  # noqa: E402
     select_within_quotas,
 )
 from jsonl_io import append_jsonl, read_jsonl, write_jsonl  # noqa: E402
-from manifest import build_run_manifest, write_manifest  # noqa: E402
+from manifest import build_run_manifest, sha256_of, write_manifest  # noqa: E402
 
 TRAIN_FRACTION, VALID_FRACTION = 0.8, 0.1
+
+
+def _model_ids(records: list[dict], role: str) -> str:
+    """Real provenance from the records themselves — never a placeholder.
+    role is "generator" or "verifier"."""
+    ids = sorted({r[role]["model_id"] for r in records if r.get(role, {}).get("model_id")})
+    return "+".join(ids) if ids else "unknown"
 
 
 def require_semantic_dedup(dedup_config_path: Path) -> None:
@@ -52,11 +59,11 @@ def run(
     out_dir: Path,
     failures_path: Path,
     run_id: str,
-    verifier_model_id: str,
     dedup_config_path: Path,
     seed: int = 42,
 ) -> dict:
     require_semantic_dedup(dedup_config_path)
+    dedup_config = json.loads(dedup_config_path.read_text(encoding="utf-8"))
     records = list(read_jsonl(in_path))
     plan = load_coverage_plan(coverage_plan_path)
     protected_hashes = load_protected_hashes(protected_registry_path)
@@ -111,24 +118,43 @@ def run(
     operation_counts = Counter(r["kind"] for r in selected)
     bucket_counts = Counter(r["coverage_bucket"] for r in selected)
 
+    from real_providers import GENERATOR_PROMPT_VERSION, VERIFIER_PROMPT_VERSION, generator_prompt_sha256, verifier_prompt_sha256
+    from policy import load_policy, POLICY_SPEC_PATH
+
+    policy = load_policy()
+
     manifest = build_run_manifest(
         run_id=run_id,
         contract_version="v3",
-        policy_spec_path=Path(plan["policy_spec"]),
+        policy_spec_path=POLICY_SPEC_PATH,
         coverage_plan_path=coverage_plan_path,
-        generator_model_id="unset",
-        verifier_model_id=verifier_model_id,
+        generator_model_id=_model_ids(selected, "generator"),
+        verifier_model_id=_model_ids(selected, "verifier"),
+        generator_prompt_version=GENERATOR_PROMPT_VERSION,
+        generator_prompt_sha256=generator_prompt_sha256(policy),
+        verifier_prompt_version=VERIFIER_PROMPT_VERSION,
+        verifier_prompt_sha256=verifier_prompt_sha256(policy),
         generation_params={},
         verifier_confidence_threshold=0.90,
-        semantic_dedup_threshold=None,
+        semantic_dedup_provider_id=dedup_config.get("semantic_dedup_provider_id"),
+        semantic_dedup_threshold=dedup_config.get("semantic_dedup_threshold"),
         stage_counts={"input": len(records), "clean": len(clean), "selected": n},
         rejection_counts_by_reason={"contamination": contamination_count, "coverage_quota_full": len(overflow)},
-        exact_dedup_count=0,
-        semantic_near_dedup_count=0,
+        exact_dedup_count=dedup_config.get("exact_dedup_count", 0),
+        semantic_near_dedup_count=dedup_config.get("semantic_near_dedup_count", 0),
+        contamination_reject_count=contamination_count,
         final_verdict_distribution={k: v / n for k, v in verdict_counts.items()} if n else {},
         final_language_distribution={k: v / n for k, v in language_counts.items()} if n else {},
         final_operation_distribution={k: v / n for k, v in operation_counts.items()} if n else {},
         final_coverage_bucket_counts=dict(bucket_counts),
+        train_count=len(train),
+        valid_count=len(valid),
+        internal_test_count=len(internal_test),
+        seed=seed,
+        accepted_corpus_sha256=sha256_of(accepted_path),
+        train_sha256=sha256_of(out_dir / "train.jsonl"),
+        valid_sha256=sha256_of(out_dir / "valid.jsonl"),
+        internal_test_sha256=sha256_of(out_dir / "internal_test.jsonl"),
         started_at="",
     )
     write_manifest(manifest, out_dir / f"{run_id}.manifest.json")
@@ -155,13 +181,12 @@ def main() -> None:
     parser.add_argument("--out-dir", default=str(base / "data" / "frozen"))
     parser.add_argument("--failures", default=str(base / "data" / "failures" / "build_dataset.jsonl"))
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--verifier-model-id", default="unset")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     stats = run(
         Path(args.input_path), Path(args.coverage_plan), Path(args.protected_registry), Path(args.out_dir),
-        Path(args.failures), args.run_id, args.verifier_model_id, Path(args.dedup_config), args.seed,
+        Path(args.failures), args.run_id, Path(args.dedup_config), args.seed,
     )
     print(stats)
 

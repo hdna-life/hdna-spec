@@ -72,10 +72,17 @@ small paid smoke only, recording `semantic_dedup: disabled` in
 
 ## Spend cap
 
-Every real (`--provider openrouter`) run requires `--budget-requests`
-(and optionally `--budget-usd`) — the pipeline stops before the next
-request would exceed the cap, not after. Spend is recorded in the run
-manifest.
+Every real (`--provider openrouter`) run requires `--budget-requests`.
+`--max-budget-usd`, if set, requires a non-zero `--max-cost-per-request-usd`
+— a conservative, predeclared worst-case per-request cost. That worst
+case is *reserved* before every request (`reserved_spend + max_cost_per_
+request_usd <= max_budget_usd`, checked BEFORE the request, not after);
+the actual provider-reported cost (when OpenRouter returns one) is
+recorded separately for provenance only and never loosens the
+pre-request check — a cheaper-than-estimated actual cost never unlocks
+an extra request, and a more-expensive-than-estimated one never
+retroactively becomes unsafe. Reserved and actual generator/verifier
+spend are both recorded in the run manifest.
 
 ## Smoke run (20-50 real candidates)
 
@@ -88,25 +95,61 @@ corpus, trains anything, or touches acceptance thresholds/coverage
 quotas/the final benchmark.
 
 Every run is isolated under `data/smoke/<run-id>/`; a new `--run-id`
-never touches another run's artifacts, and re-running the same
-`--run-id` resumes it. `--budget-usd`, if set, is a single cap shared
-between the generator and verifier combined, not doubled. The generator
-and verifier refuse to start if `benchmark/protected-cases.v1.json` is
-still empty, unless `--allow-empty-protected-registry-smoke-only` is
+never touches another run's artifacts. Re-running the same `--run-id`
+**resumes** it and is fully cumulative:
+
+- `--max-candidates` is the TOTAL for that run_id across every
+  invocation, not "more, again" — a resume only generates the shortfall.
+- The budget (requests, reserved spend, actual spend, shared between
+  generator and verifier) is persisted and restored, never reset by a
+  restart.
+- The run's model IDs, coverage plan, policy spec, token/confidence
+  settings, budget configuration, and protected-registry override mode
+  are persisted at creation (`run_config.json`) and a resume is
+  **refused** if the requested configuration differs.
+- Diagnostics in the smoke manifest are always rebuilt from the run's
+  full accumulated artifacts, so they describe the whole run_id, not
+  just the latest invocation.
+
+The generator and verifier refuse to start if `benchmark/protected-cases.v1.json`
+is still empty, unless `--allow-empty-protected-registry-smoke-only` is
 passed deliberately (recorded in the manifest; never honored by the full
-build).
+build — see `pipeline/full_run.py`).
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 python3 pipeline/smoke.py --run-id smoke-001 \
   --generator-model-id <model> --verifier-model-id <model> \
   --max-candidates 30 --generator-budget-requests 35 --verifier-budget-requests 35 \
-  --budget-usd 1.00 --cost-per-request-usd 0.01
+  --max-budget-usd 1.00 --max-cost-per-request-usd 0.01
 python3 pipeline/review_smoke.py data/smoke/smoke-001/smoke-001.smoke_manifest.json
 ```
 
 `review_smoke.py` prints the diagnostics for a human STOP/REVISE-vs-
 PROCEED call — it never decides this itself.
+
+## Full run (later, not executed by this pass)
+
+`pipeline/full_run.py` is the canonical orchestration entrypoint for the
+eventual 5K-accepted-example generation: generate -> validate ->
+contamination guard -> blind verifier -> acceptance -> exact dedup ->
+semantic near-dedup -> contamination guard again -> `build_dataset.py`'s
+quota/band/language enforcement -> frozen dataset. Its
+`replenish_to_accepted_quota()` treats each coverage bucket's quota as a
+target for **accepted** examples, not generated candidates: it keeps
+generating for a bucket — replenishing whatever schema rejection,
+verifier disagreement, low confidence, provider failure, exact/semantic
+dedup, or contamination removed — until that bucket's accepted count
+meets its frozen quota, an explicit `max_total_requests` ceiling is
+reached, or every still-short bucket hits its own
+`max_attempts_per_bucket` ceiling. There are no built-in large defaults
+for either ceiling — a real full run must pass them explicitly. Hitting
+a ceiling before every quota is met stops safely, preserves progress,
+and reports the shortfall; it never freezes a corpus with missing
+quotas (`build_dataset.py` refuses that unconditionally). Unlike smoke,
+full-run generation requires a populated protected-case registry with no
+override, and semantic near-dedup requires an explicitly configured
+embedding provider — this module does not pick one.
 
 ## Offline testing
 
@@ -136,9 +179,11 @@ training/test2/
   README.md
   ACCEPTANCE_CRITERIA.md
   coverage-plan.v1.json
-  lib/                shared modules (ids, jsonl_io, providers, dedup,
-                       contamination, coverage, acceptance, manifest)
-  pipeline/            the five stage scripts + add_protected_case.py
+  lib/                shared modules (ids, jsonl_io, providers, real_providers,
+                       dedup, contamination, coverage, acceptance, budget,
+                       run_state, manifest, smoke_report)
+  pipeline/            the five stage scripts + smoke.py + full_run.py +
+                       review_smoke.py + add_protected_case.py
   tests/               offline end-to-end pipeline test
   data/                generated/accepted corpus (gitignored)
   benchmark/

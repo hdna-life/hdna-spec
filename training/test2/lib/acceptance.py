@@ -6,7 +6,34 @@ disagreement there is recorded for audit, not rejected."""
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
+from policy import is_valid_dimensions_list  # noqa: E402
+
 VERIFIER_CONFIDENCE_THRESHOLD = 0.90
+
+
+def validate_verifier_output_structure(output: dict[str, Any], policy: dict) -> str | None:
+    """Canonical v3 structural contract for a verifier response — rejected,
+    never repaired, on any violation:
+      - verdict must be one of the policy's verdicts
+      - dimensions must be a valid dimension/direction list
+      - confidence must be a number in [0, 1]
+      - verdict == "uncertain" requires dimensions == []
+    Returns a rejection reason, or None if structurally valid."""
+    if output.get("verdict") not in policy["verdicts"]:
+        return "invalid_verdict"
+    if not is_valid_dimensions_list(output.get("dimensions", []), policy):
+        return "invalid_dimensions"
+    confidence = output.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not (0.0 <= confidence <= 1.0):
+        return "invalid_confidence"
+    if output["verdict"] == "uncertain" and output["dimensions"]:
+        return "uncertain_with_nonempty_dimensions"
+    return None
 
 
 def decide_acceptance(record: dict, confidence_threshold: float = VERIFIER_CONFIDENCE_THRESHOLD) -> dict:
