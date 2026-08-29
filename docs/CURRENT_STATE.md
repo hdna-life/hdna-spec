@@ -1,534 +1,171 @@
-# CURRENT_STATE.md
+# HDNA Current State
 
-Last reviewed commit: (initial commit — this PR)
+Read this first. It describes the CURRENT product/architecture reality —
+not a chronological narrative of how the project got here. History lives
+in `docs/history/` and `docs/decisions/`'s ADRs; this file should never
+need those to be understood.
 
-## Current phase
+## What is HDNA?
 
-**Phase 5A — persona evidence utility validation — is now the immediate
-priority, per an explicit operator-driven roadmap change (see
-`docs/decisions/0016`).** Following the first real Phase 4/T3 human dogfood
-test (`docs/decisions/0015`): **PIPELINE EXECUTION is VALIDATED** (canonical
-evidence → deterministic metrics → patterns → minimized aggregates →
-OpenRouter → persisted claims worked end to end against the real extension
-and a real external API); **PERSONA INFORMATION RICHNESS is NOT VALIDATED**
-— the two deterministic dimensions PATTERNS currently produces
-(`compressionRatio`, `lexicalOverlap`) don't carry enough semantic
-information for T3 to construct a meaningful persona, an
-information-representation bottleneck, not a sample-count problem. T3 itself
-is not a failed implementation. Phase 5A (`SemanticDeltaExtractionService`,
-OpenRouter-based, observation-only, per-source idempotent via receipts)
-implements a new experimental evidence layer — AI-output/human-edit pairs →
-grounded `SemanticDeltaCandidate` observations — to test whether richer
-semantic evidence can be derived upstream of PATTERNS. **The first real run
-against the 5-pair corpus is complete and human-graded: INFORMATION GAIN —
-PASS (the central question), GROUNDEDNESS — FAIL (66.7% vs. required
-≥80%), overall status ITERATE** — see "Current experiments / pending
-decisions" below and `docs/decisions/0016` for the full result. This is
-promising evidence, not proof the hypothesis is fully validated. Two
-controlled follow-up trials have since targeted the groundedness shortfall
-specifically: **Trial 1** (transformation-grounding instruction) —
-groundedness unchanged (66.7%), still ITERATE; **Trial 2** (deterministic
-evidence localization + atomic/redundancy/removal discipline) — the first
-quantitative groundedness improvement (66.7% → 70.6%), still below the
-≥80% threshold, still ITERATE. **Trial 3** (local semantic-revision-judge
-feasibility — an architecture change, not a prompt tweak: deterministic
-per-intervention judging via a tiny local `Qwen3-0.6B` model over MLX,
-zero-shot, no fine-tuning) — **local runtime/MLX execution PASS, but
-zero-shot semantic capability FAIL** (broad semantic matrix 52.9%, A/B
-discrimination 51% — chance level, coarse feature classification 14.9%);
-COMPLETE, recorded as the official zero-shot tiny-model baseline; **still
-ITERATE overall** — see "Current experiments / pending decisions" below
-for all three. **Phase 5A overall status remains ITERATE — not complete,
-not validated.** The prior immediate roadmap (retrieval runtime → WebGPU
-expression engine) is **deferred/reordered, not cancelled**, pending this
-evidence-utility question — see `docs/decisions/0016`.
+A local, portable behavioral layer for AI. Frontier models provide
+intelligence; HDNA learns how a user naturally communicates and adapts
+frontier output's expression to match, without training or fine-tuning
+the frontier model itself and without sending raw personal text off the
+user's device by default. Full product contract:
+`docs/MVP_PRODUCT_CONTRACT.md`.
 
-Phase 4's TRAITS/BELIEFS (T3) step — persona interpretation over compiled
-PATTERNS via an LLM call — is now implemented (see `docs/decisions/0015`),
-using OpenRouter as the concrete MVP provider behind a provider-agnostic
-interface. Phase 0, Phase 1, Phase 2's first slice, and all of Phase 3
-(3A/3B/3C) and Phase 4 (both the deterministic PATTERNS layer and the T3
-TRAITS/BELIEFS step) are complete. This is the project's first
-network/LLM dependency. Also includes a post-3C fix: `HeuristicTinyClassifier` was silently
-English-only, saturating/biasing on non-English (Turkish) evidence — see
-`docs/decisions/0012`. And two post-3A governor fixes on the same branch: `DEEP_IDLE` mode
-selection was gated on an empty queue, which made any pending `P3` job
-self-blocking (its own presence in the backlog prevented the only mode
-that could dispatch it) — see `docs/decisions/0013`; then a follow-up
-correction after manual testing on the real unpacked extension found that
-fix's in-memory `idleTicks` counter could never accumulate across MV3
-service-worker restarts, making `DEEP_IDLE` unreachable in real Chrome —
-replaced with a persisted wall-clock timestamp
-(`RuntimeStatus.foregroundInactiveSince`), alongside a generic
-`JobQueue.enqueueSingleton()` fix for a separate bug where repeated clicks
-on a rebuild button queued unbounded duplicate jobs — see
-`docs/decisions/0014`. A further post-3C fix corrected the T2 panel's
-"No evidence classified yet." message, which was indistinguishable from
-"the classifier abstained on all evidence" — see
-`docs/validation/manual-mvp-validation.md` for the full manual-testing
-narrative behind 0012/0013/0014 and this fix.
+**This is not personality inference or mind-reading.** HDNA reasons about
+directly observable textual behavior only — never a claim about the
+user's psychology, motivation, emotional state, or identity.
 
-## Active MVP scope
+## Product status
 
-Infrastructure prerequisites for the MVP hypothesis, Phase 1 cold-start data
-collection, a first Phase 2 passive-collection slice, Phase 3
-(batching/eviction infra, embeddings/retrieval, and T2 classifiers), and
-Phase 4's deterministic PATTERNS layer:
+- **Phase 5A Trial 4 / Test 1: CLOSED — SUCCESS.** Trainability of a very
+  small local edit judge is validated: a `Qwen/Qwen3-0.6B` LoRA
+  specialized on 183 human-reviewed examples reached 80% semantic-exact
+  accuracy and 80% human-acceptable rate on a fresh 10-case held-out
+  validation. Full result:
+  `training/phase5a/benchmark/test1-final-result.md`.
+- **Test 2 is next:** automated synthetic distillation (~5,000 accepted
+  examples, frontier-generated + independently filtered) targeting a
+  smaller WebGPU-oriented student, `google/gemma-3-270m-it`. Pipeline
+  implemented and offline-tested; no generation has run, no paid API
+  calls made — see "Next" below.
+- The MV3 extension runtime (storage, job queue, governor, deterministic
+  Phase 1-4 evidence pipeline, T3 OpenRouter persona interpretation, Phase
+  5A semantic-delta extraction, and the Trial 4 benchmark Dashboard) is
+  implemented and tested — see `docs/architecture/mvp-scope.md` for which
+  of it is retained product foundation vs. superseded experimental runtime.
 
-- MV3 extension runtime (WXT + Svelte), background service worker + popup.
-- Local storage abstraction (`StorageAdapter`) backed by IndexedDB.
-- Persistent job queue with P0-P3 priority classes, survives SW termination.
-- Resource governor skeleton: pure latency/backlog-driven batch-size decisions.
-- Runtime controls: pause processing vs. pause learning (distinct, persisted).
-- Transparency UI: status, queue counts, storage usage by class, controls.
-- Deterministic test infrastructure (vitest + fake-indexeddb), 223 tests.
-- `spec/` protocol/schema types for storage classes, evidence metadata, identity
-  facts, Expression Sheet, writing samples, edit events/metrics/profile,
-  storage policy, embeddings, T2 dimensions/trait scores/profile, patterns,
-  `.hdna` manifest shape.
-- Phase 1 onboarding: real writing samples -> deterministic T0 stylometry ->
-  Expression Sheet compilation, synchronous (see `docs/decisions/0004`).
-- Phase 2 (first slice): AI-output/human-edit pairs, captured manually in the
-  popup, processed asynchronously through the job queue (P1) -> T0 diff
-  metrics -> T1 incremental profile (see `docs/decisions/0005`).
-- Phase 3A: dispatch is mode-gated (INTERACTIVE/BACKGROUND/DEEP_IDLE actually
-  restrict which job priorities run), foreground activity is real (popup-open
-  detection via `chrome.runtime.Port`), and storage eviction (CACHE→DERIVED→RAW,
-  CANONICAL never automatic) actually runs (see `docs/decisions/0008`).
-- Phase 3B: `EmbeddingProvider` (execution-context-agnostic interface) +
-  `HashingEmbeddingProvider` (deterministic, non-semantic baseline) +
-  `VectorIndexService` (rebuildable index over canonical evidence) +
-  `cosineSimilarity`/`queryNearest` retrieval primitives. Incremental
-  indexing is `P2`, full rebuild is `P3`, both through the existing job
-  queue; query-time embedding runs directly in the popup (see
-  `docs/decisions/0009`).
-- Phase 3C: `TinyClassifier` (execution-context-agnostic interface) +
-  `HeuristicTinyClassifier` (deterministic, heuristic baseline covering only
-  formality + directness — the other five T2 dimensions stay
-  `SPEC_RESERVED`) + `TraitClassifierService` (idempotent classify + atomic
-  profile fold-in, rebuildable from evidence, same pattern as
-  `VectorIndexService`). Confidence-weighted incremental aggregation in
-  `T2Profile`. `classify_evidence` is `P2`, `rebuild_t2_profile` is `P3`
-  (see `docs/decisions/0010`).
-- Phase 4 (PATTERNS layer): `PatternCompilerService` aggregates
-  `EditMetrics`/`TraitScoreRecord` into context-scoped `Pattern` records
-  (context resolved from evidence's `context.surface`, defaulting to
-  `"unscoped"`), gated by an explicit evidence threshold
-  (`PatternCompilerPolicy`) — no `Pattern` is emitted below threshold.
-  `compile_patterns` is `P3`, manually triggered — see `docs/decisions/0011`.
-- Phase 4 (T3, TRAITS/BELIEFS): `PersonaInterpreterService` interprets
-  compiled `Pattern`s into `TraitBeliefClaim`s via a provider-agnostic
-  `PersonaInterpreterProvider` interface, concretely implemented by
-  `OpenRouterPersonaInterpreter` (the project's first network/LLM
-  dependency). Gated by a deterministic evidence threshold
-  (`PersonaInterpreterPolicy`) before any network call is made; only
-  minimized `PatternCandidate` aggregates leave the device, never raw
-  evidence or prior claims. `interpret_traits_beliefs` is `P3`, manually
-  triggered. API key/model/enabled config lives in `chrome.storage.local`,
-  outside the persona storage taxonomy — see `docs/decisions/0015`.
-- Phase 5A (persona evidence utility validation): `SemanticDeltaExtractionService`
-  extracts observation-centered `SemanticDeltaCandidate`s from `EditEvent`
-  AI-output/human-edit pairs via a provider-agnostic
-  `SemanticDeltaExtractorProvider` interface, concretely implemented by
-  `OpenRouterSemanticDeltaExtractor`. Deliberately sends raw edit-pair text
-  (unlike T3's minimized aggregates) — an explicit, disclosed
-  privacy-boundary difference, opt-in via its own independent
-  `SemanticDeltaExtractorConfigStore`. Per-source idempotent via
-  `SemanticDeltaExtractionReceipt` (candidate existence alone can't signal
-  "already processed," since a correct abstention produces zero
-  candidates). `extract_semantic_deltas` is `P3`, manually triggered. Stops
-  at OBSERVATION — no semantic aggregation/promotion into patterns or
-  traits in this phase — see `docs/decisions/0016`.
-- Post-3C fix: real-world Turkish evidence (35 samples) exposed that
-  `HeuristicTinyClassifier` was silently English-only — `directness`
-  saturated at a confidently-wrong 100%, `formality` was biased upward.
-  Fixed with `isLikelyEnglish()`, which requires BOTH a non-ASCII-letter
-  ratio ≤ 2% AND English function-word density ≥ 5%. The first version used
-  only the non-ASCII signal; the operator rejected it and requested an
-  ASCII-only-Turkish regression test, which exposed that diacritic-free
-  non-English text (common in real typing) passes a character-only check —
-  the function-word signal closes that gap. Both dimensions abstain (omit
-  entirely) rather than emit a fabricated value when the gate fails — see
-  `docs/decisions/0012`.
+## Two things not to confuse
 
-## Implemented capabilities
+**VALIDATED RESEARCH PRIMITIVE** — localized BEFORE/AFTER semantic +
+behavioral judgment (`SemanticRevisionJudgeProvider`, the v3 two-axis
+contract). Given one AI-draft/human-edit pair, judges the semantic
+`verdict` plus observable-behavior `dimensions` of that one localized
+change. This is what Test 1 validated as trainable on a tiny local model.
+It is not the product's primary learning mechanism — its future role is
+contributing to the `<VERIFY>` safety gate (see
+`docs/MVP_PRODUCT_CONTRACT.md`).
 
-- `IndexedDbStorageAdapter`: get/put/delete/query, per-storage-class byte usage,
-  `putMany` (atomic multi-key write via one IDBTransaction).
-- `JobQueue`: enqueue, priority+FIFO ordering, `runNext`, `countsByPriority`,
-  persists through `StorageAdapter`. At-least-once: `RUNNING` jobs whose lease
-  (`startedAt`) expires (default 5 min) are reclaimed back to `PENDING` and
-  retried, so a job interrupted mid-execution by MV3 service-worker
-  termination is not lost — see `docs/decisions/0007`.
-- `decideMode()` / `resource-governor.decide()`: `decideMode()` is a pure
-  function of `(foregroundActive, inactiveDurationMs)` —
-  INTERACTIVE/BACKGROUND/DEEP_IDLE, never queue backlog (`docs/decisions/0013`).
-  `inactiveDurationMs` is computed at the runtime boundary
-  (`entrypoints/background.ts`) by `computeForegroundInactivity()`
-  (`extension/src/runtime/foreground-inactivity.ts`) from a *persisted*
-  timestamp (`RuntimeStatus.foregroundInactiveSince`), not an in-memory
-  tick counter — the latter could never accumulate across MV3
-  service-worker restarts, making `DEEP_IDLE` structurally unreachable in
-  real Chrome; see `docs/decisions/0014`. `decideMode()` is exported
-  separately from `decide()` so mode is recomputed fresh, from storage,
-  before each tick's dispatch. `decide()`'s batch-size halving/doubling on
-  latency ratio is unchanged, still carried in memory across ticks (a
-  self-correcting adaptation value, not a correctness-sensitive one).
-- `RuntimeControls`: persisted `processingPaused`/`learningPaused` state.
-- `stylometry.ts`: deterministic T0 extractors — sentence/word splitting,
-  sentence-length distribution, punctuation-per-100-sentences, lowercase-start
-  probability, emoji-per-word rate. No model calls, no randomness.
-- `compileExpressionSheet()`: samples -> `ExpressionSheet`, populates only
-  MVP_REQUIRED fields (asserted by test), never SPEC_RESERVED ones.
-- `WritingSampleStore` (CANONICAL) / `ExpressionSheetStore` (DERIVED,
-  rebuildable from samples at any time).
-- `levenshteinDistance` / `jaccardWordOverlap` / `computeEditMetrics`: pure T0
-  diff extractors over an EditEvent (AI text vs. human-edited final text).
-- `applyEditMetrics()`: numerically-stable online mean update, no history
-  rescan — folds one new EditMetrics into the running EditProfile.
-- `EditEventStore` (CANONICAL) / `EditMetricsStore` (DERIVED, per-event) /
-  `EditProfileStore` (DERIVED, running aggregate).
-- `captureEditEvent()`: persist + enqueue P1 job, returns immediately — the
-  actual T0/T1 computation runs later in the background dispatch loop.
-- `process_edit_event` processor is idempotent: `EditMetrics.profileAppliedAt`
-  is the receipt that stops a reclaimed/replayed job from double-counting
-  `EditProfile`; the metrics write and profile write land atomically via
-  `putMany()` so no crash window can leave the receipt and the profile
-  update out of sync (`docs/decisions/0007`).
-- Popup UI: onboarding textarea + Expression Sheet summary + edit-capture form
-  + Edit Profile summary + real governor mode + last-eviction info, wired to
-  live queue/storage/controls state, polls every 2s.
-- `chrome.alarms`-driven background dispatch loop running the `noop` and
-  `process_edit_event` processors, now mode-gated: `JobQueue.next()`/`runNext()`
-  accept an `allowedPriorities` filter, and dispatch is restricted to
-  `ALLOWED_PRIORITIES_BY_MODE[mode]` each tick.
-- `ForegroundTracker`: tracks whether the popup is open via a long-lived
-  `chrome.runtime.Port`, feeding the governor's real `foregroundActive` signal
-  (previously hardcoded `false`).
-- `planEviction()` (pure) / `evictIfNeeded()`: evicts CACHE, then DERIVED,
-  then RAW records until back under `DEFAULT_STORAGE_POLICY.maxTotalBytes`;
-  CANONICAL is never evicted automatically. Runs each dispatch tick, deletions
-  skipped while `mode === 'INTERACTIVE'`.
-- `RuntimeStatusStore`: persists the background loop's live
-  `{ mode, batchSize, lastEvictionAt, lastEvictionBytesFreed }` (CACHE class)
-  so the popup, a separate execution context, can display it.
-- `HashingEmbeddingProvider`: deterministic FNV-1a character-3-gram hashing
-  trick, L2-normalized, 128 dimensions. Non-semantic by design — see
-  `docs/decisions/0009`.
-- `VectorIndexService`: `indexOne()`, `rebuild()` (discards and recomputes
-  the entire index from every registered canonical evidence source —
-  `writing_sample` and `edit_event`, the latter embedding the human-edited
-  `finalText`), `query()`.
-- `EmbeddingStore` (`DERIVED`, keyed by `sourceType:sourceId`).
-- Popup UI: Vector Index panel — embedding count, extractor id/version,
-  "Rebuild index" button, similarity search (results show
-  `sourceType:sourceId (score)`, no text-snippet resolution yet).
-- `HeuristicTinyClassifier`: deterministic formality (word length,
-  contraction/emoji/exclamation rate) and directness (hedge-phrase
-  frequency) scoring, 0-confidence for empty text, confidence saturating at
-  20 words. Non-validated heuristics, explicitly documented as such — see
-  `docs/decisions/0010`.
-- `applyTraitScore()`: confidence-weighted incremental mean per T2 dimension
-  — same "no history rescan" principle as `applyEditMetrics()`.
-- `TraitScoreStore` / `T2ProfileStore` (`DERIVED`).
-- `TraitClassifierService`: `classifyOne()` (idempotent via
-  `TraitScoreRecord.profileAppliedAt`, atomic dual-write) / `rebuild()`
-  (discards and recomputes from `writing_sample` + `edit_event` sources,
-  reusing the exact `embedding-sources.ts` adapters from Phase 3B).
-- Popup UI: Behavioral Estimates (T2) panel — formality/directness as
-  percentages with sample counts, explicit "heuristic estimates, not
-  established traits" note, "Rebuild T2 Profile" button (enqueues the
-  existing `rebuild_t2_profile` P3 job — same rebuild UX as the Vector
-  Index panel's button). `deriveT2PanelState()`
-  (`extension/src/persona/t2-panel-state.ts`) distinguishes no evidence at
-  all from evidence the classifier abstained on from actually-classified
-  evidence, so the abstention path (all-Turkish corpora on the
-  English-only baseline) reads as "preserved but skipped," not as no
-  samples having been submitted — see
-  `docs/validation/manual-mvp-validation.md`.
-- `aggregateObservations()`: pure, threshold-gated confidence-weighted
-  aggregation by (dimension, context) — same weighting principle as
-  `applyTraitScore()`.
-- `PatternStore` (`DERIVED`, keyed by `dimension:context`).
-- `PatternCompilerService.compile()`: full rebuild from `EditMetrics`
-  (`compressionRatio`, `lexicalOverlap`) and `TraitScoreRecord`
-  (`formality`, `directness`), context resolved per-record from the source
-  evidence. Mirrors `VectorIndexService`'s rebuild contract.
-- Popup UI: Patterns panel — dimension/context/value/sample-count list,
-  "Compile patterns" button.
-- `JobQueue.enqueueSingleton(type, priority, payload)`: enqueues only if no
-  `PENDING`/`RUNNING` job of that `type` already exists, otherwise returns
-  the existing one — generic coalescing, keyed by type alone. Used by all
-  three full-rebuild job wrappers (`enqueueT2ProfileRebuild`,
-  `enqueueVectorIndexRebuild`, `enqueuePatternCompilation`) so repeated
-  clicks on a rebuild button can't accumulate duplicate `P3` jobs; see
-  `docs/decisions/0014`.
-- `TraitBeliefStore` (`DERIVED`, keyed by id) — TRAITS/BELIEFS claims,
-  fully rebuildable from `PatternStore`.
-- `PersonaInterpreterConfigStore` — OpenRouter API key, model id, enabled
-  flag; backed by `chrome.storage.local` directly, deliberately outside
-  `StorageAdapter`/the persona storage-class taxonomy — see
+**FINAL MVP LEARNING DIRECTION** — a single natural user-authored text
+(no AI draft, no edit pair) → local `<LEARN>` → structured style/
+preference observations → deterministic confidence/recency aggregation →
+user-owned `.hdna` state. This is the actual product learning mechanism.
+**Not validated by Test 1.** Full contract, boundaries, and privacy
+rules: `docs/MVP_PRODUCT_CONTRACT.md`.
+
+Do not read the existing `EditEvent`/`EditProfile`/`SemanticDeltaCandidate`
+research pipeline (AI-output → human-edit comparison) as the product's
+learning source — it answered a narrower research question and is being
+superseded by the direction above.
+
+## Current canonical runtime principles
+
+- **Local-first / user-owned behavioral data.** Evidence is stored on the
+  user's device (`IndexedDbStorageAdapter`) by default; nothing leaves
+  the device without an explicit, disclosed, opt-in network boundary.
+- **Deterministic preprocessing where possible.** Localization, diffing,
+  admission, and storage classification are deterministic HDNA logic —
+  models are given the narrowest possible judgment, never asked to
+  discover boundaries or aggregate across evidence themselves.
+- **Local small-model judgment.** The edit-judgment step targets a
+  sub-billion-parameter model runnable locally (currently MLX/Apple
+  Silicon for Test 1; WebGPU is the target runtime — see "Next").
+- **Browser/WebGPU target.** The eventual runtime for both judgment and
+  any transformation layer is the browser, not a server.
+- **Observable textual behavior, not hidden psychology.** The judgment
+  contract (`task-contract.v3.md`) explicitly forbids inferring emotion,
+  motivation, psychology, identity, or personality from one observation —
+  only directly observable expressed wording.
+- **Explicit export/network boundaries.** Every network-calling component
+  (T3's `OpenRouterPersonaInterpreter`, Phase 5A's semantic-delta
+  extractor, Trial 4's benchmark providers) is opt-in, behind its own
+  config store, and documented with exactly what leaves the device.
+- **Rebuildable derived state.** Every derived store (embeddings, T2
+  profile, patterns, trait/belief claims) is fully reconstructable from
+  canonical evidence — nothing derived is itself a second source of
+  truth.
+
+## Validated
+
+- **Test 1 (`Qwen3-0.6B` specialization feasibility): SUCCESS.** A LoRA
+  adapter trained on 183 human-reviewed v3 examples materially
+  outperformed the same base model zero-shot (Trial 3's frozen baseline:
+  52.9% semantic / 51% A-B discrimination / 14.9% coarse-feature).
+- **183-example LoRA baseline** — the frozen training corpus is committed
+  (`training/phase5a/dataset/frozen/trial4-v3-human-183.json` + manifest).
+  Adapter weights themselves are a local/generated artifact
+  (`training/phase5a/adapters/v1/`, gitignored — not committed); not being
+  expanded further.
+- **Final fresh 10-case Turkish held-out validation:** 80% semantic-exact
+  accuracy, 80% human-acceptable rate, vs. DeepSeek (frontier reference)
+  78% / 100%. Do not read this as "beat DeepSeek" — DeepSeek remained
+  clearly superior in dimension quality and blind ranking (89% Rank-1 vs.
+  10%).
+- **Dimensions remain the main weakness** — false-positive dimensions,
+  missed dimensions, and boundary confusion between related dimensions
+  were common; the semantic verdict axis was learned far better than the
+  full 15-dimension behavioral taxonomy.
+- **Test 1 was feasibility/trainability validation, not production
+  certification** — it did not establish production-ready judgment
+  quality, reliable dimension prediction, frontier-level output quality,
+  or that `Qwen3-0.6B` should be the production student. See
+  `training/phase5a/benchmark/test1-final-result.md`'s "What Test 1 did
+  NOT prove" section.
+- Deterministic pipeline execution (canonical evidence -> derived metrics
+  -> patterns -> minimized aggregates -> LLM interpretation -> persisted
+  claims) is confirmed working end to end against real data and a real
+  external API (T3/OpenRouter dogfood run) — see
   `docs/decisions/0015`.
-- `OpenRouterPersonaInterpreter implements PersonaInterpreterProvider` —
-  the sole owner of `fetch`/credential handling; structured/schema-validated
-  request+response, both the request's `response_format` and a defensive
-  `validateClaimDraft()` on the parsed response.
-- `PersonaInterpreterService.interpret()`: deterministic evidence-threshold
-  gate (`isEligibleForInterpretation`, no network call below threshold) ->
-  minimize `Pattern`s to `PatternCandidate`s -> provider call (never given
-  the previous claim set, to avoid self-reinforcing drift) -> validate ->
-  full-rebuild write to `TraitBeliefStore`. Provider constructed fresh from
-  current config on every run, not cached in the service-worker closure.
-- Popup UI: Traits/Beliefs (T3) panel — claim/context/confidence/
-  supporting-pattern-count list, "Interpret traits/beliefs" button, inline
-  settings form (API key, model id, enabled).
-- `extension/wxt.config.ts`: `host_permissions: ['https://openrouter.ai/*']`
-  — scoped to exactly the one provider origin in use.
-- `SemanticDeltaCandidateStore` / `SemanticDeltaExtractionReceiptStore`
-  (both `DERIVED`) — observation-centered evidence candidates and their
-  per-source processing provenance, see `docs/decisions/0016`.
-- `SemanticDeltaExtractorConfigStore` — independent `chrome.storage.local`-
-  backed config (OpenRouter API key, model id, its own `enabled` flag),
-  deliberately separate from `PersonaInterpreterConfigStore`.
-- `OpenRouterSemanticDeltaExtractor implements SemanticDeltaExtractorProvider`
-  — sends raw `originalText`/`finalText` (Phase 5A's documented,
-  intentional privacy-boundary difference from T3), structured/schema-
-  validated request+response, `validateCandidateDraft()` as the real
-  enforcement point.
-- `SemanticDeltaExtractionService.runExperiment()`: per-source idempotent
-  (not full-rebuild) — skips a source only when an existing receipt's
-  extractor identity matches the currently configured provider, so an
-  intentional model/version change can still reprocess it, while an
-  accidental repeat run never resends raw text for an already-processed
-  source.
-- Popup UI: Semantic Delta Extraction (Phase 5A — experimental) panel —
-  readiness status, explicit raw-text-upload warning next to the trigger
-  button, extracted/abstained receipt counts, candidate list, inline
-  settings form.
 
-## Known limitations
+## Next
 
-- `DEEP_IDLE_AFTER_INACTIVE_MS = 90_000` is a placeholder tuning value, not
-  derived from measurement — see `docs/decisions/0013` and `0014`.
-- No retry cap on stale-RUNNING reclaim: a job that reliably crashes the
-  service worker every time it runs would be retried indefinitely rather
-  than eventually marked `FAILED`. Not implemented — see `docs/decisions/0007`.
-- `putMany()`'s atomicity currently relies on `IndexedDbStorageAdapter`
-  keeping all records in one physical object store. A future SQLite/OPFS
-  adapter would need its own transaction mechanism to preserve this
-  guarantee behind the same `StorageAdapter` interface.
-- Eviction budget (50 MB) is a hardcoded placeholder, not user-configurable —
-  see `docs/decisions/0008`.
-- Within-class eviction order is not LRU/recency-based, just whatever
-  `listRecordMeta()` returns — see `docs/decisions/0008`.
-- `foregroundActive` only reflects "is the popup open," not other foreground
-  signals the doc mentions (tab focus, recent interaction latency).
-- `HashingEmbeddingProvider` is not semantic — retrieval reflects character/
-  lexical overlap, not meaning. Explicit, accepted tradeoff, not a bug — see
-  `docs/decisions/0009`.
-- `queryNearest` is a linear scan, not an ANN index — fine at MVP scale,
-  untested beyond it.
-- No UI resolution from a vector-search result back to its source text.
-- `HeuristicTinyClassifier`'s formality/directness scores are crude,
-  non-validated heuristics — explicit, accepted tradeoff, not a bug — see
-  `docs/decisions/0010`.
-- T2 confidence only reflects word count within the English-gated path —
-  genre and other factors beyond language-applicability still aren't
-  modeled. See `docs/decisions/0012` for the language-gate fix.
-- `isLikelyEnglish()` doesn't attempt general language identification —
-  non-English text that is both ASCII-only *and* happens to reuse enough
-  English function words (rare, but conceivable for heavily code-mixed
-  text) could still pass. Intentional, documented scope boundary — see
-  `docs/decisions/0012`.
-- No UI currently sets `context.surface` on writing samples or edit events,
-  so in practice all pattern observations fall into the `"unscoped"` bucket
-  today — the context-scoping architecture is correct and tested, just not
-  yet exercised with real multi-context data. See `docs/decisions/0011`.
-- Pattern dimensions are limited to what existing derived evidence exposes
-  (`compressionRatio`, `lexicalOverlap`, `formality`, `directness`) —
-  `editDistance`/`sentenceCountChange` excluded as unbounded raw counts.
-- `PatternCompilerService.compile()` is a full rebuild, not incremental —
-  acceptable for this job's `P3`/expensive-rare classification.
-- `PersonaInterpreterConfigStore`'s API key has no encryption beyond
-  whatever Chrome provides for extension local storage — an explicit,
-  documented MVP tradeoff, not an oversight. See `docs/decisions/0015`.
-- No per-request cost/rate limiting or spend cap on T3 interpretation —
-  bounded only by `enqueueSingleton`'s existing one-outstanding-job
-  coalescing, not by any cost-awareness logic.
-- `SemanticDeltaExtractorConfigStore`'s API key has the same no-encryption-
-  beyond-Chrome tradeoff as `PersonaInterpreterConfigStore`; no per-request
-  cost/rate limiting either — see `docs/decisions/0016`.
-- Phase 5A's optional (A) human-final-text-alone vs. (B) contrastive
-  original+final control is documented but not implemented.
+**Test 2 — the final pre-product research test.** Narrow question: can
+`google/gemma-3-270m-it`, after clean synthetic filtered distillation,
+retain acceptable quality on the canonical v3 judgment primitive AND run
+as the intended browser/WebGPU-class model? Test 2 does **not** claim to
+validate the complete LEARN/REWRITE product loop — that loop is product
+work, implemented immediately after Test 2 passes, using normal product
+acceptance tests rather than another broad research phase.
 
-## Known gaps (intentionally deferred, not bugs)
+- Pipeline: `policy/coverage spec -> generator candidate -> deterministic
+  schema/policy validation -> blind verifier -> acceptance/dedup ->
+  coverage balancing -> frozen accepted corpus -> LoRA/SFT -> fresh
+  held-out benchmark`. Implemented and offline-tested (mock providers, no
+  network) in `training/test2/`; no paid generation has run.
+- Target: ~5,000 accepted examples against a frozen coverage plan
+  (`training/test2/coverage-plan.v1.json`) targeted at difficult taxonomy
+  boundaries rather than scaling random examples.
+- Frozen pass/fail criteria before any output exists:
+  `training/test2/ACCEPTANCE_CRITERIA.md` — semantic exact >=80%, human
+  acceptable >=80%, schema-valid >=98%, dimension micro-F1 >=0.60, n>=100
+  fresh benchmark cases, plus a required browser/WebGPU deployment smoke
+  test (a training run alone does not validate the WebGPU target).
+- A completely new held-out evaluation — Test 1's benchmark cases must
+  not be reused as Test 2's scored benchmark, guarded by a committed
+  content-hash registry (`training/test2/benchmark/protected-cases.v1.json`).
 
-- No live/passive capture — evidence only arrives via explicit user action
-  (onboarding samples, manual edit-event form). Content-script-based live
-  capture across web pages is `PLANNED`, pending a separate operator decision
-  on `host_permissions` scope and privacy review (`docs/decisions/0005`).
-- No character n-grams, typo-pattern detection, response-latency, or
-  keystroke/session telemetry yet (Phase 2 T0 items not yet built).
-- Five of seven T2 dimensions (warmth, assertiveness, politeness, emotional
-  intensity, sarcasm likelihood) remain `SPEC_RESERVED` — typed, never
-  computed. Sarcasm specifically needs conservative handling a simple
-  heuristic can't provide — see `docs/decisions/0010`.
-- EditProfile, the vector index, the T2 profile, and now Patterns are not
-  yet wired into the Expression Sheet or any retrieval-for-generation flow —
-  that integration belongs to Phase 5 (retrieval runtime), not this slice.
-- No real (neural) embedding model or trained classifier, no WebGPU model.
-- Governor's WebGPU-contention/battery/memory-pressure signals are typed
-  (`SPEC_RESERVED`) but unwired — nothing produces them yet.
-- Expression Sheet's SPEC_RESERVED fields (prosody, gesture, formality,
-  directness, warmth) remain unpopulated by design.
-- Sentence splitting is a naive regex (no abbreviation/decimal handling) —
-  acceptable for T0 per the doc, documented in `stylometry.ts`.
-- `.hdna` manifest type exists; no compiler/export pipeline.
-- SQLite WASM + OPFS (doc's original Phase 0 storage mandate) not implemented —
-  see `docs/decisions/0001-storage-indexeddb-first.md`.
+**If Test 2 passes:** implement the LEARN/REWRITE/VERIFY product loop per
+`docs/MVP_PRODUCT_CONTRACT.md`.
 
-## Current experiments / pending decisions
+Full detail: `training/phase5a/benchmark/test1-final-result.md`'s "Direct
+transition to Test 2" section, `docs/decisions/0017`, `training/test2/README.md`.
 
-**Open: Phase 5A's ITERATE result.** `docs/decisions/0016` implements the
-experiment (schema/protocol/provider/service/job/store/UI, fully tested)
-and it has now been run once against the real 5-pair edit corpus and
-human-graded. Result: **PIPELINE EXECUTION — PASS**, **INFORMATION GAIN —
-PASS** (semantic candidates preserve materially more persona-relevant
-information than `compressionRatio`/`lexicalOverlap` alone — the central
-question Phase 5A exists to answer), **COVERAGE — PASS/BORDERLINE** (~1
-`MISSED_SIGNAL` in 5 sources), **GROUNDEDNESS — FAIL** (66.7% `SUPPORTED`
-vs. the required ≥80% — the extractor sometimes attributes to the human
-edit meaning that was already present in the AI-drafted source),
-**SMALL-MODEL VIABILITY — PROMISING / NOT YET VALIDATED** (`gpt-4o-mini`
-extracted meaningful Turkish semantic differences, but the groundedness
-shortfall leaves this open). Overall status: **Phase 5A: ITERATE** — not
-abandoned, not declared validated. The persona-evidence-utility hypothesis
-is not rejected by this result, but is not fully validated either; a
-separate follow-up task is expected to address the identified
-extraction-precision failure mode (confusing human-introduced
-information with information already present in the AI source) — no such
-fix has been implemented yet. See `docs/decisions/0016`'s "First real
-experiment result" section and `docs/validation/manual-mvp-validation.md`'s
-Phase 5A results table for full grading detail.
+## Where to look
 
-**That fix was Trial 1 (`docs/decisions/0016`'s "Trial 1" section):
-REAL RESULT RECORDED — ITERATE, aggregate groundedness unchanged.** A
-single controlled change to the extraction instruction — grounding every
-candidate in the ORIGINAL→FINAL transformation via a mandatory
-counterfactual check — targeted the failure mode above. Same 5 real
-`EditEvent`s, same OpenRouter model (`openai/gpt-4o-mini`), same
-schema/candidate kinds/receipt mechanism/acceptance thresholds;
-`providerId` bumped to `openrouter/transformation-grounded-v1`, confirmed
-by receipts to have reprocessed all 5 sources. **Real result: still 15
-candidates, still 10/15 (66.7%) `SUPPORTED` — identical to baseline,
-below the required ≥80% threshold.** A qualitative behavioral shift was
-observed (more directional ORIGINAL→FINAL framing) but did not move the
-aggregate score. Manual grading identified three remaining failure
-classes: preserved+changed meaning mixed within one candidate, overlapping/
-redundant candidates, and over-interpreted removals.
-
-**Trial 2 (`docs/decisions/0016`'s "Trial 2" section): REAL RESULT
-RECORDED — ITERATE, first quantitative groundedness improvement.**
-Targeted the three Trial 1 failure classes by adding a deterministic,
-language-general evidence-localization layer
-(`extension/src/persona/revision-diff.ts`, `computeRevisionDiff`) ahead of
-semantic interpretation — a word/token-level adaptation of Conijn et al.
-(2022)'s restricted-Damerau-Levenshtein revision classification
-(insertion/deletion/substitution/reordering) — plus explicit
-atomic-candidate, local redundancy-avoidance, and removal-discipline
-instruction rules. `providerId` `openrouter/evidence-localized-v2`,
-distinct from both prior trials; confirmed by receipts to have reprocessed
-all 5 sources. **Real result: 17 candidates, 12/17 (70.6%) `SUPPORTED` —
-up from Trial 0/1's 66.7%, still below the required ≥80% threshold.**
-`PARTIALLY_SUPPORTED` fell (26.7% → 17.6%) but `UNSUPPORTED` rose (6.7% →
-11.8%) — both reported. A newly exposed failure class: the deterministic
-layer can correctly localize *that* text changed while the semantic
-extractor still assigns unsupported meaning to that change (`TEXTUAL
-INTERVENTION != SEMANTIC CHANGE != PERSONA-RELEVANT EVIDENCE`), e.g. a
-correctly-localized `davranışlarına` → `hareketine` replacement graded
-`UNSUPPORTED` for an unsupported "narrowing" interpretation on top of it.
-Conservative conclusion: localization appears useful but is not
-sufficient. No claim of statistical significance, generalization, or
-persona-reconstruction validation.
-
-**Trial 3 (`docs/decisions/0016`'s "Trial 3"/"Trial 3 addendum"/"Trial 3 —
-final zero-shot capability assessment" sections): REAL RESULT RECORDED —
-COMPLETE.** Unlike Trial 1/2 (single-variable prompt changes on the same
-provider/call-shape), Trial 3 is an **architecture validation trial**: it
-moves localization, intervention construction, and admission entirely
-into deterministic HDNA logic (`revision-diff.ts` reused unchanged from
-Trial 2, plus new `revision-intervention.ts`/`semantic-revision-admission.ts`),
-leaving the model only one narrow per-intervention judgment
-(`no_meaningful_change`/`meaning_added`/`meaning_removed`/
-`meaning_transformed`/`uncertain` + a one-sentence description), and
-switches transport from OpenRouter to a **local MLX-LM server** running
-**`Qwen3-0.6B`** on Apple Silicon (`LocalMlxSemanticRevisionJudge`), zero-
-shot, thinking disabled, no fine-tuning/LoRA/SFT. **Real result: local
-runtime/MLX execution PASS** (real sub-second per-intervention latency, no
-cloud dependency); **zero-shot semantic capability FAIL** — broad semantic
-matrix 52.9%, A/B discrimination 51% (chance level on a two-way forced
-choice), coarse feature classification 14.9% (below every pre-declared
-feasibility band). **This falsifies the hypothesis that unmodified
-`Qwen3-0.6B` has sufficient zero-shot semantic capability for the Phase 5A
-transformation — explicitly NOT a WebGPU/MLX/local-runtime blocker.** The
-three scores are recorded as the official Phase 5A zero-shot tiny-model
-baseline for future comparison. Trial 3 is marked COMPLETE; **Phase 5A
-overall remains ITERATE**, not validated, not abandoned.
-
-**Trial 4 (`docs/decisions/0017`) — human-filtered specialization + blind
-benchmark: INFRASTRUCTURE IMPLEMENTED, NO RUN YET.** Twelve explicit
-operator decisions are recorded in `docs/decisions/0017`, most notably:
-DeepSeek generates candidate training examples but is never the
-ground-truth authority (human accept/reject is); `Qwen3-0.6B` remains the
-sole student model, isolating the specialization effect against Trial 3's
-frozen baseline (52.9% / 51% / 14.9%); the three-way benchmark
-(untrained Qwen / trained Qwen / DeepSeek) is blind (A/B/C, randomized,
-revealed only after judging, reveal never mutates the recorded judgment);
-training/falsification separation is structural, not just a rule (the
-generation script has no code path that reads any benchmark file). What
-exists: a versioned task/lore contract
-(`training/phase5a/lore/task-contract.v1.md`); standalone Python scripts
-for DeepSeek candidate generation, dataset export/split, and an
-`mlx_lm.lora` training wrapper (`training/phase5a/`, verified against the
-installed `mlx-lm==0.29.1` CLI/data-format contract); new extension
-schemas/stores/provider/service (`DeepSeekSemanticRevisionJudge`,
-`Trial4BenchmarkService`, reusing Trial 3's exact
-`SemanticRevisionJudgeProvider` interface for all three benchmarked
-systems); and two new popup panels
-(`Trial4TrainingReviewPanel.svelte`/`Trial4BenchmarkPanel.svelte`) for
-Accept/Reject review and blind grading. **No dataset has been generated,
-no training run has happened, no adapter exists, and no benchmark case
-has been run** — this is exactly "the pipeline is ready," not a result.
-Phase 5A overall status is unaffected: still **ITERATE**.
-
-Seventeen operator decisions to date are recorded in `docs/decisions/`.
-One decision (`0005`) is a scope boundary awaiting a future explicit operator
-call: whether/how to add content-script-based live capture. Future work, each
-`PLANNED` pending its own decision: a real neural embedding provider
-(swapping `HashingEmbeddingProvider`, likely needing an offscreen-document
-execution context per `docs/decisions/0009`); a real trained classifier or
-additional heuristic T2 dimensions (`docs/decisions/0010`); a non-OpenRouter
-`PersonaInterpreterProvider` or per-request cost/rate limiting for T3
-(`docs/decisions/0015`); Phase 5A's optional (A)-vs-(B) control
-(`docs/decisions/0016`); and retrieval runtime / WebGPU expression engine,
-now explicitly **deferred (not cancelled)** pending the Phase 5A
-evidence-utility answer, to actually wire derived signals (including
-TraitBeliefClaims, and possibly SemanticDeltaCandidates) into anything
-user-facing.
-
-The research question that motivated Phase 5A (see
-`docs/decisions/0015`'s "HUMAN-OPERATOR OBSERVATION / MVP DOGFOOD
-FINDING" section) found that `compressionRatio`/`lexicalOverlap` — the
-only two dimensions PATTERNS currently produces — don't carry enough
-semantic information for T3 to construct a meaningful persona; the T3
-pipeline itself (evidence → patterns → OpenRouter → persisted claims) is
-confirmed working end to end. Phase 5A is this codebase's answer to "how do
-we derive higher-information semantic preference/behavioral-delta evidence
-from AI-output → human-edit deltas upstream of PATTERNS" — implemented and
-ready to run, not yet validated as actually solving the problem.
-
-## Current benchmark status
-
-No benchmarks run yet — none are in scope for this PR (semantic-preservation,
-persona-similarity, and operator-acceptance benchmarks belong to the WebGPU
-Expression Engine phase, not this foundation).
+- Module-level source layout: `spec/` (protocol/schema types, no runtime
+  logic), `extension/src/` (runtime), `extension/entrypoints/` (MV3
+  background + Dashboard/popup), `training/phase5a/` (Python
+  training/benchmark pipeline). Read the source tree directly rather than
+  a manually maintained file listing — it will always be more current.
+- Final MVP product contract (post-Test-2 direction): `docs/MVP_PRODUCT_CONTRACT.md`.
+- MVP scope classification (what's implemented vs. planned vs.
+  experimental): `docs/architecture/mvp-scope.md`.
+- Canonical edit-judgment contract:
+  `training/phase5a/lore/task-contract.v3.md` (+
+  `policy-spec.v1.json`).
+- Decision log (concise, current architectural decisions):
+  `docs/decisions/`.
+- Historical experiment narratives, superseded trial-by-trial results,
+  and old manual-testing chronology: `docs/history/`.

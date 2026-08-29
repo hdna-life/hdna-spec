@@ -6,6 +6,7 @@
   import type { Job } from '@spec/protocol/job';
   import type { Trial4BenchmarkConfig } from '../persona/trial4-benchmark-config-store';
   import { computeTrial4BenchmarkStats } from '../persona/trial4-benchmark-stats';
+  import { CANONICAL_DIMENSION_DIRECTIONS } from '../persona/behavior-dimension';
   import type { Trial4BenchmarkImportMode } from '../persona/trial4-benchmark-case-import';
   import {
     DIMENSION_LABELS_TR,
@@ -104,32 +105,13 @@
     return `${DIRECTION_LABELS_EN[direction]} (${DIRECTION_LABELS_TR[direction]})`;
   }
 
-  // Ground-truth-entry-only restriction (docs/decisions/0017 Test 1
-  // ground-truth-flow addendum) — NOT the general per-dimension/direction
-  // validity rule (`isValidDimensionsArray` deliberately keeps that open,
-  // per `behavior-dimension.ts`'s docstring, "to avoid building a rigid
-  // ontology platform"). This narrower list exists only so the HUMAN
-  // operator, hand-labeling frozen held-out ground truth, cannot lock a
-  // nonsensical pairing (e.g. "scope: increased") — it is intentionally
-  // scoped to this file and never imported elsewhere, so it can never
-  // start constraining what a model is allowed to output.
-  const GROUND_TRUTH_DIRECTIONS_BY_DIMENSION: Record<BehaviorDimension, BehaviorDirection[]> = {
-    expressed_affect_valence: ['more_positive', 'more_negative'],
-    expressed_affect_intensity: ['increased', 'decreased'],
-    directness: ['increased', 'decreased'],
-    politeness: ['increased', 'decreased'],
-    formality: ['increased', 'decreased'],
-    certainty: ['increased', 'decreased'],
-    evidentiality: ['changed'],
-    commitment: ['increased', 'decreased'],
-    directive_force: ['increased', 'decreased'],
-    conditionality: ['added', 'removed'],
-    scope: ['narrowed', 'expanded'],
-    specificity: ['increased', 'decreased'],
-    rationale: ['added', 'removed'],
-    factual_content: ['changed'],
-    action_or_decision: ['changed'],
-  };
+  // The canonical, NORMATIVELY-ENFORCED per-dimension direction mapping
+  // (productization cleanup phase 2 — `isValidDimensionsArray` now
+  // rejects a pair outside this mapping for every provider too, not just
+  // ground-truth entry). Reused directly from `behavior-dimension.ts`
+  // rather than duplicated here, so this UI can never drift out of sync
+  // with what the runtime actually accepts.
+  const GROUND_TRUTH_DIRECTIONS_BY_DIMENSION = CANONICAL_DIMENSION_DIRECTIONS;
 
   // Test 1's central question is not "does trained Qwen beat DeepSeek" — it
   // is base->trained improvement and acceptable-local-judge quality under

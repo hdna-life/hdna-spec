@@ -1,0 +1,53 @@
+{
+  "version": "v3",
+  "contractFile": "training/phase5a/lore/task-contract.v3.md",
+  "verdicts": [
+    "no_meaningful_change",
+    "meaning_added",
+    "meaning_removed",
+    "meaning_transformed",
+    "uncertain"
+  ],
+  "dimensions": {
+    "expressed_affect_valence": ["more_positive", "more_negative"],
+    "expressed_affect_intensity": ["increased", "decreased"],
+    "directness": ["increased", "decreased"],
+    "politeness": ["increased", "decreased"],
+    "formality": ["increased", "decreased"],
+    "certainty": ["increased", "decreased"],
+    "evidentiality": ["changed"],
+    "commitment": ["increased", "decreased"],
+    "directive_force": ["increased", "decreased"],
+    "conditionality": ["added", "removed"],
+    "scope": ["narrowed", "expanded"],
+    "specificity": ["increased", "decreased"],
+    "rationale": ["added", "removed"],
+    "factual_content": ["changed"],
+    "action_or_decision": ["changed"]
+  },
+  "rules": [
+    "semantic verdict and behavioral dimensions are orthogonal",
+    "judge directly observable textual behavior only",
+    "never infer hidden emotion, motivation, psychology, identity or personality",
+    "expressed affect describes the text, not the human's internal state",
+    "no duplicate dimensions within one judgment",
+    "uncertain verdict requires dimensions: []",
+    "longer text does not automatically mean specificity increased",
+    "softer wording does not automatically imply directive force changed",
+    "social persuasiveness/manipulation is not directive force",
+    "temporal ordering alone is not conditionality",
+    "action_or_decision changes only when an actual action or decision changes",
+    "use conservative dimensions; do not force labels onto edits with no genuine observable shift",
+    "no_meaningful_change may carry a non-empty dimensions array",
+    "meaning_added/meaning_removed/meaning_transformed normally carry at least one dimension, but this is guidance, not a hard requirement",
+    "the counterfactual check (would this observation hold having seen only the ORIGINAL span?) is the operative test for the verdict axis",
+    "a changed factual topic is not required for a meaningful change",
+    "do not attribute pre-existing meaning to the edit",
+    "do not infer a motivation, reason, or psychological explanation for a removal or replacement unless the FINAL text states it directly",
+    "do not use textual-diff magnitude as evidence of semantic-change magnitude",
+    "do not use unchanged factual topic as evidence of no semantic change",
+    "do not rely on language-specific wording, suffixes, or grammar",
+    "do not invent a comparison that contradicts the FINAL text",
+    "abstention (no_meaningful_change, uncertain, dimensions: []) is a correct outcome, not a failure"
+  ]
+}

@@ -4,25 +4,20 @@ import type {
   SemanticRevisionJudgmentDraft,
 } from '@spec/protocol/semantic-revision-judge';
 import { SEMANTIC_REVISION_JUDGE_VERSION } from './semantic-revision-judge-identity';
-import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from './behavior-dimension';
+import {
+  BEHAVIOR_DIMENSIONS,
+  CANONICAL_DIMENSION_DIRECTIONS,
+  formatCanonicalDimensionDirections,
+  isValidDimensionsArray,
+} from './behavior-dimension';
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Re-exported for existing call sites/tests that import the version
-// constant from this file — the canonical definition now lives in
-// semantic-revision-judge-identity.ts, shared with
-// local-mlx-semantic-revision-judge.ts, so the two transports' receipt
-// identities can never silently drift apart. See that file's docstring.
 export { SEMANTIC_REVISION_JUDGE_VERSION };
 
 // Strict OpenAI/Azure-compatible structured outputs require every
-// `properties` key to also appear in `required` (the same real HTTP 400
-// documented in docs/decisions/0016's "Post-implementation fix" section)
-// — `description` is therefore always-present but nullable
-// (`type: ['string', 'null']`), matching `SemanticRevisionJudgmentDraft`'s
-// domain shape directly (no wire/domain normalization layer is needed
-// here, unlike `preferred`/`rejected` in the Trial 0-2 provider, because
-// the domain type itself already declares `description: string | null`).
+// `properties` key to also appear in `required`, and every nested object
+// to declare `additionalProperties: false`.
 const JUDGMENT_JSON_SCHEMA = {
   type: 'object',
   properties: {
@@ -30,21 +25,20 @@ const JUDGMENT_JSON_SCHEMA = {
       type: 'string',
       enum: ['no_meaningful_change', 'meaning_added', 'meaning_removed', 'meaning_transformed', 'uncertain'],
     },
-    // Test 1 addendum (docs/decisions/0017) — the orthogonal observable-
-    // behavior axis. Strict structured outputs require every nested object
-    // to also declare `additionalProperties: false` and list every one of
-    // its own properties in its own `required` array (the same rule that
-    // already governs the top-level schema below).
     dimensions: {
       type: 'array',
       items: {
-        type: 'object',
-        properties: {
-          dimension: { type: 'string', enum: BEHAVIOR_DIMENSIONS },
-          direction: { type: 'string', enum: BEHAVIOR_DIRECTIONS },
-        },
-        required: ['dimension', 'direction'],
-        additionalProperties: false,
+        // One branch per dimension, each constraining direction to its own
+        // allowed set — rejected at the schema level, not just post-parse.
+        anyOf: BEHAVIOR_DIMENSIONS.map((dimension) => ({
+          type: 'object',
+          properties: {
+            dimension: { type: 'string', enum: [dimension] },
+            direction: { type: 'string', enum: [...CANONICAL_DIMENSION_DIRECTIONS[dimension]] },
+          },
+          required: ['dimension', 'direction'],
+          additionalProperties: false,
+        })),
       },
     },
     description: { type: ['string', 'null'] },
@@ -54,16 +48,7 @@ const JUDGMENT_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-/**
- * Trial 3's compact judge prompt (docs/decisions/0016's Trial 3 §13) —
- * deliberately not a rewrite of Trial 1/2's large reasoning prompt. The
- * model receives exactly one localized intervention, never the whole
- * EditEvent, never asked to discover boundaries or generate an arbitrary
- * candidate set. No wording here names a language or a language-specific
- * grammatical form (docs/decisions/0016's Trial 3 §11 language-generality
- * requirement) — verified by
- * `openrouter-semantic-revision-judge.test.ts`'s regression test.
- */
+/** No wording here names a language or language-specific grammatical form — regression-tested. */
 function buildPrompt(input: SemanticRevisionJudgeInput): string {
   return [
     'You are judging one localized human text revision.\n\n',
@@ -95,8 +80,7 @@ function buildPrompt(input: SemanticRevisionJudgeInput): string {
     'change here does NOT require a semantic verdict other than ',
     '"no_meaningful_change" — many genuine dimension changes happen while ',
     'the underlying proposition stays exactly the same.\n\n',
-    `Allowed dimensions: ${BEHAVIOR_DIMENSIONS.join(', ')}.\n`,
-    `Allowed directions: ${BEHAVIOR_DIRECTIONS.join(', ')}.\n\n`,
+    `Allowed dimension(direction) pairs — ONLY these pairings are valid: ${formatCanonicalDimensionDirections()}.\n\n`,
     'Only describe DIRECTLY OBSERVABLE changes in expressed wording/stance ',
     '— never infer the human\'s actual internal emotion, mood, or ',
     'psychological state.\n\n',
@@ -129,21 +113,13 @@ function isValidJudgmentWireShape(value: unknown): value is SemanticRevisionJudg
 }
 
 /**
- * Concrete `SemanticRevisionJudgeProvider` backed by OpenRouter. Transport
- * only — OpenRouter is a stand-in for a future local/WebGPU-scale model,
- * not the architectural target (docs/decisions/0016's Trial 3 section, and
- * `docs/architecture/mvp-scope.md`). `modelId` is caller-configured and
- * never overridden or upgraded by this class: there is no fallback model
- * anywhere in this file. If the configured model cannot satisfy the
- * structured-output contract, `judge()` throws — the caller (
- * `SemanticRevisionJudgeExtractionService`) isolates that as a
- * per-intervention judge failure, it is never silently routed to a
- * stronger model.
+ * `modelId` is caller-configured, never overridden — a model that can't
+ * satisfy the structured-output contract makes `judge()` throw rather than
+ * silently falling back to a stronger model.
  *
- * Same `fetch.bind(globalThis)` discipline as
- * `OpenRouterSemanticDeltaExtractor`/`OpenRouterPersonaInterpreter` — see
- * docs/decisions/0015's real MV3 "Illegal invocation" bug. Do not
- * reintroduce a bare `fetch` default here.
+ * `fetch.bind(globalThis)` default is required — a bare `fetch` default
+ * breaks in MV3 (native `fetch` is receiver-checked; `this.fetchImpl(...)`
+ * without binding throws "Illegal invocation"). Do not remove the bind.
  */
 export class OpenRouterSemanticRevisionJudge implements SemanticRevisionJudgeProvider {
   readonly providerId = `openrouter/${SEMANTIC_REVISION_JUDGE_VERSION}`;

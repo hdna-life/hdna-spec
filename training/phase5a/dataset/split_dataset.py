@@ -57,40 +57,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
-# Must match extension/src/persona/behavior-dimension.ts's BEHAVIOR_DIMENSIONS
-# / BEHAVIOR_DIRECTIONS exactly (order and values) — single source of truth
-# for the prompt text lives there; this is a deliberate one-time mirror
-# (Python has no import path into the TS module), kept in sync by hand.
-BEHAVIOR_DIMENSIONS = [
-    "expressed_affect_valence",
-    "expressed_affect_intensity",
-    "directness",
-    "politeness",
-    "formality",
-    "certainty",
-    "evidentiality",
-    "commitment",
-    "directive_force",
-    "conditionality",
-    "scope",
-    "specificity",
-    "rationale",
-    "factual_content",
-    "action_or_decision",
-]
-
-BEHAVIOR_DIRECTIONS = [
-    "increased",
-    "decreased",
-    "more_positive",
-    "more_negative",
-    "added",
-    "removed",
-    "narrowed",
-    "expanded",
-    "changed",
-]
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lore"))
+from policy import format_dimension_direction_pairs, is_valid_dimensions_list, load_policy  # noqa: E402
 
 # Turkish labels for deterministic description generation — must match
 # extension/src/persona/trial4-review-state.ts's DIMENSION_LABELS_TR /
@@ -134,15 +102,12 @@ VERDICT_PHRASES_EN = {
 }
 
 
-# The exact narrow judge prompt format, matching
-# extension/src/persona/semantic-revision-judge-wire.ts's
-# buildNarrowJudgePrompt character-for-character.
+# Must match extension/src/persona/semantic-revision-judge-wire.ts's
+# buildNarrowJudgePrompt character-for-character — the trained model must
+# see exactly the prompt served at inference time.
 def build_judge_prompt(
-    kind: str, before_context: str, original_text: str, final_text: str, after_context: str
+    kind: str, before_context: str, original_text: str, final_text: str, after_context: str, policy: dict[str, Any]
 ) -> str:
-    """Build the prompt string for the narrow semantic-change judge task (v3, two-axis)."""
-    dims = ", ".join(BEHAVIOR_DIMENSIONS)
-    dirs = ", ".join(BEHAVIOR_DIRECTIONS)
     return (
         "You are judging one localized human text revision.\n\n"
         f"Operation: {kind}\n"
@@ -173,8 +138,8 @@ def build_judge_prompt(
         '"no_meaningful_change" — many genuine dimension changes happen while '
         "the underlying proposition stays exactly the same (e.g. tone, "
         "certainty, or politeness shifting while the claim itself does not).\n\n"
-        f"Allowed dimensions: {dims}.\n"
-        f"Allowed directions: {dirs}.\n\n"
+        f"Allowed dimension(direction) pairs — ONLY these pairings are valid: "
+        f"{format_dimension_direction_pairs(policy)}.\n\n"
         "Only describe DIRECTLY OBSERVABLE changes in expressed wording/stance "
         "— never infer the human's actual internal emotion, mood, or "
         'psychological state. "expressed_affect_valence"/"expressed_affect_intensity" '
@@ -269,17 +234,15 @@ def build_description(verdict: str, dimensions: list[dict[str, str]]) -> str | N
     return f"{base}."
 
 
-def candidate_to_example(candidate: dict[str, Any]) -> dict[str, str]:
+def candidate_to_example(candidate: dict[str, Any], policy: dict[str, Any]) -> dict[str, str]:
     """Convert one human-reviewed candidate to training example:
     {"prompt": "...", "completion": "..."}.
 
-    Deliberately reads only kind/beforeContext/originalText/finalText/
-    afterContext/humanVerdict/humanDimensions — proposedVerdict/
-    proposedDimensions/proposedDescription (the model's own unreviewed
-    proposal) and reviewNoteTr/operatorNoteTr/loreNoteTr (Turkish
-    operator-review assistance; see spec/schema/trial4-training-candidate.ts)
-    are never read here on purpose, so none of them can structurally enter
-    the training dataset even if present on the input candidate.
+    Reads only kind/beforeContext/originalText/finalText/afterContext/
+    humanVerdict/humanDimensions — never proposedVerdict/proposedDimensions/
+    proposedDescription or any operator-note field, so none of them can
+    enter the training dataset. Raises if humanDimensions contains a pair
+    the policy spec does not allow.
     """
     prompt = build_judge_prompt(
         kind=candidate["kind"],
@@ -287,10 +250,13 @@ def candidate_to_example(candidate: dict[str, Any]) -> dict[str, str]:
         original_text=candidate["originalText"],
         final_text=candidate["finalText"],
         after_context=candidate["afterContext"],
+        policy=policy,
     )
 
     verdict = candidate["humanVerdict"]
     dimensions = candidate.get("humanDimensions") or []
+    if not is_valid_dimensions_list(dimensions, policy):
+        raise ValueError(f"Candidate {candidate.get('id', '?')} has an invalid dimensions list: {dimensions}")
     description = build_description(verdict, dimensions)
 
     if verdict in ["meaning_added", "meaning_removed", "meaning_transformed"]:
@@ -349,7 +315,8 @@ def main():
         print("No human-reviewed, included candidates to process. Exiting.", file=sys.stderr)
         sys.exit(1)
 
-    examples = [candidate_to_example(c) for c in candidates]
+    policy = load_policy()
+    examples = [candidate_to_example(c, policy) for c in candidates]
 
     random.seed(args.seed)
     random.shuffle(examples)

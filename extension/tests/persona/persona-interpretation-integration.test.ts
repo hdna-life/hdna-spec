@@ -174,7 +174,7 @@ describe('T3 pipeline: popup save -> background reads persisted config -> enqueu
   });
 
   it('reaches fetch() exactly once for the operator\'s exact real persisted corpus (compressionRatio/unscoped + lexicalOverlap/unscoped)', async () => {
-    // Regression fixture: docs/validation/manual-mvp-validation.md's Phase 4
+    // Regression fixture: docs/history/experiments/manual-mvp-validation.md's Phase 4
     // observed exactly these two compiled Patterns from the operator's real
     // corpus. This proves the deterministic eligibility path is not the
     // reason a manual retest saw zero OpenRouter requests — the exact same

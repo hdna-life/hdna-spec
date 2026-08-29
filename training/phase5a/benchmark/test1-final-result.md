@@ -3,7 +3,7 @@
 **Status:** Test 1 is **CLOSED — SUCCESS**. This is a documentation/
 experiment-closure record. No training data, adapter weights, benchmark
 results, or evaluation code were changed to produce or in writing this
-report. See `test1-smoke-iteration-1.md` for the earlier smoke/debug round
+report. See `docs/history/test1/test1-smoke-iteration-1.md` for the earlier smoke/debug round
 this final result supersedes as Test 1's answer (that round remains
 documented separately, unedited, as a smoke iteration — not the final
 result).
@@ -31,7 +31,7 @@ Test 1 used two small fresh Turkish held-out benchmark rounds.
 
 ### Round 1 — smoke/debug benchmark (not the final result)
 
-Full record: `test1-smoke-iteration-1.md`. This round was primarily a
+Full record: `docs/history/test1/test1-smoke-iteration-1.md`. This round was primarily a
 smoke/debug benchmark. It exposed several infrastructure and evaluation
 issues, including: Qwen/MLX trailing `<|im_end|>` transport tokens,
 schema-invalid base-model outputs, transport failures needing separation

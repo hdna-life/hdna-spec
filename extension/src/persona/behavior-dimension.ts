@@ -1,16 +1,6 @@
 import type { BehaviorDimension, BehaviorDimensionChange, BehaviorDirection } from '@spec/protocol/semantic-revision-judge';
 
-/**
- * Test 1's closed dimension/direction taxonomy (docs/decisions/0017's
- * "structured behavioral dimensions" addendum;
- * `training/phase5a/lore/task-contract.v3.md`). Single source of truth for
- * validation — reused by the shared wire parser
- * (`semantic-revision-judge-wire.ts`), Trial 3's admission-time draft
- * validator (`semantic-revision-judgment.ts`), and the OpenRouter provider's
- * own JSON-Schema-adjacent wire check (`openrouter-semantic-revision-judge.ts`),
- * so the "no duplicate dimensions, only these dimension/direction values"
- * rule is defined once, not reimplemented per call site.
- */
+/** Canonical taxonomy — see `training/phase5a/lore/task-contract.v3.md`. Single source of truth for validation. */
 export const BEHAVIOR_DIMENSIONS: BehaviorDimension[] = [
   'expressed_affect_valence',
   'expressed_affect_intensity',
@@ -41,24 +31,50 @@ export const BEHAVIOR_DIRECTIONS: BehaviorDirection[] = [
   'changed',
 ];
 
+/**
+ * Normative dimension -> allowed-directions mapping (must match
+ * `training/phase5a/lore/policy-spec.v1.json` exactly — enforced by
+ * `policy-spec-consistency.test.ts`). A direction valid for
+ * `BEHAVIOR_DIRECTIONS` generally but not for a given dimension here
+ * (e.g. `factual_content -> increased`) is rejected by `isValidDimensionsArray`.
+ */
+export const CANONICAL_DIMENSION_DIRECTIONS: Readonly<Record<BehaviorDimension, readonly BehaviorDirection[]>> = {
+  expressed_affect_valence: ['more_positive', 'more_negative'],
+  expressed_affect_intensity: ['increased', 'decreased'],
+  directness: ['increased', 'decreased'],
+  politeness: ['increased', 'decreased'],
+  formality: ['increased', 'decreased'],
+  certainty: ['increased', 'decreased'],
+  evidentiality: ['changed'],
+  commitment: ['increased', 'decreased'],
+  directive_force: ['increased', 'decreased'],
+  conditionality: ['added', 'removed'],
+  scope: ['narrowed', 'expanded'],
+  specificity: ['increased', 'decreased'],
+  rationale: ['added', 'removed'],
+  factual_content: ['changed'],
+  action_or_decision: ['changed'],
+};
+
 const DIMENSION_SET = new Set<string>(BEHAVIOR_DIMENSIONS);
-const DIRECTION_SET = new Set<string>(BEHAVIOR_DIRECTIONS);
 
 function isValidBehaviorDimensionChange(value: unknown): value is BehaviorDimensionChange {
   if (typeof value !== 'object' || value === null) return false;
   const change = value as Record<string, unknown>;
   if (typeof change.dimension !== 'string' || !DIMENSION_SET.has(change.dimension)) return false;
-  if (typeof change.direction !== 'string' || !DIRECTION_SET.has(change.direction)) return false;
-  return true;
+  if (typeof change.direction !== 'string') return false;
+  const allowedDirections = CANONICAL_DIMENSION_DIRECTIONS[change.dimension as BehaviorDimension];
+  return (allowedDirections as readonly string[]).includes(change.direction);
 }
 
-/**
- * Validates a `dimensions` array: must be an array, every element must be
- * a well-formed `BehaviorDimensionChange` (known dimension + known
- * direction), and no `dimension` may repeat within the array. An empty
- * array is always valid — it means "no observable behavioral shift
- * asserted," a legitimate answer, not a malformed one.
- */
+/** Renders `CANONICAL_DIMENSION_DIRECTIONS` as `dimension(dir1|dir2), ...` for judge prompts — the single renderer both transports use. */
+export function formatCanonicalDimensionDirections(): string {
+  return BEHAVIOR_DIMENSIONS.map((dimension) => `${dimension}(${CANONICAL_DIMENSION_DIRECTIONS[dimension].join('|')})`).join(
+    ', ',
+  );
+}
+
+/** Every entry must be a valid {dimension, direction} pair per `CANONICAL_DIMENSION_DIRECTIONS`, with no repeated dimension. Empty array is valid. */
 export function isValidDimensionsArray(value: unknown): value is BehaviorDimensionChange[] {
   if (!Array.isArray(value)) return false;
   const seenDimensions = new Set<string>();

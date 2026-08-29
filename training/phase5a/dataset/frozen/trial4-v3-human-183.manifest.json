@@ -1,0 +1,18 @@
+{
+  "file": "trial4-v3-human-183.json",
+  "sha256": "1f133291f5809aad6a43c691e3a1457c11960247b87d88a7692a385a2894f830",
+  "row_count": 183,
+  "contract_version": "v3",
+  "language_distribution": { "tr": 102, "en": 81 },
+  "verdict_distribution": {
+    "meaning_transformed": 61,
+    "no_meaningful_change": 49,
+    "meaning_added": 38,
+    "meaning_removed": 35
+  },
+  "kind_distribution": { "replaced": 112, "removed": 35, "added": 34, "reordered": 2 },
+  "split_reproduced_by": "dataset/split_dataset.py --seed 42",
+  "split_counts": { "train": 146, "valid": 18, "internal_test": 19 },
+  "split_note": "The 19-row internal test split is a held-out slice of THIS training corpus for training diagnostics only. It is NOT the final Test 1 benchmark — the final Test 1 result used a separate, fresh 10-case held-out set (see training/phase5a/benchmark/test1-final-result.md).",
+  "caveat": "Early annotations were produced while the taxonomy was stabilizing and may contain supervision noise."
+}

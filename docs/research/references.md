@@ -108,7 +108,7 @@ specific narrow prompt, `SemanticRevisionJudgmentDraft` schema, or
 deterministic admission gate improves groundedness on HDNA's real corpus —
 that remains open and unmeasured until the real operator run (see
 `docs/decisions/0016`'s Trial 3 section and
-`docs/validation/manual-mvp-validation.md`'s Trial 3 subsection). Trial 3's
+`docs/history/experiments/manual-mvp-validation.md`'s Trial 3 subsection). Trial 3's
 deterministic localization layer itself makes no new claim beyond what
 Trial 2's Conijn et al. grounding already establishes above —
 `revision-intervention.ts` only filters/repackages `RevisionDiff` output,

@@ -1,0 +1,6111 @@
+[
+  {
+    "id": "t1v3-affect-en-001",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'm happy about this",
+    "finalText": "I'm very happy about this",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'm happy about this.” → SONRA: “I'm very happy about this.” Olumlu duygu aynı; yalnızca ifade edilen mutluluğun şiddeti artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:20:55.783Z"
+  },
+  {
+    "id": "t1v3-affect-en-002",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'm very happy about this",
+    "finalText": "I'm a little happy about this",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'm very happy about this.” → SONRA: “I'm a little happy about this.” Olumlu duygu aynı; ifade edilen mutluluğun şiddeti azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:20:33.333Z"
+  },
+  {
+    "id": "t1v3-affect-en-003",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'm disappointed",
+    "finalText": "I'm very disappointed",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'm disappointed.” → SONRA: “I'm very disappointed.” Hayal kırıklığı aynı; ifade edilen şiddet artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:20:12.752Z"
+  },
+  {
+    "id": "t1v3-affect-en-004",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'm very disappointed",
+    "finalText": "I'm slightly disappointed",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'm very disappointed.” → SONRA: “I'm slightly disappointed.” Hayal kırıklığı aynı; ifade edilen şiddet azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:19:57.517Z"
+  },
+  {
+    "id": "t1v3-affect-en-005",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This made me happy",
+    "finalText": "This made me sad",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "proposedDescription": "The expressed affect changes from positive to negative.",
+    "reviewNoteTr": "ÖNCE: “This made me happy.” → SONRA: “This made me sad.” Duygu olumlu yönden olumsuz yöne dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:19:42.351Z"
+  },
+  {
+    "id": "t1v3-affect-en-006",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This made me sad",
+    "finalText": "This made me happy",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "proposedDescription": "The expressed affect changes from negative to positive.",
+    "reviewNoteTr": "ÖNCE: “This made me sad.” → SONRA: “This made me happy.” Duygu olumsuz yönden olumlu yöne dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:19:34.435Z"
+  },
+  {
+    "id": "t1v3-affect-en-007",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I hate this",
+    "finalText": "I love this",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "proposedDescription": "The expressed affect reverses from negative to positive.",
+    "reviewNoteTr": "ÖNCE: “I hate this.” → SONRA: “I love this.” Açık olumsuz duygu açık olumlu duyguya dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:19:22.802Z"
+  },
+  {
+    "id": "t1v3-affect-en-008",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I love this",
+    "finalText": "I hate this",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "proposedDescription": "The expressed affect reverses from positive to negative.",
+    "reviewNoteTr": "ÖNCE: “I love this.” → SONRA: “I hate this.” Açık olumlu duygu açık olumsuz duyguya dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:19:13.518Z"
+  },
+  {
+    "id": "t1v3-affect-tr-001",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu habere sevindim",
+    "finalText": "Bu habere çok sevindim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu habere sevindim.” → SONRA: “Bu habere çok sevindim.” Olumlu duygu aynı; yalnızca ifade edilen sevincin şiddeti artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:18:53.218Z"
+  },
+  {
+    "id": "t1v3-affect-tr-002",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu habere çok sevindim",
+    "finalText": "Bu habere biraz sevindim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu habere çok sevindim.” → SONRA: “Bu habere biraz sevindim.” Olumlu duygu aynı; ifade edilen sevincin şiddeti azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:18:43.601Z"
+  },
+  {
+    "id": "t1v3-affect-tr-003",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Buna üzüldüm",
+    "finalText": "Buna çok üzüldüm",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Buna üzüldüm.” → SONRA: “Buna çok üzüldüm.” Üzüntünün yönü aynı; yalnızca şiddeti artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:18:25.601Z"
+  },
+  {
+    "id": "t1v3-affect-tr-004",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Buna çok üzüldüm",
+    "finalText": "Buna biraz üzüldüm",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Buna çok üzüldüm.” → SONRA: “Buna biraz üzüldüm.” Üzüntünün yönü aynı; yalnızca şiddeti azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:18:07.402Z"
+  },
+  {
+    "id": "t1v3-affect-tr-005",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Ona kızgınım",
+    "finalText": "Ona çok kızgınım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Ona kızgınım.” → SONRA: “Ona çok kızgınım.” Kızgınlık aynı yönde kalıyor; ifade edilen şiddet artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:17:50.668Z"
+  },
+  {
+    "id": "t1v3-affect-tr-006",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Ona çok kızgınım",
+    "finalText": "Ona biraz kızgınım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Ona çok kızgınım.” → SONRA: “Ona biraz kızgınım.” Kızgınlık aynı yönde kalıyor; ifade edilen şiddet azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:17:33.735Z"
+  },
+  {
+    "id": "t1v3-affect-tr-007",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu beni mutlu etti",
+    "finalText": "Bu beni üzdü",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "proposedDescription": "The expressed affect changes from positive to negative.",
+    "reviewNoteTr": "ÖNCE: “Bu beni mutlu etti.” → SONRA: “Bu beni üzdü.” İfade edilen duygu olumlu yönden olumsuz yöne dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:17:14.835Z"
+  },
+  {
+    "id": "t1v3-affect-tr-008",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu beni üzdü",
+    "finalText": "Bu beni mutlu etti",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "proposedDescription": "The expressed affect changes from negative to positive.",
+    "reviewNoteTr": "ÖNCE: “Bu beni üzdü.” → SONRA: “Bu beni mutlu etti.” İfade edilen duygu olumsuz yönden olumlu yöne dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:17:07.785Z"
+  },
+  {
+    "id": "t1v3-affect-tr-009",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu hoşuma gitti",
+    "finalText": "Bu hiç hoşuma gitmedi",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "proposedDescription": "The expressed preference changes from positive to negative.",
+    "reviewNoteTr": "ÖNCE: “Bu hoşuma gitti.” → SONRA: “Bu hiç hoşuma gitmedi.” Beğeni açık biçimde olumsuz tercihe dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:16:44.285Z"
+  },
+  {
+    "id": "t1v3-affect-tr-010",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu hiç hoşuma gitmedi",
+    "finalText": "Bu hoşuma gitti",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "proposedDescription": "The expressed preference changes from negative to positive.",
+    "reviewNoteTr": "ÖNCE: “Bu hiç hoşuma gitmedi.” → SONRA: “Bu hoşuma gitti.” Olumsuz tercih açık biçimde olumlu tercihe dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:16:27.685Z"
+  },
+  {
+    "id": "t1v3-affect-tr-011",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu beni biraz rahatsız etti",
+    "finalText": "Bu beni çok rahatsız etti",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu beni biraz rahatsız etti.” → SONRA: “Bu beni çok rahatsız etti.” Rahatsızlık aynı; ifade edilen şiddet açıkça artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:16:02.419Z"
+  },
+  {
+    "id": "t1v3-affect-tr-012",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu beni çok rahatsız etti",
+    "finalText": "Bu beni biraz rahatsız etti",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu beni çok rahatsız etti.” → SONRA: “Bu beni biraz rahatsız etti.” Rahatsızlık aynı; ifade edilen şiddet açıkça azalıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:15:18.164Z",
+    "reviewedAt": "2026-08-28T03:15:39.686Z"
+  },
+  {
+    "id": "t1v3-en-001",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "good",
+    "finalText": "really good",
+    "beforeContext": "The movie was ",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The movie was good.” → SONRA: “The movie was really good.” Vurgu artıyor; temel olumlu değerlendirme aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:05:55.735Z"
+  },
+  {
+    "id": "t1v3-en-002",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "bad",
+    "finalText": "pretty bad",
+    "beforeContext": "The service was ",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The service was bad.” → SONRA: “The service was pretty bad.” Olumsuz değerlendirme şiddetleniyor; temel yargı aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:20:37.147Z"
+  },
+  {
+    "id": "t1v3-en-003",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'm sorry",
+    "finalText": "I'm really sorry",
+    "beforeContext": "",
+    "afterContext": " about that.",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'm sorry about that.” → SONRA: “I'm really sorry about that.” İfade edilen üzüntünün şiddeti artıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:06:51.801Z"
+  },
+  {
+    "id": "t1v3-en-004",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I liked it",
+    "finalText": "I really liked it",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I liked it.” → SONRA: “I really liked it.” Beğeni şiddeti artıyor; tercih yönü aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:31:07.146Z"
+  },
+  {
+    "id": "t1v3-en-005",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Close the window",
+    "finalText": "Please close the window",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Close the window.” → SONRA: “Please close the window.” Aynı istek daha nazik ifade ediliyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:07:44.317Z"
+  },
+  {
+    "id": "t1v3-en-006",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I would appreciate a call",
+    "finalText": "Give me a call when you can",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I would appreciate a call.” → SONRA: “Give me a call when you can.” Aynı arama isteği daha gündelik ve daha doğrudan.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:21:08.831Z"
+  },
+  {
+    "id": "t1v3-en-007",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "She is upset",
+    "finalText": "She looks upset",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “She is upset.” → SONRA: “She looks upset.” Operatör sınırına göre temel değerlendirme korunuyor; ifade gözlemsel ve daha ihtiyatlı hale geliyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:08:16.734Z"
+  },
+  {
+    "id": "t1v3-en-008",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is safe",
+    "finalText": "This appears safe",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is safe.” → SONRA: “This appears safe.” Temel pratik iddia korunuyor; kanıtsal duruş değişiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:58:26.072Z"
+  },
+  {
+    "id": "t1v3-en-009",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I'll call you tomorrow",
+    "finalText": "Tomorrow I'll call you",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I'll call you tomorrow.” → SONRA: “Tomorrow I'll call you.” Kelime sırası değişiyor; taahhüt aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:08:31.667Z"
+  },
+  {
+    "id": "t1v3-en-010",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This bag belongs to me",
+    "finalText": "This is my bag",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This bag belongs to me.” → SONRA: “This is my bag.” Sahiplik aynı; eşdeğer paraphrase.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:21:31.963Z"
+  },
+  {
+    "id": "t1v3-en-011",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "The doctor advised me to rest",
+    "finalText": "The doctor recommended that I rest",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The doctor advised me to rest.” → SONRA: “The doctor recommended that I rest.” Öneri içeriği ve gücü aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:08:48.117Z"
+  },
+  {
+    "id": "t1v3-en-012",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "The meeting starts at three",
+    "finalText": "At three, the meeting starts",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The meeting starts at three.” → SONRA: “At three, the meeting starts.” Kelime sırası değişiyor; saat bilgisi aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:31:16.462Z"
+  },
+  {
+    "id": "t1v3-en-013",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This route is shorter",
+    "finalText": "This way is shorter",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This route is shorter.” → SONRA: “This way is shorter.” Karşılaştırma aynı; sözcük seçimi değişiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:08:57.134Z"
+  },
+  {
+    "id": "t1v3-en-014",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I will see you tomorrow",
+    "finalText": "I'll see you tomorrow",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I will see you tomorrow.” → SONRA: “I'll see you tomorrow.” Kısaltma dışında anlam değişmiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:21:47.914Z"
+  },
+  {
+    "id": "t1v3-en-015",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "The color is blue.",
+    "finalText": "The colour is blue.",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The color is blue.” → SONRA: “The colour is blue.” Bölgesel yazım farkı; içerik aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:09:15.134Z"
+  },
+  {
+    "id": "t1v3-en-016",
+    "language": "en",
+    "kind": "reordered",
+    "originalText": "red, blue, and green",
+    "finalText": "green, red, and blue",
+    "beforeContext": "The box contains ",
+    "afterContext": " pencils.",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “The box contains red, blue, and green pencils.” → SONRA: “The box contains green, red, and blue pencils.” Liste sırası değişiyor; öğeler aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:14:45.470Z"
+  },
+  {
+    "id": "t1v3-en-017",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I might come tomorrow",
+    "finalText": "I will come tomorrow",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Possibility becomes a commitment.",
+    "reviewNoteTr": "ÖNCE: “I might come tomorrow.” → SONRA: “I will come tomorrow.” Olasılık taahhüde dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:09:47.734Z"
+  },
+  {
+    "id": "t1v3-en-018",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I could call you later",
+    "finalText": "I will call you later",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Possibility becomes a commitment.",
+    "reviewNoteTr": "ÖNCE: “I could call you later.” → SONRA: “I will call you later.” Arama olasılığı taahhüde dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:23:03.997Z"
+  },
+  {
+    "id": "t1v3-en-019",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "You can come early if you want",
+    "finalText": "You should come early",
+    "beforeContext": "For the preparations, ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "An option becomes a recommendation.",
+    "reviewNoteTr": "ÖNCE: “For the preparations, You can come early if you want.” → SONRA: “For the preparations, You should come early.” Seçenek daha güçlü yönlendirmeye dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      },
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:10:18.617Z"
+  },
+  {
+    "id": "t1v3-en-020",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "It would be good to take the medicine",
+    "finalText": "You must take the medicine",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Soft advice becomes an obligation.",
+    "reviewNoteTr": "ÖNCE: “It would be good to take the medicine.” → SONRA: “You must take the medicine.” Yumuşak öneri zorunluluğa dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:31:59.235Z"
+  },
+  {
+    "id": "t1v3-en-021",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Everyone can come",
+    "finalText": "Only family members can come",
+    "beforeContext": "Tonight, ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "The allowed audience is narrowed.",
+    "reviewNoteTr": "ÖNCE: “Tonight, Everyone can come.” → SONRA: “Tonight, Only family members can come.” Kapsam daralıyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:10:37.833Z"
+  },
+  {
+    "id": "t1v3-en-022",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Only family members can come",
+    "finalText": "Everyone can come",
+    "beforeContext": "Tonight, ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "The allowed audience is expanded.",
+    "reviewNoteTr": "ÖNCE: “Tonight, Only family members can come.” → SONRA: “Tonight, Everyone can come.” Kapsam genişliyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:23:35.397Z"
+  },
+  {
+    "id": "t1v3-en-023",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Let's meet at eight",
+    "finalText": "Let's meet at nine",
+    "beforeContext": "Tomorrow, ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The meeting time changes.",
+    "reviewNoteTr": "ÖNCE: “Tomorrow, Let's meet at eight.” → SONRA: “Tomorrow, Let's meet at nine.” Buluşma saati değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:11:47.683Z"
+  },
+  {
+    "id": "t1v3-en-024",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Buy two loaves",
+    "finalText": "Buy three loaves",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The requested quantity changes.",
+    "reviewNoteTr": "ÖNCE: “Buy two loaves.” → SONRA: “Buy three loaves.” Miktar değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:59:13.039Z"
+  },
+  {
+    "id": "t1v3-en-025",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Let's take the bus",
+    "finalText": "Let's take the train",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The transport decision changes.",
+    "reviewNoteTr": "ÖNCE: “Let's take the bus.” → SONRA: “Let's take the train.” Ulaşım kararı değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:12:38.966Z"
+  },
+  {
+    "id": "t1v3-en-026",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "The keys are in the kitchen",
+    "finalText": "The keys are in the living room",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The stated location changes.",
+    "reviewNoteTr": "ÖNCE: “The keys are in the kitchen.” → SONRA: “The keys are in the living room.” Konum bilgisi değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:24:07.534Z"
+  },
+  {
+    "id": "t1v3-en-027",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This item is free",
+    "finalText": "This item costs money",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The price status changes.",
+    "reviewNoteTr": "ÖNCE: “This item is free.” → SONRA: “This item costs money.” Ücret durumu değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:13:41.716Z"
+  },
+  {
+    "id": "t1v3-en-028",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I like this dish",
+    "finalText": "I don't like this dish",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      },
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The expressed preference reverses.",
+    "reviewNoteTr": "ÖNCE: “I like this dish.” → SONRA: “I don't like this dish.” Tercih olumludan olumsuza dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      },
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:32:36.820Z"
+  },
+  {
+    "id": "t1v3-en-029",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Leave the door open",
+    "finalText": "Close the door",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The requested action reverses.",
+    "reviewNoteTr": "ÖNCE: “Leave the door open.” → SONRA: “Close the door.” İstenen eylem tersine dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:14:09.649Z"
+  },
+  {
+    "id": "t1v3-en-030",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I may buy it",
+    "finalText": "I will buy it",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A possibility becomes a purchase commitment.",
+    "reviewNoteTr": "ÖNCE: “I may buy it.” → SONRA: “I will buy it.” Olasılık satın alma taahhüdüne dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:25:05.896Z"
+  },
+  {
+    "id": "t1v3-en-031",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I can cook tonight",
+    "finalText": "I will cook tonight",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Ability/offer becomes a commitment.",
+    "reviewNoteTr": "ÖNCE: “I can cook tonight.” → SONRA: “I will cook tonight.” Yapabilme/teklif taahhüde dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:14:24.966Z"
+  },
+  {
+    "id": "t1v3-en-032",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "We can wait here",
+    "finalText": "We should not wait here",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "An option becomes advice against waiting.",
+    "reviewNoteTr": "ÖNCE: “We can wait here.” → SONRA: “We should not wait here.” Seçenek beklememe yönlendirmesine dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:14:37.470Z"
+  },
+  {
+    "id": "t1v3-en-033",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "if it doesn't rain, ",
+    "beforeContext": "Tonight, ",
+    "afterContext": "we'll go for a walk.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A weather condition is added.",
+    "reviewNoteTr": "ÖNCE: “Tonight, we'll go for a walk.” → SONRA: “Tonight, if it doesn't rain, we'll go for a walk.” Plana hava koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:15:25.182Z"
+  },
+  {
+    "id": "t1v3-en-034",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "if I finish work early, ",
+    "beforeContext": "Tomorrow, ",
+    "afterContext": "I'll stop by.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A condition is added to the visit.",
+    "reviewNoteTr": "ÖNCE: “Tomorrow, I'll stop by.” → SONRA: “Tomorrow, if I finish work early, I'll stop by.” Uğrama planına koşul ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:25:42.414Z"
+  },
+  {
+    "id": "t1v3-en-035",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "before eight ",
+    "beforeContext": "Come home ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A deadline is added.",
+    "reviewNoteTr": "ÖNCE: “Come home .” → SONRA: “Come home before eight .” Son saat bilgisi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:16:01.862Z"
+  },
+  {
+    "id": "t1v3-en-036",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "on weekends only ",
+    "beforeContext": "You can park here ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "A time restriction is added.",
+    "reviewNoteTr": "ÖNCE: “You can park here .” → SONRA: “You can park here on weekends only .” İzin hafta sonlarıyla sınırlandırılıyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:32:47.302Z"
+  },
+  {
+    "id": "t1v3-en-037",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "if the doctor approves, ",
+    "beforeContext": "",
+    "afterContext": "you can start exercising again.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "An approval condition is added.",
+    "reviewNoteTr": "ÖNCE: “you can start exercising again.” → SONRA: “if the doctor approves, you can start exercising again.” Spora dönüşe onay koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:16:29.147Z"
+  },
+  {
+    "id": "t1v3-en-038",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "without nuts ",
+    "beforeContext": "You can make the dessert ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "An ingredient exclusion is added.",
+    "reviewNoteTr": "ÖNCE: “You can make the dessert .” → SONRA: “You can make the dessert without nuts .” Tarife fındık kullanmama kısıtı ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:26:17.013Z"
+  },
+  {
+    "id": "t1v3-en-039",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "after the kids fall asleep, ",
+    "beforeContext": "",
+    "afterContext": "let's start the movie.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A timing prerequisite is added.",
+    "reviewNoteTr": "ÖNCE: “let's start the movie.” → SONRA: “after the kids fall asleep, let's start the movie.” Filmi başlatmaya zaman önkoşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:16:45.147Z"
+  },
+  {
+    "id": "t1v3-en-040",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "up to two ",
+    "beforeContext": "You can have ",
+    "afterContext": "cookies.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A quantity cap is added.",
+    "reviewNoteTr": "ÖNCE: “You can have cookies.” → SONRA: “You can have up to two cookies.” Miktar üst sınırı ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:59:44.989Z"
+  },
+  {
+    "id": "t1v3-en-041",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "in cash only ",
+    "beforeContext": "You can pay ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "A payment-method restriction is added.",
+    "reviewNoteTr": "ÖNCE: “You can pay .” → SONRA: “You can pay in cash only .” Ödeme yöntemi kısıtı ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:17:03.298Z"
+  },
+  {
+    "id": "t1v3-en-042",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "because I have to wake up early ",
+    "beforeContext": "I'm going to bed early ",
+    "afterContext": "tonight.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A rationale is added.",
+    "reviewNoteTr": "ÖNCE: “I'm going to bed early tonight.” → SONRA: “I'm going to bed early because I have to wake up early tonight.” Karara gerekçe ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:26:47.496Z"
+  },
+  {
+    "id": "t1v3-en-043",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "text me and ",
+    "beforeContext": "When you get home, ",
+    "afterContext": "lock the door.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A second requested action is added.",
+    "reviewNoteTr": "ÖNCE: “When you get home, lock the door.” → SONRA: “When you get home, text me and lock the door.” İkinci eylem ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:17:53.435Z"
+  },
+  {
+    "id": "t1v3-en-044",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "with your ID ",
+    "beforeContext": "Go to the clinic ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A preparation requirement is added.",
+    "reviewNoteTr": "ÖNCE: “Go to the clinic .” → SONRA: “Go to the clinic with your ID .” Kimlik alma gerekliliği ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:33:28.203Z"
+  },
+  {
+    "id": "t1v3-en-045",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "tonight only ",
+    "beforeContext": "You can use the car ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "A temporal restriction is added.",
+    "reviewNoteTr": "ÖNCE: “You can use the car .” → SONRA: “You can use the car tonight only .” İzin bu akşamla sınırlandırılıyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:18:08.781Z"
+  },
+  {
+    "id": "t1v3-en-046",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "at six o'clock ",
+    "beforeContext": "Pick me up from the station ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A specific time is added.",
+    "reviewNoteTr": "ÖNCE: “Pick me up from the station .” → SONRA: “Pick me up from the station at six o'clock .” Belirli saat ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:27:04.130Z"
+  },
+  {
+    "id": "t1v3-en-047",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "with your sister ",
+    "beforeContext": "You can go to the park ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A companionship condition is added.",
+    "reviewNoteTr": "ÖNCE: “You can go to the park .” → SONRA: “You can go to the park with your sister .” Parka gitmeye birlikte gitme koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:18:24.964Z"
+  },
+  {
+    "id": "t1v3-en-048",
+    "language": "en",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "because dinner is already at home, ",
+    "beforeContext": "Tonight, ",
+    "afterContext": "let's not order food.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A rationale is added.",
+    "reviewNoteTr": "ÖNCE: “Tonight, let's not order food.” → SONRA: “Tonight, because dinner is already at home, let's not order food.” Karara gerekçe ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:14:24.170Z"
+  },
+  {
+    "id": "t1v3-en-050",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "after work ",
+    "finalText": "",
+    "beforeContext": "I'll ",
+    "afterContext": "call you.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A timing condition is removed.",
+    "reviewNoteTr": "ÖNCE: “I'll after work call you.” → SONRA: “I'll call you.” Zaman koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:29:01.746Z"
+  },
+  {
+    "id": "t1v3-en-051",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "by six o'clock ",
+    "finalText": "",
+    "beforeContext": "Finish your homework ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A deadline is removed.",
+    "reviewNoteTr": "ÖNCE: “Finish your homework by six o'clock .” → SONRA: “Finish your homework .” Son saat bilgisi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:34:36.302Z"
+  },
+  {
+    "id": "t1v3-en-052",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "on Tuesdays only ",
+    "finalText": "",
+    "beforeContext": "You can come here ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "A day restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “You can come here on Tuesdays only .” → SONRA: “You can come here .” Gün kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:29:19.729Z"
+  },
+  {
+    "id": "t1v3-en-053",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "if your teacher approves, ",
+    "finalText": "",
+    "beforeContext": "You can ",
+    "afterContext": "join the trip.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "An approval condition is removed.",
+    "reviewNoteTr": "ÖNCE: “You can if your teacher approves, join the trip.” → SONRA: “You can join the trip.” Onay koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:00:37.605Z"
+  },
+  {
+    "id": "t1v3-en-054",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "without sugar ",
+    "finalText": "",
+    "beforeContext": "Make the coffee ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "An ingredient restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Make the coffee without sugar .” → SONRA: “Make the coffee .” İçerik kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:29:30.829Z"
+  },
+  {
+    "id": "t1v3-en-055",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "after dinner ",
+    "finalText": "",
+    "beforeContext": "Take your medicine ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A timing prerequisite is removed.",
+    "reviewNoteTr": "ÖNCE: “Take your medicine after dinner .” → SONRA: “Take your medicine .” Zaman önkoşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:34:53.202Z"
+  },
+  {
+    "id": "t1v3-en-056",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "up to three slices of ",
+    "finalText": "",
+    "beforeContext": "You can eat ",
+    "afterContext": "pizza.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A quantity cap is removed.",
+    "reviewNoteTr": "ÖNCE: “You can eat up to three slices of pizza.” → SONRA: “You can eat pizza.” Miktar üst sınırı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:29:38.596Z"
+  },
+  {
+    "id": "t1v3-en-058",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "because I have an exam tomorrow, ",
+    "finalText": "",
+    "beforeContext": "I won't go out ",
+    "afterContext": "tonight.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "The stated rationale is removed.",
+    "reviewNoteTr": "ÖNCE: “I won't go out because I have an exam tomorrow, tonight.” → SONRA: “I won't go out tonight.” Karar kalıyor, gerekçe kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:38:01.702Z"
+  },
+  {
+    "id": "t1v3-en-059",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "and call me ",
+    "finalText": "",
+    "beforeContext": "When you arrive, text me ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A second requested action is removed.",
+    "reviewNoteTr": "ÖNCE: “When you arrive, text me and call me .” → SONRA: “When you arrive, text me .” Arama eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:01:05.139Z"
+  },
+  {
+    "id": "t1v3-en-060",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "with an umbrella ",
+    "finalText": "",
+    "beforeContext": "Go outside ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A preparation action is removed.",
+    "reviewNoteTr": "ÖNCE: “Go outside with an umbrella .” → SONRA: “Go outside .” Şemsiye alma eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:38:18.286Z"
+  },
+  {
+    "id": "t1v3-en-062",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "at seven ",
+    "finalText": "",
+    "beforeContext": "Pick me up from home ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "The pickup time is removed.",
+    "reviewNoteTr": "ÖNCE: “Pick me up from home at seven .” → SONRA: “Pick me up from home .” Belirli saat kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:47:46.739Z"
+  },
+  {
+    "id": "t1v3-en-063",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "with your brother ",
+    "finalText": "",
+    "beforeContext": "You can go shopping ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A companionship condition is removed.",
+    "reviewNoteTr": "ÖNCE: “You can go shopping with your brother .” → SONRA: “You can go shopping .” Birlikte gitme koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:01:36.555Z"
+  },
+  {
+    "id": "t1v3-en-064",
+    "language": "en",
+    "kind": "removed",
+    "originalText": "because traffic is heavy, ",
+    "finalText": "",
+    "beforeContext": "Let's leave early ",
+    "afterContext": "today.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "The stated rationale is removed.",
+    "reviewNoteTr": "ÖNCE: “Let's leave early because traffic is heavy, today.” → SONRA: “Let's leave early today.” Erken çıkma kararı kalıyor, gerekçe kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:48:47.339Z"
+  },
+  {
+    "id": "t1v3-en-066",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is ready",
+    "finalText": "This is almost ready",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is ready.” → SONRA: “This is almost ready.” Literal completeness changes, but the importance of what remains is unknown.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:49:44.806Z"
+  },
+  {
+    "id": "t1v3-en-067",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "He is a friend",
+    "finalText": "He is an old friend",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “He is a friend.” → SONRA: “He is an old friend.” “Old friend” can mean long-standing friend; broader context is needed to exclude other readings.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:06:31.600Z"
+  },
+  {
+    "id": "t1v3-en-068",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Great.",
+    "finalText": "Great...",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Great.” → SONRA: “Great...” The ellipsis may signal hesitation, irony, or merely style; conversational context is missing.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:50:34.989Z"
+  },
+  {
+    "id": "t1v3-en-070",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Interesting.",
+    "finalText": "Interesting...",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Interesting.” → SONRA: “Interesting...” The ellipsis could signal doubt, irony, or reflection; context is insufficient.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:50:54.206Z"
+  },
+  {
+    "id": "t1v3-en-071",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "Sure",
+    "finalText": "Sure, I guess",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Sure.” → SONRA: “Sure, I guess.” The added hedge may be conversational or may weaken agreement materially; no interaction context is available.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:07:16.616Z"
+  },
+  {
+    "id": "t1v3-en-072",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "I will do it",
+    "finalText": "I can do it",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “I will do it.” → SONRA: “I can do it.” Commitment may have dropped to ability/offer, but the surrounding role/plan context is missing.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:52:15.206Z"
+  },
+  {
+    "id": "t1v3-en-074",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is expensive",
+    "finalText": "This feels expensive to me",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is expensive.” → SONRA: “This feels expensive to me.” The statement may shift from general evaluation to personal perspective; practical consequence is unclear.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:53:11.806Z"
+  },
+  {
+    "id": "t1v3-en-075",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is correct",
+    "finalText": "This is technically correct",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is correct.” → SONRA: “This is technically correct.” “Technically” may signal an unstated caveat; the relevant dimension is not specified.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:07:49.217Z"
+  },
+  {
+    "id": "t1v3-en-076",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is possible",
+    "finalText": "This is theoretically possible",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is possible.” → SONRA: “This is theoretically possible.” The qualifier may separate practical from theoretical feasibility; task context is missing.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:54:10.489Z"
+  },
+  {
+    "id": "t1v3-en-078",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "This is normal",
+    "finalText": "This is generally normal",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “This is normal.” → SONRA: “This is generally normal.” “Generally” admits exceptions; whether this case is one is unknown.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:55:30.156Z"
+  },
+  {
+    "id": "t1v3-en-079",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "He will come",
+    "finalText": "He will probably come",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “He will come.” → SONRA: “He will probably come.” Certainty drops; whether that is practically meaningful depends on planning context.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:08:14.199Z"
+  },
+  {
+    "id": "t1v3-en-080",
+    "language": "en",
+    "kind": "replaced",
+    "originalText": "That's bold",
+    "finalText": "That's... bold",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “That's bold.” → SONRA: “That's... bold.” The punctuation may signal admiration, criticism, or hesitation; context is insufficient.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:55:37.590Z"
+  },
+  {
+    "id": "t1v3-mixed-formality-tr-001",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu teklif hoşuma gitti, biraz düşüneceğim",
+    "finalText": "Teklifinizi memnuniyetle kabul ediyorum",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A tentative positive reaction becomes a formal, positive acceptance and commitment.",
+    "reviewNoteTr": "Olumlu duygu güçleniyor; ifade daha resmi hale geliyor ve 'düşüneceğim' kararı açık kabule dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:22:38.196Z",
+    "reviewedAt": "2026-08-28T03:24:56.499Z"
+  },
+  {
+    "id": "t1v3-mixed-formality-tr-002",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu saçma, bunu yapmayacağım",
+    "finalText": "Bu yaklaşımı uygun bulmuyorum; ancak değerlendirmeye devam edeceğim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A blunt rejection becomes a more formal, less emotionally intense statement that keeps evaluation open.",
+    "reviewNoteTr": "Olumsuz duygu şiddeti düşüyor, resmiyet artıyor ve kesin reddetme kararı değerlendirmeye devam etmeye dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:22:38.196Z",
+    "reviewedAt": "2026-08-28T03:24:26.765Z"
+  },
+  {
+    "id": "t1v3-mixed-politeness-tr-001",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu fikir berbat, vazgeç",
+    "finalText": "Bu fikir beni ikna etmedi; lütfen başka bir seçenek düşün",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directive_force",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A harsh command to abandon the idea becomes a more polite, less emotionally intense request to consider an alternative.",
+    "reviewNoteTr": "Nezaket artıyor, olumsuz duygu şiddeti azalıyor ve 'vazgeç' talimatı alternatif düşünme isteğine dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      },
+      {
+        "dimension": "directive_force",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:22:38.196Z",
+    "reviewedAt": "2026-08-28T03:23:48.500Z"
+  },
+  {
+    "id": "t1v3-mixed-politeness-tr-002",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Harika, bunu hemen yap",
+    "finalText": "Bunu beğendim ama lütfen şimdilik bekle",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "Strong enthusiasm becomes milder positive affect while the requested action changes from acting immediately to waiting.",
+    "reviewNoteTr": "Nezaket artıyor, olumlu duygu şiddeti azalıyor ve 'hemen yap' talimatı 'şimdilik bekle' kararına dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-28T03:22:38.196Z",
+    "reviewedAt": "2026-08-28T03:23:10.966Z"
+  },
+  {
+    "id": "t1v3-tr-002",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "kötüydü",
+    "finalText": "oldukça kötüydü",
+    "beforeContext": "Hizmet ",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Hizmet kötüydü.” → SONRA: “Hizmet oldukça kötüydü.” Olumsuzluğun şiddeti artıyor; temel değerlendirme aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "politeness",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T20:56:30.172Z"
+  },
+  {
+    "id": "t1v3-tr-003",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu konuda üzgünüm",
+    "finalText": "Bu konuda gerçekten üzgünüm",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu konuda üzgünüm.” → SONRA: “Bu konuda gerçekten üzgünüm.” İfade edilen üzüntünün şiddeti artıyor; proposition aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:09:03.148Z"
+  },
+  {
+    "id": "t1v3-tr-005",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bunu beğendim",
+    "finalText": "Bunu çok beğendim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bunu beğendim.” → SONRA: “Bunu çok beğendim.” Beğeni şiddeti artıyor; tercih yönü değişmiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:09:47.180Z"
+  },
+  {
+    "id": "t1v3-tr-007",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Müsaitsen beni ara",
+    "finalText": "Beni ara lütfen",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "politeness",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Müsaitsen beni ara.” → SONRA: “Beni ara lütfen.” Arama isteği aynı; ifade daha doğrudan ve açık nezaket içeriyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "politeness",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:11:03.446Z"
+  },
+  {
+    "id": "t1v3-tr-009",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Toplantıya katılmanızı rica ederim",
+    "finalText": "Lütfen toplantıya katıl",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Toplantıya katılmanızı rica ederim.” → SONRA: “Lütfen toplantıya katıl.” Aynı katılım isteği daha az resmi ve daha doğrudan ifade ediliyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "formality",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:11:58.512Z"
+  },
+  {
+    "id": "t1v3-tr-011",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O üzgün",
+    "finalText": "O üzgün görünüyor",
+    "beforeContext": "Şu anda ",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Şu anda O üzgün.” → SONRA: “Şu anda O üzgün görünüyor.” Operatör sınırına göre temel değerlendirme korunuyor; doğrudan iddia gözlemsel ifadeye dönüşüyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:14:54.609Z"
+  },
+  {
+    "id": "t1v3-tr-013",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Yarın seni ararım",
+    "finalText": "Seni yarın ararım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Yarın seni ararım.” → SONRA: “Seni yarın ararım.” Yalnızca kelime sırası değişiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:01.442Z"
+  },
+  {
+    "id": "t1v3-tr-015",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Doktor dinlenmemi önerdi",
+    "finalText": "Doktor dinlenmemi tavsiye etti",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Doktor dinlenmemi önerdi.” → SONRA: “Doktor dinlenmemi tavsiye etti.” Önerinin içeriği ve gücü aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:09.125Z"
+  },
+  {
+    "id": "t1v3-tr-017",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Çocuklar dışarıda oynuyor",
+    "finalText": "Çocuklar dışarıda oyun oynuyor",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Çocuklar dışarıda oynuyor.” → SONRA: “Çocuklar dışarıda oyun oynuyor.” Olay aynı; yalnızca eşdeğer ifade değişimi var.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:20.758Z"
+  },
+  {
+    "id": "t1v3-tr-019",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bugün markete gideceğim",
+    "finalText": "Markete bugün gideceğim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bugün markete gideceğim.” → SONRA: “Markete bugün gideceğim.” Kelime sırası değişiyor; plan aynı.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:25.159Z"
+  },
+  {
+    "id": "t1v3-tr-021",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Yarın görüşürüz",
+    "finalText": "Yarın görüşürüz.",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Yarın görüşürüz” → SONRA: “Yarın görüşürüz.” Yalnızca noktalama değişiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:28.892Z"
+  },
+  {
+    "id": "t1v3-tr-023",
+    "language": "tr",
+    "kind": "reordered",
+    "originalText": "kırmızı, mavi ve yeşil",
+    "finalText": "yeşil, kırmızı ve mavi",
+    "beforeContext": "Kutuda ",
+    "afterContext": " kalemler var.",
+    "proposedVerdict": "no_meaningful_change",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Kutuda kırmızı, mavi ve yeşil kalemler var.” → SONRA: “Kutuda yeşil, kırmızı ve mavi kalemler var.” Eşdeğer liste öğelerinin sırası değişiyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:15:36.292Z"
+  },
+  {
+    "id": "t1v3-tr-025",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Belki yarın gelirim",
+    "finalText": "Yarın geleceğim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Possibility becomes a commitment.",
+    "reviewNoteTr": "ÖNCE: “Belki yarın gelirim.” → SONRA: “Yarın geleceğim.” Olasılık kesin taahhüde dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:16:07.225Z"
+  },
+  {
+    "id": "t1v3-tr-027",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "İstersen erken gelebilirsin",
+    "finalText": "Erken gelmelisin",
+    "beforeContext": "Hazırlık için ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "An option becomes a stronger directive.",
+    "reviewNoteTr": "ÖNCE: “Hazırlık için İstersen erken gelebilirsin.” → SONRA: “Hazırlık için Erken gelmelisin.” Seçenek daha güçlü yönlendirmeye dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "directive_force",
+        "direction": "increased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:17:54.506Z"
+  },
+  {
+    "id": "t1v3-tr-029",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Herkes gelebilir",
+    "finalText": "Sadece aile üyeleri gelebilir",
+    "beforeContext": "Akşam yemeğine ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "The allowed audience is narrowed.",
+    "reviewNoteTr": "ÖNCE: “Akşam yemeğine Herkes gelebilir.” → SONRA: “Akşam yemeğine Sadece aile üyeleri gelebilir.” Kapsam herkesten aile üyelerine daralıyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "politeness",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:18:30.789Z"
+  },
+  {
+    "id": "t1v3-tr-031",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Sadece aile üyeleri gelebilir",
+    "finalText": "Herkes gelebilir",
+    "beforeContext": "Akşam yemeğine ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "The allowed audience is expanded.",
+    "reviewNoteTr": "ÖNCE: “Akşam yemeğine Sadece aile üyeleri gelebilir.” → SONRA: “Akşam yemeğine Herkes gelebilir.” Kapsam genişliyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:19:33.132Z"
+  },
+  {
+    "id": "t1v3-tr-033",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "İki ekmek al",
+    "finalText": "Üç ekmek al",
+    "beforeContext": "Marketten ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The requested quantity changes.",
+    "reviewNoteTr": "ÖNCE: “Marketten İki ekmek al.” → SONRA: “Marketten Üç ekmek al.” Miktar değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:20:19.480Z"
+  },
+  {
+    "id": "t1v3-tr-035",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Cumartesi görüşelim",
+    "finalText": "Pazar görüşelim",
+    "beforeContext": "Bu hafta sonu ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The chosen day changes.",
+    "reviewNoteTr": "ÖNCE: “Bu hafta sonu Cumartesi görüşelim.” → SONRA: “Bu hafta sonu Pazar görüşelim.” Buluşma günü değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      },
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:20:28.763Z"
+  },
+  {
+    "id": "t1v3-tr-037",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu ürün ücretsiz",
+    "finalText": "Bu ürün ücretli",
+    "beforeContext": "Kampanya dışında ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The price status reverses.",
+    "reviewNoteTr": "ÖNCE: “Kampanya dışında Bu ürün ücretsiz.” → SONRA: “Kampanya dışında Bu ürün ücretli.” Ücret durumu tersine dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:20:49.346Z"
+  },
+  {
+    "id": "t1v3-tr-039",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu yemeği seviyorum",
+    "finalText": "Bu yemeği sevmiyorum",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      },
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The expressed preference reverses.",
+    "reviewNoteTr": "ÖNCE: “Bu yemeği seviyorum.” → SONRA: “Bu yemeği sevmiyorum.” Tercih olumlu yönden olumsuza dönüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_negative"
+      },
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:21:11.663Z"
+  },
+  {
+    "id": "t1v3-tr-041",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Kapıyı açık bırak",
+    "finalText": "Kapıyı kapat",
+    "beforeContext": "Çıkarken ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The requested action reverses.",
+    "reviewNoteTr": "ÖNCE: “Çıkarken Kapıyı açık bırak.” → SONRA: “Çıkarken Kapıyı kapat.” İstenen eylem değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:21:21.079Z"
+  },
+  {
+    "id": "t1v3-tr-043",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu akşam evde kalacağım",
+    "finalText": "Bu akşam dışarı çıkacağım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "The plan changes.",
+    "reviewNoteTr": "ÖNCE: “Bu akşam evde kalacağım.” → SONRA: “Bu akşam dışarı çıkacağım.” Akşam planı değişiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:21:26.979Z"
+  },
+  {
+    "id": "t1v3-tr-045",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bunu belki satın alırım",
+    "finalText": "Bunu kesin satın alacağım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A possibility becomes a firm purchase commitment.",
+    "reviewNoteTr": "ÖNCE: “Bunu belki satın alırım.” → SONRA: “Bunu kesin satın alacağım.” Olasılık kesin satın alma taahhüdüne dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:22:30.711Z"
+  },
+  {
+    "id": "t1v3-tr-047",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Yemeği ben yapabilirim",
+    "finalText": "Yemeği ben yapacağım",
+    "beforeContext": "Bu akşam ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_transformed",
+    "proposedDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "Ability/offer becomes a commitment.",
+    "reviewNoteTr": "ÖNCE: “Bu akşam Yemeği ben yapabilirim.” → SONRA: “Bu akşam Yemeği ben yapacağım.” Yapabilme/teklif taahhüde dönüşüyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "increased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:23:51.825Z"
+  },
+  {
+    "id": "t1v3-tr-049",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "hava güzel olursa ",
+    "beforeContext": "Akşam ",
+    "afterContext": "yürüyüşe çıkarız.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A weather condition is added to the plan.",
+    "reviewNoteTr": "ÖNCE: “Akşam yürüyüşe çıkarız.” → SONRA: “Akşam hava güzel olursa yürüyüşe çıkarız.” Plana hava koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:25:08.140Z"
+  },
+  {
+    "id": "t1v3-tr-051",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "saat sekizden önce ",
+    "beforeContext": "Eve ",
+    "afterContext": "gel.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A deadline is added.",
+    "reviewNoteTr": "ÖNCE: “Eve gel.” → SONRA: “Eve saat sekizden önce gel.” Eve gelme isteğine son saat bilgisi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_valence",
+        "direction": "more_positive"
+      },
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directness",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:26:18.289Z"
+  },
+  {
+    "id": "t1v3-tr-053",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "annene haber verip ",
+    "beforeContext": "Dışarı çıkmadan önce ",
+    "afterContext": "anahtarı al.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "An additional notification action is added.",
+    "reviewNoteTr": "ÖNCE: “Dışarı çıkmadan önce anahtarı al.” → SONRA: “Dışarı çıkmadan önce annene haber verip anahtarı al.” Anahtarı alma eylemine ek olarak haber verme eylemi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-27T21:27:18.254Z"
+  },
+  {
+    "id": "t1v3-tr-055",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "fındık eklemeden ",
+    "beforeContext": "Tatlıyı ",
+    "afterContext": "yapabilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "An ingredient exclusion is added.",
+    "reviewNoteTr": "ÖNCE: “Tatlıyı yapabilirsin.” → SONRA: “Tatlıyı fındık eklemeden yapabilirsin.” Tarife fındık eklememe kısıtı ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:26:24.446Z"
+  },
+  {
+    "id": "t1v3-tr-057",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "en fazla iki ",
+    "beforeContext": "",
+    "afterContext": "kurabiye yiyebilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A quantity cap is added.",
+    "reviewNoteTr": "ÖNCE: “kurabiye yiyebilirsin.” → SONRA: “en fazla iki kurabiye yiyebilirsin.” Miktara üst sınır ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:26:38.429Z"
+  },
+  {
+    "id": "t1v3-tr-059",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "yarın erken kalkacağım için ",
+    "beforeContext": "Bu gece ",
+    "afterContext": "erken yatacağım.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A rationale is added to the decision.",
+    "reviewNoteTr": "ÖNCE: “Bu gece erken yatacağım.” → SONRA: “Bu gece yarın erken kalkacağım için erken yatacağım.” Karara gerekçe ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:27:09.629Z"
+  },
+  {
+    "id": "t1v3-tr-060",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "bana mesaj atıp ",
+    "beforeContext": "Eve varınca ",
+    "afterContext": "kapıyı kilitle.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A second requested action is added.",
+    "reviewNoteTr": "ÖNCE: “Eve varınca kapıyı kilitle.” → SONRA: “Eve varınca bana mesaj atıp kapıyı kilitle.” Kapıyı kilitlemeye mesaj atma eylemi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:11:51.554Z"
+  },
+  {
+    "id": "t1v3-tr-061",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "kimliğini yanına alıp ",
+    "beforeContext": "Hastaneye ",
+    "afterContext": "git.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A preparation requirement is added.",
+    "reviewNoteTr": "ÖNCE: “Hastaneye git.” → SONRA: “Hastaneye kimliğini yanına alıp git.” Hastaneye gitmeye kimlik alma gerekliliği ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:30:42.311Z"
+  },
+  {
+    "id": "t1v3-tr-062",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "sadece salonda ",
+    "beforeContext": "Misafirler ",
+    "afterContext": "oturabilir.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "proposedDescription": "A location restriction is added.",
+    "reviewNoteTr": "ÖNCE: “Misafirler oturabilir.” → SONRA: “Misafirler sadece salonda oturabilir.” Misafirlerin oturma alanı salonla sınırlandırılıyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:11:19.489Z"
+  },
+  {
+    "id": "t1v3-tr-063",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "bu akşam ",
+    "beforeContext": "Arabayı ",
+    "afterContext": "kullanabilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A temporal scope is added to the permission.",
+    "reviewNoteTr": "ÖNCE: “Arabayı kullanabilirsin.” → SONRA: “Arabayı bu akşam kullanabilirsin.” Araç kullanma izni bu akşamla sınırlandırılıyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:30:56.178Z"
+  },
+  {
+    "id": "t1v3-tr-064",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "son otobüsü kaçırmadan ",
+    "beforeContext": "Dışarıda ",
+    "afterContext": "kalabilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A timing condition is added.",
+    "reviewNoteTr": "ÖNCE: “Dışarıda kalabilirsin.” → SONRA: “Dışarıda son otobüsü kaçırmadan kalabilirsin.” Dışarıda kalmaya son otobüs koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:10:28.857Z"
+  },
+  {
+    "id": "t1v3-tr-065",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "önce beni aradıktan sonra ",
+    "beforeContext": "Kararını ",
+    "afterContext": "değiştirebilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A prerequisite is added before changing the decision.",
+    "reviewNoteTr": "ÖNCE: “Kararını değiştirebilirsin.” → SONRA: “Kararını önce beni aradıktan sonra değiştirebilirsin.” Karar değiştirmeye önce arama önkoşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:31:36.930Z"
+  },
+  {
+    "id": "t1v3-tr-066",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "süt alarak ",
+    "beforeContext": "Marketten ",
+    "afterContext": "dön.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "An additional required action is added.",
+    "reviewNoteTr": "ÖNCE: “Marketten dön.” → SONRA: “Marketten süt alarak dön.” Dönüşe süt alma eylemi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:09:59.274Z"
+  },
+  {
+    "id": "t1v3-tr-067",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "yalnızca bir gece ",
+    "beforeContext": "Bizde ",
+    "afterContext": "kalabilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A duration limit is added.",
+    "reviewNoteTr": "ÖNCE: “Bizde kalabilirsin.” → SONRA: “Bizde yalnızca bir gece kalabilirsin.” Kalma süresi bir geceyle sınırlandırılıyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:34:01.743Z"
+  },
+  {
+    "id": "t1v3-tr-068",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "saat altıda ",
+    "beforeContext": "Beni ",
+    "afterContext": "istasyondan al.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "proposedDescription": "A specific pickup time is added.",
+    "reviewNoteTr": "ÖNCE: “Beni istasyondan al.” → SONRA: “Beni saat altıda istasyondan al.” Eyleme belirli saat ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:09:36.407Z"
+  },
+  {
+    "id": "t1v3-tr-069",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "kardeşinle birlikte ",
+    "beforeContext": "Parka ",
+    "afterContext": "gidebilirsin.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A companionship condition is added.",
+    "reviewNoteTr": "ÖNCE: “Parka gidebilirsin.” → SONRA: “Parka kardeşinle birlikte gidebilirsin.” Parka gitmeye kardeşle birlikte olma koşulu ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:34:16.327Z"
+  },
+  {
+    "id": "t1v3-tr-070",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "evde yemek olduğu için ",
+    "beforeContext": "Bu akşam ",
+    "afterContext": "dışarıdan yemek söylemeyelim.",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "proposedDescription": "A rationale is added.",
+    "reviewNoteTr": "ÖNCE: “Bu akşam dışarıdan yemek söylemeyelim.” → SONRA: “Bu akşam evde yemek olduğu için dışarıdan yemek söylemeyelim.” Karara gerekçe ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "added"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:09:07.391Z"
+  },
+  {
+    "id": "t1v3-tr-072",
+    "language": "tr",
+    "kind": "added",
+    "originalText": "",
+    "finalText": "ve su al ",
+    "beforeContext": "Marketten ekmek al ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_added",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A second shopping item is added.",
+    "reviewNoteTr": "ÖNCE: “Marketten ekmek al .” → SONRA: “Marketten ekmek al ve su al .” Alışveriş görevine su alma eylemi ekleniyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:08:45.425Z"
+  },
+  {
+    "id": "t1v3-tr-073",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "hava kötüleşirse ",
+    "finalText": "",
+    "beforeContext": "Pikniği ",
+    "afterContext": "iptal ederiz.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A weather condition is removed.",
+    "reviewNoteTr": "ÖNCE: “Pikniği hava kötüleşirse iptal ederiz.” → SONRA: “Pikniği iptal ederiz.” İptal kararındaki hava koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:35:56.476Z"
+  },
+  {
+    "id": "t1v3-tr-074",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "işten sonra ",
+    "finalText": "",
+    "beforeContext": "Seni ",
+    "afterContext": "ararım.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A timing condition is removed.",
+    "reviewNoteTr": "ÖNCE: “Seni işten sonra ararım.” → SONRA: “Seni ararım.” Arama eylemindeki zaman koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:08:28.342Z"
+  },
+  {
+    "id": "t1v3-tr-075",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "saat altıya kadar ",
+    "finalText": "",
+    "beforeContext": "Ödevini ",
+    "afterContext": "bitir.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "The deadline is removed.",
+    "reviewNoteTr": "ÖNCE: “Ödevini saat altıya kadar bitir.” → SONRA: “Ödevini bitir.” Ödev için son saat bilgisi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:36:29.559Z"
+  },
+  {
+    "id": "t1v3-tr-076",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "yalnızca salı günleri ",
+    "finalText": "",
+    "beforeContext": "Buraya ",
+    "afterContext": "gelebilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "A day restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Buraya yalnızca salı günleri gelebilirsin.” → SONRA: “Buraya gelebilirsin.” İzin gün kısıtı kalktığı için kapsam genişliyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:08:01.142Z"
+  },
+  {
+    "id": "t1v3-tr-077",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "babana da haber verip ",
+    "finalText": "",
+    "beforeContext": "Arabayı ",
+    "afterContext": "al.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A notification action is removed.",
+    "reviewNoteTr": "ÖNCE: “Arabayı babana da haber verip al.” → SONRA: “Arabayı al.” Aracı alma öncesindeki haber verme eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:39:15.942Z"
+  },
+  {
+    "id": "t1v3-tr-078",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "öğretmenin onaylarsa ",
+    "finalText": "",
+    "beforeContext": "Geziye ",
+    "afterContext": "katılabilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "An approval condition is removed.",
+    "reviewNoteTr": "ÖNCE: “Geziye öğretmenin onaylarsa katılabilirsin.” → SONRA: “Geziye katılabilirsin.” Geziye katılım için onay koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:07:38.260Z"
+  },
+  {
+    "id": "t1v3-tr-079",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "şeker koymadan ",
+    "finalText": "",
+    "beforeContext": "Kahveyi ",
+    "afterContext": "hazırla.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "An ingredient restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Kahveyi şeker koymadan hazırla.” → SONRA: “Kahveyi hazırla.” Şeker kullanmama kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:40:55.505Z"
+  },
+  {
+    "id": "t1v3-tr-080",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "yemekten sonra ",
+    "finalText": "",
+    "beforeContext": "İlacını ",
+    "afterContext": "al.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A timing prerequisite is removed.",
+    "reviewNoteTr": "ÖNCE: “İlacını yemekten sonra al.” → SONRA: “İlacını al.” İlacın ne zaman alınacağı koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:07:08.593Z"
+  },
+  {
+    "id": "t1v3-tr-081",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "en fazla üç dilim ",
+    "finalText": "",
+    "beforeContext": "Pizza ",
+    "afterContext": "yiyebilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A quantity cap is removed.",
+    "reviewNoteTr": "ÖNCE: “Pizza en fazla üç dilim yiyebilirsin.” → SONRA: “Pizza yiyebilirsin.” Miktar üst sınırı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:41:49.538Z"
+  },
+  {
+    "id": "t1v3-tr-082",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "sadece kartla ",
+    "finalText": "",
+    "beforeContext": "Ödemeyi ",
+    "afterContext": "yapabilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "A payment-method restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Ödemeyi sadece kartla yapabilirsin.” → SONRA: “Ödemeyi yapabilirsin.” Ödeme yöntemi kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:06:41.560Z"
+  },
+  {
+    "id": "t1v3-tr-084",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "ve beni ara ",
+    "finalText": "",
+    "beforeContext": "Eve vardığında mesaj at ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A second requested action is removed.",
+    "reviewNoteTr": "ÖNCE: “Eve vardığında mesaj at ve beni ara .” → SONRA: “Eve vardığında mesaj at .” Mesaj atma kalıyor, arama eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:06:14.361Z"
+  },
+  {
+    "id": "t1v3-tr-085",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "yanına şemsiye alıp ",
+    "finalText": "",
+    "beforeContext": "Dışarı ",
+    "afterContext": "çık.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "A preparation action is removed.",
+    "reviewNoteTr": "ÖNCE: “Dışarı yanına şemsiye alıp çık.” → SONRA: “Dışarı çık.” Dışarı çıkmadan önce şemsiye alma eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:42:40.771Z"
+  },
+  {
+    "id": "t1v3-tr-086",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "yalnızca bahçede ",
+    "finalText": "",
+    "beforeContext": "Çocuklar ",
+    "afterContext": "oynayabilir.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "proposedDescription": "A location restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Çocuklar yalnızca bahçede oynayabilir.” → SONRA: “Çocuklar oynayabilir.” Oyun alanı kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:05:51.411Z"
+  },
+  {
+    "id": "t1v3-tr-087",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "bu hafta sonu ",
+    "finalText": "",
+    "beforeContext": "Arabayı ",
+    "afterContext": "kullanabilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A temporal restriction is removed.",
+    "reviewNoteTr": "ÖNCE: “Arabayı bu hafta sonu kullanabilirsin.” → SONRA: “Arabayı kullanabilirsin.” İzin üzerindeki zaman kısıtı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:43:36.041Z"
+  },
+  {
+    "id": "t1v3-tr-088",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "gece yarısından önce ",
+    "finalText": "",
+    "beforeContext": "Eve ",
+    "afterContext": "dön.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A return-time limit is removed.",
+    "reviewNoteTr": "ÖNCE: “Eve gece yarısından önce dön.” → SONRA: “Eve dön.” Dönüş saat sınırı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:05:22.495Z"
+  },
+  {
+    "id": "t1v3-tr-089",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "önce ödevini bitirip ",
+    "finalText": "",
+    "beforeContext": "Televizyon ",
+    "afterContext": "izleyebilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A prerequisite is removed.",
+    "reviewNoteTr": "ÖNCE: “Televizyon önce ödevini bitirip izleyebilirsin.” → SONRA: “Televizyon izleyebilirsin.” Televizyon izlemeye bağlı önkoşul kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:44:23.620Z"
+  },
+  {
+    "id": "t1v3-tr-090",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "ve peynir al ",
+    "finalText": "",
+    "beforeContext": "Marketten süt al ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "One requested shopping action is removed.",
+    "reviewNoteTr": "ÖNCE: “Marketten süt al ve peynir al .” → SONRA: “Marketten süt al .” Peynir alma eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:04:35.913Z"
+  },
+  {
+    "id": "t1v3-tr-091",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "iki günlüğüne ",
+    "finalText": "",
+    "beforeContext": "Bizde ",
+    "afterContext": "kalabilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "A duration limit is removed.",
+    "reviewNoteTr": "ÖNCE: “Bizde iki günlüğüne kalabilirsin.” → SONRA: “Bizde kalabilirsin.” Kalma süresi sınırı kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "expanded"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:45:37.304Z"
+  },
+  {
+    "id": "t1v3-tr-092",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "saat yedide ",
+    "finalText": "",
+    "beforeContext": "Beni ",
+    "afterContext": "evden al.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "proposedDescription": "The pickup time is removed.",
+    "reviewNoteTr": "ÖNCE: “Beni saat yedide evden al.” → SONRA: “Beni evden al.” Belirli saat bilgisi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:04:06.863Z"
+  },
+  {
+    "id": "t1v3-tr-093",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "abla ile birlikte ",
+    "finalText": "",
+    "beforeContext": "Alışverişe ",
+    "afterContext": "gidebilirsin.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "A companionship condition is removed.",
+    "reviewNoteTr": "ÖNCE: “Alışverişe abla ile birlikte gidebilirsin.” → SONRA: “Alışverişe gidebilirsin.” Birlikte gitme koşulu kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "conditionality",
+        "direction": "removed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:46:22.269Z"
+  },
+  {
+    "id": "t1v3-tr-094",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "trafik yoğun olduğu için ",
+    "finalText": "",
+    "beforeContext": "Bugün ",
+    "afterContext": "erken çıkalım.",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "proposedDescription": "The stated rationale is removed.",
+    "reviewNoteTr": "ÖNCE: “Bugün trafik yoğun olduğu için erken çıkalım.” → SONRA: “Bugün erken çıkalım.” Erken çıkma kararı kalıyor, gerekçe kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "rationale",
+        "direction": "removed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:03:53.947Z"
+  },
+  {
+    "id": "t1v3-tr-096",
+    "language": "tr",
+    "kind": "removed",
+    "originalText": "ve çöpü çıkar ",
+    "finalText": "",
+    "beforeContext": "Çıkarken kapıyı kilitle ",
+    "afterContext": ".",
+    "proposedVerdict": "meaning_removed",
+    "proposedDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "proposedDescription": "An additional requested action is removed.",
+    "reviewNoteTr": "ÖNCE: “Çıkarken kapıyı kilitle ve çöpü çıkar .” → SONRA: “Çıkarken kapıyı kilitle .” Çöp çıkarma eylemi kaldırılıyor.",
+    "humanVerdict": "meaning_removed",
+    "humanDimensions": [
+      {
+        "dimension": "action_or_decision",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:03:25.481Z"
+  },
+  {
+    "id": "t1v3-tr-097",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu iyi",
+    "finalText": "Bu yeterince iyi",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu iyi.” → SONRA: “Bu yeterince iyi.” “Yeterince” bir kabul eşiği ekleyebilir; bu eşiğin pratik sonucu bağlam olmadan bilinmiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:49:06.884Z"
+  },
+  {
+    "id": "t1v3-tr-098",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu hazır",
+    "finalText": "Bu neredeyse hazır",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu hazır.” → SONRA: “Bu neredeyse hazır.” Literal tamlık değişiyor ama eksik kalan kısmın pratik önemi bilinmiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:02:38.181Z"
+  },
+  {
+    "id": "t1v3-tr-099",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O bir arkadaşım",
+    "finalText": "O eski bir arkadaşım",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “O bir arkadaşım.” → SONRA: “O eski bir arkadaşım.” “Eski” uzun süredir tanışılan kişi mi yoksa artık arkadaş olunmayan kişi mi, bağlamdan belli değil.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:50:06.033Z"
+  },
+  {
+    "id": "t1v3-tr-100",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Harika.",
+    "finalText": "Harika...",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Harika.” → SONRA: “Harika...” Üç nokta memnuniyet, tereddüt veya ironi taşıyabilir; konuşma bağlamı yok.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:02:03.233Z"
+  },
+  {
+    "id": "t1v3-tr-102",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "İlginç.",
+    "finalText": "İlginç...",
+    "beforeContext": "",
+    "afterContext": "",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “İlginç.” → SONRA: “İlginç...” Üç nokta merak, şüphe veya ironi ifade edebilir; yeterli bağlam yok.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:01:59.283Z"
+  },
+  {
+    "id": "t1v3-tr-104",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Olur",
+    "finalText": "Olabilir",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Olur.” → SONRA: “Olabilir.” Kesin kabul mü olasılık bildirimi mi olduğu konuşma bağlamına bağlı.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:01:49.565Z"
+  },
+  {
+    "id": "t1v3-tr-105",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bunu yaparız",
+    "finalText": "Bunu yapabiliriz",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bunu yaparız.” → SONRA: “Bunu yapabiliriz.” Kesin plan mı yalnızca imkan bildirimi mi olduğu önceki konuşmaya bağlı olarak farklı sonuç verebilir.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:50:56.700Z"
+  },
+  {
+    "id": "t1v3-tr-106",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Sanırım yeter",
+    "finalText": "Yeter gibi",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Sanırım yeter.” → SONRA: “Yeter gibi.” İki ihtiyat ifadesinin pratik farkı bağlama göre değişebilir; güvenli ayrım yapılamıyor.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:00:52.333Z"
+  },
+  {
+    "id": "t1v3-tr-107",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O erken geldi",
+    "finalText": "O yine erken geldi",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “O erken geldi.” → SONRA: “O yine erken geldi.” “Yine” geçmişteki tekrarı ekliyor; bunun mevcut editin hedeflenen anlamı olup olmadığı daha geniş bağlam gerektiriyor.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:51:58.466Z"
+  },
+  {
+    "id": "t1v3-tr-108",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu pahalı",
+    "finalText": "Bu bana pahalı geliyor",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu pahalı.” → SONRA: “Bu bana pahalı geliyor.” Nesnel fiyat yargısından kişisel değerlendirmeye kayış olabilir; kullanım amacına göre pratik fark değişir.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T03:00:24.551Z"
+  },
+  {
+    "id": "t1v3-tr-109",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bunu alırım",
+    "finalText": "Bunu alabilirim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bunu alırım.” → SONRA: “Bunu alabilirim.” Taahhüt düşmüş olabilir veya yalnızca konuşma tarzı değişmiş olabilir; satın alma bağlamı yok.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:52:32.666Z"
+  },
+  {
+    "id": "t1v3-tr-110",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Ben giderim",
+    "finalText": "Ben gidebilirim",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Ben giderim.” → SONRA: “Ben gidebilirim.” Karardan imkan/teklife kayış olabilir; rol dağılımı bağlamı olmadan güvenli karar verilemiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "commitment",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:59:49.968Z"
+  },
+  {
+    "id": "t1v3-tr-111",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O bunu biliyor",
+    "finalText": "O bunu biliyor olmalı",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “O bunu biliyor.” → SONRA: “O bunu biliyor olmalı.” Doğrudan bilgi iddiası çıkarıma dönüşüyor; bu farkın pratik önemi görev bağlamına bağlı.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:53:06.215Z"
+  },
+  {
+    "id": "t1v3-tr-112",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu doğru",
+    "finalText": "Bu teknik olarak doğru",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu doğru.” → SONRA: “Bu teknik olarak doğru.” “Teknik olarak” gizli bir istisna/çekince ima edebilir; hangi boyutta olduğu belli değil.",
+    "humanVerdict": "no_meaningful_change",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:59:08.602Z"
+  },
+  {
+    "id": "t1v3-tr-113",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu mümkün",
+    "finalText": "Bu teorik olarak mümkün",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu mümkün.” → SONRA: “Bu teorik olarak mümkün.” Pratik uygulanabilirlikten yalnızca teorik mümkünlüğe daralma olabilir; görev bağlamı yok.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:53:34.915Z"
+  },
+  {
+    "id": "t1v3-tr-114",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Sorun çözüldü",
+    "finalText": "Sorun büyük ölçüde çözüldü",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Sorun çözüldü.” → SONRA: “Sorun büyük ölçüde çözüldü.” Tam çözümden kısmi çözüme kayış açık, ancak “büyük ölçüde”nin pratik eşik anlamı bağlama bağlı.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:58:34.986Z"
+  },
+  {
+    "id": "t1v3-tr-115",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu normal",
+    "finalText": "Bu genelde normal",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu normal.” → SONRA: “Bu genelde normal.” “Genelde” istisna ihtimali ekliyor; mevcut vakanın istisna olup olmadığı bilinmiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "scope",
+        "direction": "narrowed"
+      },
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:54:06.665Z"
+  },
+  {
+    "id": "t1v3-tr-116",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O gelir",
+    "finalText": "O herhalde gelir",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “O gelir.” → SONRA: “O herhalde gelir.” Kesinlik düşüyor; bunun planı değiştirecek kadar maddi olup olmadığı bağlama bağlı.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "evidentiality",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:57:52.404Z"
+  },
+  {
+    "id": "t1v3-tr-117",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bunu yapmalıyız",
+    "finalText": "Belki bunu yapmalıyız",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bunu yapmalıyız.” → SONRA: “Belki bunu yapmalıyız.” Yönlendirme zayıflıyor; pratik kararın değişip değişmediği bağlamsız belirsiz.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "certainty",
+        "direction": "decreased"
+      },
+      {
+        "dimension": "directive_force",
+        "direction": "decreased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:54:39.098Z"
+  },
+  {
+    "id": "t1v3-tr-118",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu güvenli",
+    "finalText": "Bu yeterince güvenli",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu güvenli.” → SONRA: “Bu yeterince güvenli.” Örtük güvenlik eşiği ekleniyor; eşiğin ne olduğu ve sonucu bilinmiyor.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "factual_content",
+        "direction": "changed"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:57:11.821Z"
+  },
+  {
+    "id": "t1v3-tr-119",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "Bu doğru cevap",
+    "finalText": "Bu en doğru cevap",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “Bu doğru cevap.” → SONRA: “Bu en doğru cevap.” “En doğru” karşılaştırmalı bir iddia ekliyor ama karşılaştırma kümesi belirtilmemiş.",
+    "humanVerdict": "meaning_added",
+    "humanDimensions": [
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:55:01.265Z"
+  },
+  {
+    "id": "t1v3-tr-120",
+    "language": "tr",
+    "kind": "replaced",
+    "originalText": "O sakin",
+    "finalText": "O fazla sakin",
+    "beforeContext": "",
+    "afterContext": ".",
+    "proposedVerdict": "uncertain",
+    "proposedDimensions": [],
+    "proposedDescription": null,
+    "reviewNoteTr": "ÖNCE: “O sakin.” → SONRA: “O fazla sakin.” “Fazla” bağlama göre olumsuz değerlendirme, endişe veya yalnızca derece bildirebilir.",
+    "humanVerdict": "meaning_transformed",
+    "humanDimensions": [
+      {
+        "dimension": "expressed_affect_intensity",
+        "direction": "increased"
+      },
+      {
+        "dimension": "specificity",
+        "direction": "increased"
+      }
+    ],
+    "includeInTraining": true,
+    "exclusionReasons": [],
+    "operatorNoteTr": "",
+    "loreImportant": false,
+    "loreNoteTr": null,
+    "importedAt": "2026-08-27T20:04:56.039Z",
+    "reviewedAt": "2026-08-28T02:55:50.490Z"
+  }
+]
