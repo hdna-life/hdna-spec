@@ -69,7 +69,7 @@ describe('isEligibleForInterpretation', () => {
 
   it('is eligible for the operator\'s exact real persisted corpus under the DEFAULT policy', () => {
     // Regression fixture: the operator's manually-tested extension produced
-    // exactly these two compiled Patterns (docs/validation/manual-mvp-validation.md,
+    // exactly these two compiled Patterns (docs/history/experiments/manual-mvp-validation.md,
     // Phase 4) — no formality/directness patterns, since the T2 baseline
     // abstains on Turkish evidence. `isEligibleForInterpretation` checks
     // patterns.length >= minPatternCount only; per-pattern sampleCount/

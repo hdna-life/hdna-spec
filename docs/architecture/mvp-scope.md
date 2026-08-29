@@ -1,11 +1,14 @@
-# MVP Scope Classification — Foundation PR
+# MVP Scope Classification
 
-Restates this PR's scope per `hdna-design-research-document.md`'s "MVP Scope
-and Deferred Architecture Rule", so future agents don't need to re-read the
-full source document to know what's in/out of scope for the codebase as it
-stands after this PR.
+Classifies every capability in this codebase per
+`hdna-design-research-document.md`'s "MVP Scope and Deferred Architecture
+Rule", so a contributor doesn't need to re-read that source document (or
+the full decision log) to know what's implemented, planned, or still
+experimental. For current product status/direction, see
+`docs/CURRENT_STATE.md` first — this file is the scope catalog, not the
+status narrative.
 
-## MVP_REQUIRED — implemented in this PR
+## MVP_REQUIRED — implemented
 
 - MV3 extension runtime (WXT + Svelte), background service worker + popup.
 - Local storage abstraction (`StorageAdapter`, IndexedDB-backed).
@@ -103,11 +106,27 @@ stands after this PR.
   manually triggered, mirroring `compile_patterns`'s job shape. Stops at
   OBSERVATION in the `CANONICAL -> OBSERVATION -> REPEATED PATTERN ->
   TRAIT/BELIEF` hierarchy — no semantic aggregation/promotion in this
-  phase. **This is a roadmap reordering, not a cancellation**: the
-  previously-planned retrieval runtime / WebGPU expression engine phases
-  are deferred pending this evidence-utility question, not dropped — see
-  `docs/decisions/0016` for the full academic basis, pre-declared
-  human-graded acceptance criteria, and explicitly-deferred scope list.
+  phase. This is superseded by Phase 5A Trial 4 / Test 1 below — see
+  `docs/decisions/0016` for the full academic basis and pre-declared
+  human-graded acceptance criteria this phase's own trials were scored
+  against (historical detail: `docs/history/experiments/0016-phase5a-trials-history.md`).
+
+- **Phase 5A Trial 4 / Test 1 — human-filtered tiny-model specialization
+  (`docs/decisions/0017`): CLOSED — SUCCESS.** Validates that a
+  sub-billion-parameter local model (`Qwen/Qwen3-0.6B`) can learn HDNA's
+  v3 localized edit-judgment policy (`training/phase5a/lore/task-contract.v3.md`)
+  via LoRA/SFT on a small human-reviewed dataset: `SemanticRevisionJudgeProvider`
+  (execution-context-agnostic interface, same contract for local-MLX and
+  OpenRouter transports), `Trial4BenchmarkService` (blind A/B/C three-way
+  comparison — untrained base, trained, frontier DeepSeek reference — with
+  frozen, locked ground truth and objective semantic/dimension metrics),
+  the Dashboard's Benchmark page, and a standalone Python
+  generate/review/train pipeline (`training/phase5a/`). Final result: 80%
+  semantic-exact accuracy, 80% human-acceptable rate on a fresh 10-case
+  held-out validation — see
+  `training/phase5a/benchmark/test1-final-result.md`. Test 2 (synthetic
+  filtered distillation, planned `google/gemma-3-270m-it` student) is the
+  next active training work — see PLANNED below.
 
 ## SPEC_RESERVED — typed, not implemented
 
@@ -151,40 +170,34 @@ stands after this PR.
   itself is implemented, see `docs/decisions/0016`.
 - Semantic candidate clustering, repetition/evidence-threshold aggregation,
   and `SemanticPattern` promotion from `SemanticDeltaCandidate`s into the
-  existing PATTERNS/TRAITS-BELIEFS hierarchy — explicitly deferred by
-  `docs/decisions/0016` pending Phase 5A's own validation result.
-- **Retrieval runtime and WebGPU expression engine — DEFERRED, not
-  cancelled**, per `docs/decisions/0016`'s explicit operator-driven roadmap
-  reordering, pending the Phase 5A evidence-utility question (query-focused
-  persona assembly, and how/whether `TraitBeliefClaim`s or
-  `SemanticDeltaCandidate`s feed generation, remain the eventual next
-  steps once that question is answered):
-  - Retrieval runtime (query-focused persona assembly).
-  - WebGPU expression engine (the actual style-transform model).
-- Phase 7 optional local neural adaptation (LoRA/adapters).
+  existing PATTERNS/TRAITS-BELIEFS hierarchy — superseded by Phase 5A
+  Trial 4's judgment-based approach above; not being pursued further.
+- **Test 2 — synthetic filtered distillation (next active training
+  work).** Replaces Test 1's manual candidate review with an automated
+  pipeline: policy/coverage spec -> frontier synthetic generation ->
+  independent frontier verification/filtering -> schema+taxonomy
+  validation -> dedup -> coverage balancing -> frozen synthetic corpus
+  (~5,000 accepted examples) -> LoRA/SFT -> a completely fresh held-out
+  benchmark. Planned student: `google/gemma-3-270m-it` (smaller,
+  WebGPU-oriented, replacing `Qwen3-0.6B` as the target production
+  student — `Qwen3-0.6B` served its purpose as the Test 1 feasibility
+  student). See `training/phase5a/benchmark/test1-final-result.md`'s
+  "Direct transition to Test 2" section. Not yet implemented.
+- **Retrieval runtime and WebGPU expression engine** — the actual
+  local behavior/transformation layer around frontier-model output
+  (query-focused persona assembly, then the style-transform model
+  itself). Depends on Test 2 producing a student small/fast enough for
+  browser/WebGPU deployment; not started.
+- Phase 7 optional local neural adaptation (LoRA/adapters) beyond the
+  Test 1/Test 2 training track itself.
 - Phase 8 multimodal activation (speech/visual/gesture).
 - Phase 9 export/publish/self-host runtime.
 
 ## EXPERIMENTAL — not started, research-only
 
-- Small (~sub-billion-parameter) persona expression model hypothesis
-  (TinyStyler-adjacent) — requires semantic-preservation, persona-similarity,
-  multilingual, and WebGPU-performance benchmarks before any implementation.
-
-## What remains out of scope after this round
-
-This PR adds the deterministic half of the Phase 4 persona compiler:
-evidence-threshold-gated, context-scoped `Pattern` compilation from existing
-derived signals (`EditMetrics`, `TraitScoreRecord`), with provenance and
-compiler versioning. It deliberately stops before the doc's TRAITS/BELIEFS
-step, which requires an actual LLM call — the project's first network
-dependency — kept out pending its own explicit model/provider decision,
-the same way embeddings and classifiers were split from their contract work.
-It still does not implement: live/content-script capture, character
-n-grams or other T0 signals beyond diffing, the remaining five T2
-dimensions, a real semantic embedding model or trained classifier, LLM-based
-trait/belief inference, wiring any derived signal (EditProfile, the vector
-index, T2Profile, Patterns) into the Expression Sheet or a retrieval-for-
-generation flow, the WebGPU expression transformation itself, user-
-configurable storage limits, or any benchmark suite. Those remain the next
-round(s) of work, unblocked by (not fulfilled by) this PR.
+- Wiring the v3 edit-judgment output (`verdict` + `dimensions`) into the
+  existing `EditProfile`/`T2Profile`/`Pattern`/`TraitBeliefClaim`
+  aggregation hierarchy — the small-model judgment step itself is no
+  longer experimental (Test 1 validated it), but aggregating its output
+  into a user-specific behavioral representation, and eventually into a
+  retrieval/transformation layer, remains unbuilt and unvalidated.

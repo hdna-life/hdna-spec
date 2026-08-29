@@ -2,15 +2,17 @@
 
 A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) can be specialized via LoRA fine-tuning on a small human-filtered dataset to judge localized semantic changes in text revisions.
 
-**Test 1 status: CLOSED — SUCCESS.** See `benchmark/test1-final-result.md` for the full closure report (final 10-case validation result, the planned-20/actual-10 protocol deviation, what Test 1 did and did not prove, and the transition to Test 2's synthetic-distillation direction with a planned `google/gemma-3-270m-it` student). `benchmark/test1-smoke-iteration-1.md` is the earlier smoke/debug round, superseded as Test 1's answer.
+**Test 1 status: CLOSED — SUCCESS.** See `benchmark/test1-final-result.md` for the full closure report (final 10-case validation result, the planned-20/actual-10 protocol deviation, what Test 1 did and did not prove, and the transition to Test 2's synthetic-distillation direction with a planned `google/gemma-3-270m-it` student). The `Qwen/Qwen3-0.6B` + 183-example LoRA baseline (`adapters/v1/`) is retained for provenance only — no further manual expansion of this dataset is planned.
+
+**Test 2 (next, not yet implemented):** automated synthetic filtered distillation — replaces the manual generate → human-review-one-at-a-time workflow below with a frontier-generate → independently-verify/filter → schema-validate → dedup → coverage-balance pipeline targeting ~5,000 accepted examples, a planned `google/gemma-3-270m-it` student, and a completely fresh held-out benchmark. See `benchmark/test1-final-result.md`'s "Direct transition to Test 2" section for the full direction. The steps below describe **Test 1's workflow**, kept for provenance/reproducibility of the closed baseline — do not treat it as the active strategy for new training work.
 
 ## Overview
 
-This pipeline generates synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imports them into the HDNA browser extension for human review, fine-tunes a local Qwen model on accepted examples, and benchmarks the trained model's verdict accuracy against a held-out test set.
+**Test 1's pipeline** (below) generated synthetic training examples via OpenRouter (routed to a DeepSeek model by default, per Operator Decision 1: DeepSeek generates candidates, it never validates/decides inclusion — see `docs/decisions/0017`), imported them into the HDNA browser extension for one-at-a-time human review, fine-tuned a local Qwen model on accepted examples, and benchmarked the trained model against a held-out test set. This is how the closed Test 1 baseline was produced.
 
-**Ground truth:** `training/phase5a/lore/task-contract.v3.md` — the versioned specification all generated examples must follow (Test 1's two-axis redesign: a `verdict` plus orthogonal `dimensions`; supersedes `task-contract.v2.md`, preserved unchanged as history).
+**Ground truth:** `training/phase5a/lore/task-contract.v3.md` (+ its machine-readable counterpart `training/phase5a/lore/policy-spec.v1.json`) — the versioned, self-contained specification all generated examples must follow (the v3 two-axis contract: a `verdict` plus orthogonal `dimensions`). `v1`/`v2` are superseded and no longer kept as active files — see Git history for their evolution.
 
-## Pipeline Steps
+## Test 1 pipeline steps (closed — reference/reproducibility only)
 
 ### 1. Generate Candidate Examples
 
@@ -151,12 +153,11 @@ training/phase5a/
 ├── README.md                              (this file)
 ├── .gitignore                             (ignore generated data, models, cache)
 ├── lore/
-│   ├── task-contract.v1.md                (superseded, preserved as history)
-│   ├── task-contract.v2.md                (superseded, preserved as history)
-│   └── task-contract.v3.md                (ground truth specification)
+│   ├── task-contract.v3.md                (canonical, active — self-contained)
+│   └── policy-spec.v1.json                (machine-readable counterpart)
 ├── dataset/
-│   ├── generate_candidates.py            (OpenRouter API client)
-│   ├── split_dataset.py                  (JSONL converter)
+│   ├── generate_candidates.py            (OpenRouter API client — Test 1's workflow)
+│   ├── split_dataset.py                  (JSONL converter — Test 1's workflow)
 │   ├── sample_candidate.json             (format fixture)
 │   ├── sample_candidate.README.md        (fixture documentation)
 │   ├── generated/                        (output of generate_candidates.py)
@@ -167,14 +168,19 @@ training/phase5a/
 │       └── test.jsonl
 ├── benchmark/
 │   ├── sample_case.json                  (format fixture)
-│   └── sample_case.README.md             (evaluation-integrity requirements)
+│   ├── sample_case.README.md             (evaluation-integrity requirements)
+│   └── test1-final-result.md             (authoritative Test 1 closure result)
 ├── train_lora.sh                         (mlx_lm.lora wrapper)
 ├── write_manifest.py                     (reproducibility metadata)
 └── adapters/                             (output of train_lora.sh)
-    └── v1/
+    └── v1/                                (Test 1 baseline — provenance only)
         ├── adapters.safetensors          (trained weights)
         └── manifest.json                 (metadata)
 ```
+
+Historical/superseded material (`task-contract.v1.md`/`v2.md`, the
+smoke-test benchmark iteration): see `docs/history/`, not this tree — see
+"History" below.
 
 ## Dependencies
 
@@ -208,10 +214,29 @@ See `benchmark/sample_case.README.md` for the full evaluation-integrity contract
 
 **Inference servers fail to start:** Ensure `mlx_lm` is installed and ports 8080/8081 are available.
 
+## History
+
+Superseded/debug material — not required reading to run Test 2 or
+understand the current contract:
+
+- `docs/history/test1/test1-smoke-iteration-1.md` — Test 1's earlier
+  smoke/debug benchmark round (superseded as Test 1's answer).
+- `docs/history/experiments/0017-trial4-implementation-journal.md` — the
+  original Trial 4 implementation walkthrough and every addendum written
+  as Test 1 actually ran (task-contract v2 refinement, generation-
+  reliability/concurrency work, the Dashboard build, the v3 two-axis
+  redesign, the evaluation-stage upgrade).
+- `task-contract.v1.md`/`v2.md` — superseded contract revisions, no
+  longer kept as active files; see Git history
+  (`git log -- training/phase5a/lore/`) for their content and the
+  reasoning behind each revision.
+
 ## References
 
-- Task contract (ground truth): `training/phase5a/lore/task-contract.v3.md`
-- Phase 5A overview: `docs/decisions/0016-phase5-persona-evidence-utility-validation.md`
-- Trial 3 context: same document, "Trial 3" sections
-- Trial 4 design: `docs/decisions/0017-phase5a-trial4-human-filtered-specialization.md` (if exists)
-- Extension implementation: `extension/src/persona/` (semantic delta extraction and UI panels)
+- Product status/direction: `docs/CURRENT_STATE.md`
+- MVP scope classification: `docs/architecture/mvp-scope.md`
+- Task contract (ground truth): `training/phase5a/lore/task-contract.v3.md` (+ `policy-spec.v1.json`)
+- Test 1 closure result: `training/phase5a/benchmark/test1-final-result.md`
+- Trial 4 / Test 1 decision record: `docs/decisions/0017-phase5a-trial4-human-filtered-specialization.md`
+- Phase 5A / earlier trials context: `docs/decisions/0016-phase5-persona-evidence-utility-validation.md`
+- Extension implementation: `extension/src/persona/trial4-*`, `extension/src/ui/Trial4BenchmarkPanel.svelte`, `extension/src/ui/dashboard/`
