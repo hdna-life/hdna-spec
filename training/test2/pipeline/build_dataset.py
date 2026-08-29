@@ -17,7 +17,14 @@ from pathlib import Path
 LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
 sys.path.insert(0, str(LIB_DIR))
 from contamination import is_contaminated, load_protected_hashes  # noqa: E402
-from coverage import check_operation_minimums, check_verdict_bands, load_coverage_plan, select_within_quotas  # noqa: E402
+from coverage import (  # noqa: E402
+    check_bucket_quotas_met,
+    check_language_mix,
+    check_operation_minimums,
+    check_verdict_bands,
+    load_coverage_plan,
+    select_within_quotas,
+)
 from jsonl_io import append_jsonl, read_jsonl, write_jsonl  # noqa: E402
 from manifest import build_run_manifest, write_manifest  # noqa: E402
 
@@ -69,6 +76,23 @@ def run(
 
     band_violations = check_verdict_bands(selected, plan)
     operation_violations = check_operation_minimums(selected, plan)
+    quota_violations = check_bucket_quotas_met(selected, plan)
+    language_violations = check_language_mix(selected, plan)
+    target = plan.get("target_accepted_examples", 0)
+    target_violations = [] if len(selected) >= target else [f"accepted {len(selected)} < target {target}"]
+
+    all_violations = {
+        "bucket_quotas_not_met": quota_violations,
+        "verdict_band_violations": band_violations,
+        "operation_minimum_violations": operation_violations,
+        "language_mix_violations": language_violations,
+        "target_not_reached": target_violations,
+    }
+    if any(all_violations.values()):
+        raise SystemExit(
+            "Refusing to freeze — coverage requirements not satisfied:\n"
+            + json.dumps(all_violations, indent=2, ensure_ascii=False)
+        )
 
     random.Random(seed).shuffle(selected)
     n = len(selected)
@@ -140,8 +164,6 @@ def main() -> None:
         Path(args.failures), args.run_id, args.verifier_model_id, Path(args.dedup_config), args.seed,
     )
     print(stats)
-    if stats["verdict_band_violations"] or stats["operation_minimum_violations"]:
-        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -79,18 +79,30 @@ manifest.
 
 ## Smoke run (20-50 real candidates)
 
-`pipeline/smoke.py` runs the real pipeline end to end — generator ->
-validate -> blind verifier -> exact dedup -> contamination check — on a
-small candidate count, writing a smoke manifest with full diagnostics.
-It never builds/freezes the final corpus, trains anything, or touches
-acceptance thresholds/coverage quotas/the final benchmark.
+`pipeline/smoke.py` runs the real pipeline end to end — round-robin
+generator (explicit per-request language routing) -> validate ->
+contamination guard -> blind verifier -> exact dedup -> contamination
+guard again (defense in depth) — on a small candidate count, writing a
+smoke manifest with full diagnostics. It never builds/freezes the final
+corpus, trains anything, or touches acceptance thresholds/coverage
+quotas/the final benchmark.
+
+Every run is isolated under `data/smoke/<run-id>/`; a new `--run-id`
+never touches another run's artifacts, and re-running the same
+`--run-id` resumes it. `--budget-usd`, if set, is a single cap shared
+between the generator and verifier combined, not doubled. The generator
+and verifier refuse to start if `benchmark/protected-cases.v1.json` is
+still empty, unless `--allow-empty-protected-registry-smoke-only` is
+passed deliberately (recorded in the manifest; never honored by the full
+build).
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 python3 pipeline/smoke.py --run-id smoke-001 \
   --generator-model-id <model> --verifier-model-id <model> \
-  --max-candidates 30 --generator-budget-requests 35 --verifier-budget-requests 35
-python3 pipeline/review_smoke.py data/smoke/smoke-001.smoke_manifest.json
+  --max-candidates 30 --generator-budget-requests 35 --verifier-budget-requests 35 \
+  --budget-usd 1.00 --cost-per-request-usd 0.01
+python3 pipeline/review_smoke.py data/smoke/smoke-001/smoke-001.smoke_manifest.json
 ```
 
 `review_smoke.py` prints the diagnostics for a human STOP/REVISE-vs-

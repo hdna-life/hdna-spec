@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
@@ -14,19 +15,20 @@ sys.path.insert(0, str(LIB_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
 
 from acceptance import decide_acceptance  # noqa: E402
-from contamination import is_contaminated  # noqa: E402
+from contamination import filter_contaminated, is_contaminated  # noqa: E402
 from dedup import exact_dedup, semantic_near_dedup  # noqa: E402
 from ids import candidate_id, normalized_pair_hash  # noqa: E402
-from jsonl_io import read_jsonl  # noqa: E402
+from jsonl_io import read_jsonl, write_jsonl  # noqa: E402
 from policy import is_valid_dimensions_list, load_policy  # noqa: E402
 from providers import MockGeneratorProvider, MockVerifierProvider  # noqa: E402
 
-from budget import BudgetConfig, BudgetTracker  # noqa: E402
+from budget import BudgetConfig, BudgetTracker, SharedSpend  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
 import build_dataset  # noqa: E402
 import dedupe as dedupe_stage  # noqa: E402
 import generate  # noqa: E402
+import smoke  # noqa: E402
 import validate  # noqa: E402
 import verify  # noqa: E402
 
@@ -61,13 +63,17 @@ def candidate(kind, before, original, final, after, verdict, dims, language="en"
 
 
 class MiniCoveragePlanMixin:
-    def build_plan(self, tmp: Path) -> Path:
+    def build_plan(self, tmp: Path, **overrides) -> Path:
         plan = {
             "coverage_buckets": [{"bucket": b, "quota": 2} for b in ["basic", "boundary"]],
             "policy_spec": "training/phase5a/lore/policy-spec.v1.json",
             "verdict_bands": {v: {"min_fraction": 0.0, "max_fraction": 1.0} for v in POLICY["verdicts"]},
             "operation_minimums": {"added": 0, "removed": 0, "replaced": 0, "reordered": 0},
+            "target_accepted_examples": 4,
+            "language_mix": {"tr": 0.5, "en": 0.5},
+            "language_mix_tolerance_fraction": 0.30,
         }
+        plan.update(overrides)
         path = tmp / "coverage-plan.json"
         path.write_text(json.dumps(plan), encoding="utf-8")
         return path
@@ -345,6 +351,242 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
                 deduped_path, plan_path, registry_path, self.tmp / "frozen", self.tmp / "build_failures.jsonl",
                 run_id="test-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
             )
+
+    def test_round_robin_coverage_no_single_bucket_dominates(self):
+        plan = {
+            "coverage_buckets": [{"bucket": b, "quota": 10} for b in ["a", "b", "c"]],
+            "language_mix": {"tr": 0.5, "en": 0.5},
+        }
+
+        class InfiniteGeneratorProvider:
+            model_id = "mock/generator-v1"
+
+            def generate(self, coverage_item):
+                return candidate("replaced", "", "x", "y", "", "no_meaningful_change", [], language=coverage_item["language"])
+
+        generated_path = self.data / "generated.jsonl"
+        gen_failures = self.data / "failures" / "generate.jsonl"
+        stats = generate.run(InfiniteGeneratorProvider(), plan, generated_path, gen_failures, max_total=9)
+        self.assertEqual(stats["generated"], 9)
+        bucket_counts = Counter(r["coverage_bucket"] for r in read_jsonl(generated_path))
+        self.assertEqual(set(bucket_counts), {"a", "b", "c"})
+        self.assertLessEqual(max(bucket_counts.values()) - min(bucket_counts.values()), 1)
+
+    def test_language_alternation_is_deterministic_and_respects_mix(self):
+        plan = {
+            "coverage_buckets": [{"bucket": "a", "quota": 8}],
+            "language_mix": {"tr": 0.5, "en": 0.5},
+        }
+
+        class LanguageEchoProvider:
+            model_id = "mock/generator-v1"
+
+            def generate(self, coverage_item):
+                return candidate("replaced", "", "x", "y", "", "no_meaningful_change", [], language=coverage_item["language"])
+
+        generated_path = self.data / "generated.jsonl"
+        gen_failures = self.data / "failures" / "generate.jsonl"
+        generate.run(LanguageEchoProvider(), plan, generated_path, gen_failures, max_total=8)
+        languages = [r["language"] for r in read_jsonl(generated_path)]
+        self.assertEqual(languages, ["en", "tr"] * 4)  # deterministic alternation, highest-fraction-first tiebreak
+
+    def test_budget_config_rejects_usd_cap_with_zero_cost_estimate(self):
+        with self.assertRaises(ValueError):
+            BudgetConfig(max_requests=5, max_usd=1.0, cost_per_request_usd=0.0)
+
+    def test_shared_spend_enforces_one_combined_usd_cap(self):
+        shared = SharedSpend()
+        generator_budget = BudgetTracker(BudgetConfig(max_requests=10, max_usd=0.05, cost_per_request_usd=0.03), shared)
+        verifier_budget = BudgetTracker(BudgetConfig(max_requests=10, max_usd=0.05, cost_per_request_usd=0.03), shared)
+        generator_budget.charge()  # shared spend now 0.03, within 0.05
+        from budget import BudgetExceeded
+
+        with self.assertRaises(BudgetExceeded):
+            verifier_budget.charge()  # would push shared spend to 0.06 > 0.05
+        self.assertEqual(generator_budget.requests, 1)
+        self.assertEqual(verifier_budget.requests, 0)  # the rejected charge never incremented its own tracker
+
+    def test_run_dir_isolation_and_unsafe_run_id_rejection(self):
+        root = self.tmp / "smoke_root"
+        dir_a = smoke.resolve_run_dir(root, "run-a")
+        dir_b = smoke.resolve_run_dir(root, "run-b")
+        self.assertNotEqual(dir_a, dir_b)
+        # Same run_id resolves to the same directory both times (resumable).
+        self.assertEqual(smoke.resolve_run_dir(root, "run-a"), dir_a)
+        with self.assertRaises(SystemExit):
+            smoke.resolve_run_dir(root, "../escape")
+        with self.assertRaises(SystemExit):
+            smoke.resolve_run_dir(root, "")
+
+    def test_contamination_guard_runs_before_verifier_is_ever_called(self):
+        protected_hash = normalized_pair_hash("secret original", "secret final")
+        protected = {protected_hash}
+        records = [
+            {"id": "c_clean", "kind": "replaced", "originalText": "ok original", "finalText": "ok final",
+             "beforeContext": "", "afterContext": "", "language": "en",
+             "generator": {"proposedVerdict": "no_meaningful_change", "proposedDimensions": []}},
+            {"id": "c_protected", "kind": "replaced", "originalText": "secret original", "finalText": "secret final",
+             "beforeContext": "", "afterContext": "", "language": "en",
+             "generator": {"proposedVerdict": "no_meaningful_change", "proposedDimensions": []}},
+        ]
+        clean, contaminated = filter_contaminated(records, protected)
+        self.assertEqual([r["id"] for r in contaminated], ["c_protected"])
+
+        clean_path = self.tmp / "clean.jsonl"
+        write_jsonl(clean_path, clean)
+        verified_path = self.tmp / "verified.jsonl"
+        verify_failures = self.tmp / "verify_failures.jsonl"
+        # No fixture for c_protected: if it ever reached the verifier, this
+        # provider would raise KeyError and the run would record a
+        # provider_error for it instead of silently succeeding.
+        provider = MockVerifierProvider(verdicts_by_id={
+            "c_clean": {"verdict": "no_meaningful_change", "dimensions": [], "confidence": 0.95},
+        })
+        verify.run(provider, clean_path, verified_path, verify_failures, POLICY)
+        seen_ids = {r["id"] for r in read_jsonl(verified_path)} | {r["id"] for r in read_jsonl(verify_failures)}
+        self.assertNotIn("c_protected", seen_ids)
+        self.assertIn("c_clean", seen_ids)
+
+    def test_full_build_fails_closed_on_each_coverage_condition(self):
+        base_records = []
+        for i in range(4):
+            base_records.append({
+                "id": f"c_{i}",
+                "originalText": f"orig {i}", "finalText": f"final {i}",
+                "kind": "replaced", "language": "en" if i % 2 == 0 else "tr",
+                "coverage_bucket": "basic" if i % 2 == 0 else "boundary",
+                "canonical_verdict": "no_meaningful_change",
+            })
+
+        def build_valid_run(tmp: Path) -> tuple[Path, Path, Path]:
+            plan_path = self.build_plan(tmp)
+            deduped_path = tmp / "deduped.jsonl"
+            write_jsonl(deduped_path, base_records)
+            dedup_config = tmp / "dedup_config.json"
+            dedup_config.write_text(json.dumps({"mode": "full", "semantic_dedup": "enabled"}), encoding="utf-8")
+            registry_path = tmp / "protected-cases.json"
+            registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+            return plan_path, deduped_path, dedup_config, registry_path
+
+        with self.subTest("valid run succeeds"):
+            tmp = self.tmp / "ok"
+            tmp.mkdir()
+            plan_path, deduped_path, dedup_config, registry_path = build_valid_run(tmp)
+            stats = build_dataset.run(
+                deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                run_id="ok-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+            )
+            self.assertEqual(stats["accepted"], 4)
+
+        with self.subTest("bucket quota not met"):
+            tmp = self.tmp / "quota"
+            tmp.mkdir()
+            plan_path, deduped_path, dedup_config, registry_path = build_valid_run(tmp)
+            write_jsonl(deduped_path, base_records[:3])  # boundary bucket short by one
+            with self.assertRaises(SystemExit):
+                build_dataset.run(
+                    deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                    run_id="quota-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                )
+
+        with self.subTest("verdict band violated"):
+            tmp = self.tmp / "band"
+            tmp.mkdir()
+            plan_path = self.build_plan(tmp, verdict_bands={"no_meaningful_change": {"min_fraction": 0.0, "max_fraction": 0.1}})
+            deduped_path = tmp / "deduped.jsonl"
+            write_jsonl(deduped_path, base_records)
+            dedup_config = tmp / "dedup_config.json"
+            dedup_config.write_text(json.dumps({"mode": "full", "semantic_dedup": "enabled"}), encoding="utf-8")
+            registry_path = tmp / "protected-cases.json"
+            registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                build_dataset.run(
+                    deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                    run_id="band-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                )
+
+        with self.subTest("operation minimum violated"):
+            tmp = self.tmp / "opmin"
+            tmp.mkdir()
+            plan_path = self.build_plan(tmp, operation_minimums={"added": 1, "removed": 0, "replaced": 0, "reordered": 0})
+            deduped_path = tmp / "deduped.jsonl"
+            write_jsonl(deduped_path, base_records)  # no "added" records
+            dedup_config = tmp / "dedup_config.json"
+            dedup_config.write_text(json.dumps({"mode": "full", "semantic_dedup": "enabled"}), encoding="utf-8")
+            registry_path = tmp / "protected-cases.json"
+            registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                build_dataset.run(
+                    deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                    run_id="opmin-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                )
+
+        with self.subTest("language mix violated"):
+            tmp = self.tmp / "lang"
+            tmp.mkdir()
+            plan_path = self.build_plan(tmp, language_mix_tolerance_fraction=0.01)
+            deduped_path = tmp / "deduped.jsonl"
+            write_jsonl(deduped_path, base_records)  # 50/50 tr/en, but tolerance now near-zero
+            dedup_config = tmp / "dedup_config.json"
+            dedup_config.write_text(json.dumps({"mode": "full", "semantic_dedup": "enabled"}), encoding="utf-8")
+            registry_path = tmp / "protected-cases.json"
+            registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+            # 50/50 exactly matches the plan's 50/50 target, so tighten the target instead to force a violation.
+            plan = json.loads(plan_path.read_text())
+            plan["language_mix"] = {"tr": 0.9, "en": 0.1}
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                build_dataset.run(
+                    deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                    run_id="lang-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                )
+
+        with self.subTest("target not reached"):
+            tmp = self.tmp / "target"
+            tmp.mkdir()
+            plan_path = self.build_plan(tmp, target_accepted_examples=100)
+            deduped_path = tmp / "deduped.jsonl"
+            write_jsonl(deduped_path, base_records)
+            dedup_config = tmp / "dedup_config.json"
+            dedup_config.write_text(json.dumps({"mode": "full", "semantic_dedup": "enabled"}), encoding="utf-8")
+            registry_path = tmp / "protected-cases.json"
+            registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                build_dataset.run(
+                    deduped_path, plan_path, registry_path, tmp / "frozen", tmp / "failures.jsonl",
+                    run_id="target-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+                )
+
+    def test_smoke_diagnostics_accounting_invariant(self):
+        generate_stats = {"generated": 10, "provider_errors": 1}
+        validate_stats = {"passed": 8, "rejected": 2}
+        verify_stats = {
+            "accepted": 5, "rejected": 3, "provider_errors": 0, "dimension_disagreements": 1,
+            "rejection_reasons": {"verdict_disagreement": 2, "low_verifier_confidence": 1},
+        }
+        dedupe_stats = {"exact_dedup_count": 1, "semantic_near_dedup_count": 0}
+        final_records = [
+            {"language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
+            {"language": "tr", "coverage_bucket": "boundary", "canonical_verdict": "meaning_added"},
+            {"language": "en", "coverage_bucket": "basic", "canonical_verdict": "no_meaningful_change"},
+        ]
+        from smoke_report import build_smoke_diagnostics
+
+        diagnostics = build_smoke_diagnostics(
+            generate_stats, validate_stats, pre_verify_contamination_count=1, verify_stats=verify_stats,
+            dedupe_stats=dedupe_stats, post_dedup_contamination_count=1, final_records=final_records,
+            generator_budget={"spend_usd": 0.1}, verifier_budget={"spend_usd": 0.2},
+        )
+        # accepted_before_dedup - exact_dups - semantic_dups - post_dedup_contamination == final_accepted
+        self.assertEqual(
+            diagnostics["accepted_before_dedup_count"]
+            - diagnostics["exact_duplicates_dropped"]
+            - diagnostics["semantic_near_duplicates_dropped"]
+            - diagnostics["post_dedup_contamination_dropped"],
+            diagnostics["final_accepted_count"],
+        )
+        self.assertEqual(diagnostics["contamination_dropped"], 2)
+        self.assertAlmostEqual(diagnostics["total_spend_usd"], 0.3)
 
 
 if __name__ == "__main__":

@@ -23,3 +23,13 @@ def load_protected_hashes(registry_path: Path) -> set[str]:
 
 def is_contaminated(record: dict, protected_hashes: set[str]) -> bool:
     return normalized_pair_hash(record["originalText"], record["finalText"]) in protected_hashes
+
+
+def filter_contaminated(records: list[dict], protected_hashes: set[str]) -> tuple[list[dict], list[dict]]:
+    """Splits records into (clean, contaminated) — reusable as a pipeline
+    stage anywhere a protected-case check must gate what happens next
+    (e.g. before the candidate ever reaches a verifier provider)."""
+    clean, contaminated = [], []
+    for record in records:
+        (contaminated if is_contaminated(record, protected_hashes) else clean).append(record)
+    return clean, contaminated

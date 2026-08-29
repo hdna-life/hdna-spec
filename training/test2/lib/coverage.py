@@ -64,3 +64,28 @@ def check_operation_minimums(records: list[dict], plan: dict[str, Any]) -> list[
         if counts.get(operation, 0) < minimum:
             violations.append(f"{operation}: {counts.get(operation, 0)} < required minimum {minimum}")
     return violations
+
+
+def check_bucket_quotas_met(records: list[dict], plan: dict[str, Any]) -> list[str]:
+    """Every bucket must reach its quota exactly, not merely avoid exceeding it."""
+    quotas = bucket_quotas(plan)
+    counts = Counter(r["coverage_bucket"] for r in records)
+    violations = []
+    for bucket, quota in quotas.items():
+        if counts.get(bucket, 0) < quota:
+            violations.append(f"{bucket}: {counts.get(bucket, 0)} < required quota {quota}")
+    return violations
+
+
+def check_language_mix(records: list[dict], plan: dict[str, Any]) -> list[str]:
+    total = len(records)
+    if total == 0 or "language_mix" not in plan:
+        return []
+    tolerance = plan.get("language_mix_tolerance_fraction", 0.05)
+    counts = Counter(r["language"] for r in records)
+    violations = []
+    for language, target_fraction in plan["language_mix"].items():
+        fraction = counts.get(language, 0) / total
+        if abs(fraction - target_fraction) > tolerance:
+            violations.append(f"{language}: {fraction:.1%} outside target {target_fraction:.0%} ± {tolerance:.0%}")
+    return violations

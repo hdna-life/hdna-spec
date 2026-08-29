@@ -23,6 +23,7 @@
   "taxonomy_boundary_bucket_fraction": 0.30,
 
   "language_mix": { "tr": 0.50, "en": 0.50 },
+  "language_mix_tolerance_fraction": 0.05,
 
   "verdict_bands": {
     "no_meaningful_change": { "min_fraction": 0.20, "max_fraction": 0.30 },

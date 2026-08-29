@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
@@ -39,7 +40,8 @@ def run(
     # not permanently exclude a candidate.
     permanently_rejected = {r["id"] for r in read_jsonl(failures_path) if r.get("reason") != "provider_error"}
     already_done = read_ids(out_path) | permanently_rejected
-    accepted = rejected = errors = 0
+    accepted = rejected = errors = dimension_disagreements = 0
+    rejection_reasons: Counter[str] = Counter()
     stopped_reason = None
 
     for record in read_jsonl(in_path):
@@ -61,6 +63,7 @@ def run(
             verifier_output["dimensions"], policy
         ):
             append_jsonl(failures_path, {"id": record["id"], "reason": "verifier_output_invalid"})
+            rejection_reasons["verifier_output_invalid"] += 1
             rejected += 1
             continue
 
@@ -72,11 +75,21 @@ def run(
             record["dimension_sets_equal"] = decision["dimension_sets_equal"]
             append_jsonl(out_path, record)
             accepted += 1
+            if not decision["dimension_sets_equal"]:
+                dimension_disagreements += 1
         else:
             append_jsonl(failures_path, {"id": record["id"], "reason": decision["reason"]})
+            rejection_reasons[decision["reason"]] += 1
             rejected += 1
 
-    return {"accepted": accepted, "rejected": rejected, "provider_errors": errors, "stopped_reason": stopped_reason}
+    return {
+        "accepted": accepted,
+        "rejected": rejected,
+        "provider_errors": errors,
+        "dimension_disagreements": dimension_disagreements,
+        "rejection_reasons": dict(rejection_reasons),
+        "stopped_reason": stopped_reason,
+    }
 
 
 def main() -> None:
@@ -91,6 +104,7 @@ def main() -> None:
     parser.add_argument("--budget-requests", type=int, default=None, help="Required with --provider openrouter.")
     parser.add_argument("--budget-usd", type=float, default=None)
     parser.add_argument("--cost-per-request-usd", type=float, default=0.0)
+    parser.add_argument("--max-output-tokens", type=int, default=800)
     args = parser.parse_args()
 
     policy = load_policy()
@@ -106,7 +120,7 @@ def main() -> None:
         from real_providers import OpenRouterVerifierProvider
 
         budget = BudgetTracker(BudgetConfig(args.budget_requests, args.budget_usd, args.cost_per_request_usd))
-        provider = OpenRouterVerifierProvider(api_key, args.model_id, budget)
+        provider = OpenRouterVerifierProvider(api_key, args.model_id, budget, max_tokens=args.max_output_tokens)
     else:
         from providers import MockVerifierProvider
 
