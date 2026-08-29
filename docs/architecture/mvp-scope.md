@@ -172,22 +172,24 @@ status narrative.
   and `SemanticPattern` promotion from `SemanticDeltaCandidate`s into the
   existing PATTERNS/TRAITS-BELIEFS hierarchy — superseded by Phase 5A
   Trial 4's judgment-based approach above; not being pursued further.
-- **Test 2 — synthetic filtered distillation (next active training
-  work).** Replaces Test 1's manual candidate review with an automated
-  pipeline: policy/coverage spec -> frontier synthetic generation ->
-  independent frontier verification/filtering -> schema+taxonomy
-  validation -> dedup -> coverage balancing -> frozen synthetic corpus
-  (~5,000 accepted examples) -> LoRA/SFT -> a completely fresh held-out
-  benchmark. Planned student: `google/gemma-3-270m-it` (smaller,
-  WebGPU-oriented, replacing `Qwen3-0.6B` as the target production
-  student — `Qwen3-0.6B` served its purpose as the Test 1 feasibility
-  student). See `training/phase5a/benchmark/test1-final-result.md`'s
-  "Direct transition to Test 2" section. Not yet implemented.
-- **Retrieval runtime and WebGPU expression engine** — the actual
-  local behavior/transformation layer around frontier-model output
-  (query-focused persona assembly, then the style-transform model
-  itself). Depends on Test 2 producing a student small/fast enough for
-  browser/WebGPU deployment; not started.
+- **Test 2 — final pre-product research test (next active training
+  work).** Narrow question: can `google/gemma-3-270m-it`, after clean
+  synthetic filtered distillation, retain acceptable quality on the
+  canonical v3 judgment primitive AND run as the intended browser/WebGPU-
+  class model? Does NOT claim to validate the complete LEARN/REWRITE
+  product loop. Pipeline: policy/coverage spec -> frontier synthetic
+  generation -> independent frontier verification/filtering ->
+  schema+taxonomy validation -> dedup -> coverage balancing -> frozen
+  synthetic corpus (~5,000 accepted examples) -> LoRA/SFT -> a completely
+  fresh held-out benchmark -> required WebGPU deployment smoke test.
+  Skeleton: `training/test2/`. See
+  `training/phase5a/benchmark/test1-final-result.md`'s "Direct transition
+  to Test 2" section. Not yet implemented; no paid generation started.
+- **LEARN/REWRITE/VERIFY product loop** — the actual MVP product
+  mechanism per `docs/MVP_PRODUCT_CONTRACT.md`: natural-writing capture ->
+  local LEARN -> aggregated user-owned state, plus REWRITE/VERIFY around
+  frontier output. Implemented as normal product work immediately after
+  Test 2 passes, not as another research phase. Not started.
 - Phase 7 optional local neural adaptation (LoRA/adapters) beyond the
   Test 1/Test 2 training track itself.
 - Phase 8 multimodal activation (speech/visual/gesture).
@@ -195,9 +197,10 @@ status narrative.
 
 ## EXPERIMENTAL — not started, research-only
 
-- Wiring the v3 edit-judgment output (`verdict` + `dimensions`) into the
-  existing `EditProfile`/`T2Profile`/`Pattern`/`TraitBeliefClaim`
-  aggregation hierarchy — the small-model judgment step itself is no
-  longer experimental (Test 1 validated it), but aggregating its output
-  into a user-specific behavioral representation, and eventually into a
-  retrieval/transformation layer, remains unbuilt and unvalidated.
+- The `<LEARN>`/`<REWRITE>`/`<VERIFY>` product loop itself
+  (`docs/MVP_PRODUCT_CONTRACT.md`) — none of the three tasks are
+  validated. The v3 judgment primitive Test 1 validated is a candidate
+  input to `<VERIFY>` only, not a stand-in for any of the three.
+- The existing `EditProfile`/`T2Profile`/`Pattern`/`TraitBeliefClaim`
+  edit-pair aggregation hierarchy is being superseded by the MVP
+  contract's LEARN-based aggregation, not extended further.

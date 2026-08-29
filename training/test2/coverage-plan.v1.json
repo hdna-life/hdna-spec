@@ -1,0 +1,20 @@
+{
+  "version": "v1",
+  "target_accepted_examples": 5000,
+  "policy_spec": "training/phase5a/lore/policy-spec.v1.json",
+  "priority_boundaries": [
+    { "boundary": "meaning_added_vs_meaning_transformed", "reason": "Test 1 weakness: verdict confusion at this boundary" },
+    { "boundary": "scope_vs_specificity", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "certainty_vs_evidentiality", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "certainty_vs_commitment", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "politeness_vs_directness", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "directness_vs_directive_force", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "factual_content_vs_action_or_decision", "reason": "Test 1 weakness: dimension boundary confusion" },
+    { "boundary": "conditionality", "reason": "Test 1 weakness: low support, easily confused with temporal sequence" },
+    { "boundary": "expressed_affect_vs_inferred_internal_emotion", "reason": "core contract guardrail — must never be crossed" },
+    { "boundary": "hard_no_meaningful_change_negatives", "reason": "Test 1 false-positive dimension rate was high" },
+    { "boundary": "uncertain_abstention", "reason": "abstention must remain a genuine, well-calibrated outcome" }
+  ],
+  "language_mix": { "note": "not yet decided — set before generation begins" },
+  "status": "not started — no generation has run"
+}

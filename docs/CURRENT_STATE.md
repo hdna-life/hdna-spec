@@ -7,18 +7,16 @@ need those to be understood.
 
 ## What is HDNA?
 
-HDNA observes how a user actually edits AI-generated text — what they
-add, remove, and rephrase — and builds a local, user-owned model of that
-editing behavior. The goal is a lightweight local layer that can later
-transform/steer frontier-model output to better match how a specific user
-actually writes and edits, without ever training or fine-tuning the
-frontier model itself, and without sending raw behavioral evidence off
-the user's device by default.
+A local, portable behavioral layer for AI. Frontier models provide
+intelligence; HDNA learns how a user naturally communicates and adapts
+frontier output's expression to match, without training or fine-tuning
+the frontier model itself and without sending raw personal text off the
+user's device by default. Full product contract:
+`docs/MVP_PRODUCT_CONTRACT.md`.
 
-**This is not personality inference or mind-reading.** HDNA only reasons
-about directly observable textual behavior in one localized edit at a
-time — never a claim about the user's psychology, motivation, emotional
-state, or identity. See §"Current canonical runtime principles" below.
+**This is not personality inference or mind-reading.** HDNA reasons about
+directly observable textual behavior only — never a claim about the
+user's psychology, motivation, emotional state, or identity.
 
 ## Product status
 
@@ -38,41 +36,28 @@ state, or identity. See §"Current canonical runtime principles" below.
   implemented and tested. See `docs/architecture/mvp-scope.md` for the
   MVP_REQUIRED/PLANNED/EXPERIMENTAL scope breakdown.
 
-## MVP product direction
+## Two things not to confuse
 
-```
-AI output
-  -> user edits
-  -> deterministic localized revision extraction
-  -> local behavioral/edit judgment
-  -> structured observable behavior evidence
-  -> aggregation into a user-specific behavioral representation
-  -> (later) a lightweight local transformation/behavior layer
-     around frontier-model output
-```
+**VALIDATED RESEARCH PRIMITIVE** — localized BEFORE/AFTER semantic +
+behavioral judgment (`SemanticRevisionJudgeProvider`, the v3 two-axis
+contract). Given one AI-draft/human-edit pair, judges the semantic
+`verdict` plus observable-behavior `dimensions` of that one localized
+change. This is what Test 1 validated as trainable on a tiny local model.
+It is not the product's primary learning mechanism — its future role is
+contributing to the `<VERIFY>` safety gate (see
+`docs/MVP_PRODUCT_CONTRACT.md`).
 
-Each arrow above corresponds to a real, implemented or validated piece of
-this codebase:
+**FINAL MVP LEARNING DIRECTION** — a single natural user-authored text
+(no AI draft, no edit pair) → local `<LEARN>` → structured style/
+preference observations → deterministic confidence/recency aggregation →
+user-owned `.hdna` state. This is the actual product learning mechanism.
+**Not validated by Test 1.** Full contract, boundaries, and privacy
+rules: `docs/MVP_PRODUCT_CONTRACT.md`.
 
-- **Deterministic localized revision extraction** — `revision-diff.ts` /
-  `revision-intervention.ts` (word/token-level diff, localizes exactly
-  what changed, never delegated to a model).
-- **Local behavioral/edit judgment** — the `SemanticRevisionJudgeProvider`
-  contract, currently a local MLX-served small model plus a frontier
-  reference via OpenRouter; Test 1 validated this judgment is learnable
-  by specialization on a sub-billion-parameter local model.
-- **Structured observable behavior evidence** — the v3 two-axis output:
-  a semantic `verdict` plus zero or more `{dimension, direction}`
-  observable-behavior pairs. Canonical contract:
-  `training/phase5a/lore/task-contract.v3.md`.
-- **Aggregation into a user-specific behavioral representation** — the
-  existing `EditProfile`/`T2Profile`/`Pattern`/`TraitBeliefClaim`
-  deterministic-then-interpreted evidence hierarchy (see "Implemented
-  capabilities" in `docs/architecture/mvp-scope.md`); not yet wired to
-  the new v3 judgment output specifically — future work.
-- **A local transformation/behavior layer around frontier output** — not
-  yet built. This is the eventual target Test 1/Test 2 exist to validate
-  the feasibility of, not a current capability.
+Do not read the existing `EditEvent`/`EditProfile`/`SemanticDeltaCandidate`
+research pipeline (AI-output → human-edit comparison) as the product's
+learning source — it answered a narrower research question and is being
+superseded by the direction above.
 
 ## Current canonical runtime principles
 
@@ -107,8 +92,11 @@ this codebase:
   adapter trained on 183 human-reviewed v3 examples materially
   outperformed the same base model zero-shot (Trial 3's frozen baseline:
   52.9% semantic / 51% A-B discrimination / 14.9% coarse-feature).
-- **183-example LoRA baseline** — preserved for provenance
-  (`training/phase5a/adapters/v1/`), not being expanded further.
+- **183-example LoRA baseline** — the frozen training corpus is committed
+  (`training/phase5a/dataset/frozen/trial4-v3-human-183.json` + manifest).
+  Adapter weights themselves are a local/generated artifact
+  (`training/phase5a/adapters/v1/`, gitignored — not committed); not being
+  expanded further.
 - **Final fresh 10-case Turkish held-out validation:** 80% semantic-exact
   accuracy, 80% human-acceptable rate, vs. DeepSeek (frontier reference)
   78% / 100%. Do not read this as "beat DeepSeek" — DeepSeek remained
@@ -132,27 +120,32 @@ this codebase:
 
 ## Next
 
-- **Test 2: automated synthetic filtered distillation.** Replaces manual
-  hundreds-of-examples review with:
-  `policy/coverage spec -> frontier synthetic generation -> independent
-  frontier verification/filtering -> schema+taxonomy validation ->
-  dedup -> coverage balancing -> frozen synthetic corpus -> LoRA/SFT ->
-  fresh held-out benchmark -> failure analysis -> targeted next iteration`.
-- **Target: ~5,000 accepted training examples**, deliberately targeted at
-  difficult taxonomy boundaries (e.g. `meaning_added` vs
-  `meaning_transformed`, `scope` vs `specificity`, `certainty` vs
-  `evidentiality`/`commitment`, observable expressed affect vs inferred
-  internal emotion) rather than scaling random examples.
-- **Planned student: `google/gemma-3-270m-it`** — smaller,
-  WebGPU-oriented, targeting lightweight quantized browser deployment.
-  Not yet implemented; this is a recorded direction, not a completed
-  migration.
-- **A completely new held-out evaluation** — Test 1's benchmark cases must
-  not be reused as Test 2's scored benchmark (they have already been
-  inspected).
+**Test 2 — the final pre-product research test.** Narrow question: can
+`google/gemma-3-270m-it`, after clean synthetic filtered distillation,
+retain acceptable quality on the canonical v3 judgment primitive AND run
+as the intended browser/WebGPU-class model? Test 2 does **not** claim to
+validate the complete LEARN/REWRITE product loop — that loop is product
+work, implemented immediately after Test 2 passes, using normal product
+acceptance tests rather than another broad research phase.
+
+- Pipeline: `policy/coverage spec -> frontier synthetic generation ->
+  independent frontier verification/filtering -> schema+taxonomy
+  validation -> dedup -> coverage balancing -> frozen synthetic corpus ->
+  LoRA/SFT -> fresh held-out benchmark -> failure analysis -> targeted
+  next iteration`. Skeleton: `training/test2/`.
+- Target: ~5,000 accepted examples, targeted at difficult taxonomy
+  boundaries rather than scaling random examples.
+- Must include a real browser/WebGPU deployment smoke test of the
+  quantized artifact — a training run alone does not validate the WebGPU
+  target.
+- A completely new held-out evaluation — Test 1's benchmark cases must
+  not be reused as Test 2's scored benchmark.
+
+**If Test 2 passes:** implement the LEARN/REWRITE/VERIFY product loop per
+`docs/MVP_PRODUCT_CONTRACT.md`.
 
 Full detail: `training/phase5a/benchmark/test1-final-result.md`'s "Direct
-transition to Test 2" section, `docs/decisions/0017`.
+transition to Test 2" section, `docs/decisions/0017`, `training/test2/README.md`.
 
 ## Where to look
 
@@ -161,6 +154,7 @@ transition to Test 2" section, `docs/decisions/0017`.
   background + Dashboard/popup), `training/phase5a/` (Python
   training/benchmark pipeline). Read the source tree directly rather than
   a manually maintained file listing — it will always be more current.
+- Final MVP product contract (post-Test-2 direction): `docs/MVP_PRODUCT_CONTRACT.md`.
 - MVP scope classification (what's implemented vs. planned vs.
   experimental): `docs/architecture/mvp-scope.md`.
 - Canonical edit-judgment contract:

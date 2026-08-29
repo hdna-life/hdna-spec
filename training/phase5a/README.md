@@ -2,7 +2,7 @@
 
 A concept-validation experiment testing whether a tiny local LLM (Qwen3-0.6B) can be specialized via LoRA fine-tuning on a small human-filtered dataset to judge localized semantic changes in text revisions.
 
-**Test 1 status: CLOSED — SUCCESS.** See `benchmark/test1-final-result.md` for the full closure report (final 10-case validation result, the planned-20/actual-10 protocol deviation, what Test 1 did and did not prove, and the transition to Test 2's synthetic-distillation direction with a planned `google/gemma-3-270m-it` student). The `Qwen/Qwen3-0.6B` + 183-example LoRA baseline (`adapters/v1/`) is retained for provenance only — no further manual expansion of this dataset is planned.
+**Test 1 status: CLOSED — SUCCESS.** See `benchmark/test1-final-result.md` for the full closure report (final 10-case validation result, the planned-20/actual-10 protocol deviation, what Test 1 did and did not prove, and the transition to Test 2's synthetic-distillation direction with a planned `google/gemma-3-270m-it` student). The 183-example frozen dataset is committed (`dataset/frozen/trial4-v3-human-183.json` + manifest). Adapter weights (`adapters/v1/`) are a local/generated artifact, gitignored — reproducible from the frozen dataset via `train_lora.sh`, not committed. No further manual expansion of this dataset is planned.
 
 **Test 2 (next, not yet implemented):** automated synthetic filtered distillation — replaces the manual generate → human-review-one-at-a-time workflow below with a frontier-generate → independently-verify/filter → schema-validate → dedup → coverage-balance pipeline targeting ~5,000 accepted examples, a planned `google/gemma-3-270m-it` student, and a completely fresh held-out benchmark. See `benchmark/test1-final-result.md`'s "Direct transition to Test 2" section for the full direction. The steps below describe **Test 1's workflow**, kept for provenance/reproducibility of the closed baseline — do not treat it as the active strategy for new training work.
 
@@ -154,15 +154,20 @@ training/phase5a/
 ├── .gitignore                             (ignore generated data, models, cache)
 ├── lore/
 │   ├── task-contract.v3.md                (canonical, active — self-contained)
-│   └── policy-spec.v1.json                (machine-readable counterpart)
+│   ├── policy-spec.v1.json                (machine-readable counterpart)
+│   ├── policy.py                          (Python: loads policy-spec.v1.json)
+│   └── test_policy_drift.py               (offline drift check)
 ├── dataset/
 │   ├── generate_candidates.py            (OpenRouter API client — Test 1's workflow)
 │   ├── split_dataset.py                  (JSONL converter — Test 1's workflow)
 │   ├── sample_candidate.json             (format fixture)
 │   ├── sample_candidate.README.md        (fixture documentation)
-│   ├── generated/                        (output of generate_candidates.py)
+│   ├── frozen/                            (COMMITTED — the real Test 1 corpus)
+│   │   ├── trial4-v3-human-183.json
+│   │   └── trial4-v3-human-183.manifest.json
+│   ├── generated/                        (gitignored, output of generate_candidates.py)
 │   │   └── candidates.json
-│   └── prepared/                         (output of split_dataset.py)
+│   └── prepared/                         (gitignored, output of split_dataset.py)
 │       ├── train.jsonl
 │       ├── valid.jsonl
 │       └── test.jsonl
@@ -170,12 +175,12 @@ training/phase5a/
 │   ├── sample_case.json                  (format fixture)
 │   ├── sample_case.README.md             (evaluation-integrity requirements)
 │   └── test1-final-result.md             (authoritative Test 1 closure result)
-├── train_lora.sh                         (mlx_lm.lora wrapper)
+├── train_lora.sh                         (mlx_lm.lora wrapper — Test 1 reproduction)
 ├── write_manifest.py                     (reproducibility metadata)
-└── adapters/                             (output of train_lora.sh)
-    └── v1/                                (Test 1 baseline — provenance only)
-        ├── adapters.safetensors          (trained weights)
-        └── manifest.json                 (metadata)
+└── adapters/                             (gitignored — local/generated, NOT committed)
+    └── v1/                                (Test 1 baseline weights, reproducible from dataset/frozen/)
+        ├── adapters.safetensors
+        └── manifest.json
 ```
 
 Historical/superseded material (`task-contract.v1.md`/`v2.md`, the
