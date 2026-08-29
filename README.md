@@ -106,3 +106,7 @@ automatically learn your own `.hdna` state.
 - [`EVIDENCE.md`](EVIDENCE.md) — demonstrated / falsified / not yet demonstrated
 - [`training/phase5a/benchmark/test1-final-result.md`](training/phase5a/benchmark/test1-final-result.md) — Test 1 result
 - [`training/phase5a/lore/task-contract.v3.md`](training/phase5a/lore/task-contract.v3.md) — the canonical edit-judgment contract
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).

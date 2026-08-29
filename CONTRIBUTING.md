@@ -51,5 +51,5 @@ CI (`.github/workflows/ci.yml`) runs all of the above.
 
 ## License
 
-Not yet chosen — see the repository's license discussion before assuming
-any particular license applies.
+By contributing, you agree your contributions are licensed under
+Apache-2.0, the same as the rest of the repository. See [LICENSE](LICENSE).
