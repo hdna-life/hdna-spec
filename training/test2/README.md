@@ -64,8 +64,37 @@ text itself is never written to this repository).
 Exact normalized dedup always runs. Semantic near-dedup requires an
 explicitly configured embedding provider (a separate choice from the
 runtime's non-semantic `HashingEmbeddingProvider`) and fails closed —
-with none configured, near-duplicates are left in place rather than
-approximated with a non-semantic method.
+`dedupe.py --mode full` refuses to run without one, and
+`build_dataset.py` refuses to freeze a corpus deduped without it.
+`--mode smoke` explicitly allows skipping semantic dedup for the first
+small paid smoke only, recording `semantic_dedup: disabled` in
+`dedup_config.json`.
+
+## Spend cap
+
+Every real (`--provider openrouter`) run requires `--budget-requests`
+(and optionally `--budget-usd`) — the pipeline stops before the next
+request would exceed the cap, not after. Spend is recorded in the run
+manifest.
+
+## Smoke run (20-50 real candidates)
+
+`pipeline/smoke.py` runs the real pipeline end to end — generator ->
+validate -> blind verifier -> exact dedup -> contamination check — on a
+small candidate count, writing a smoke manifest with full diagnostics.
+It never builds/freezes the final corpus, trains anything, or touches
+acceptance thresholds/coverage quotas/the final benchmark.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+python3 pipeline/smoke.py --run-id smoke-001 \
+  --generator-model-id <model> --verifier-model-id <model> \
+  --max-candidates 30 --generator-budget-requests 35 --verifier-budget-requests 35
+python3 pipeline/review_smoke.py data/smoke/smoke-001.smoke_manifest.json
+```
+
+`review_smoke.py` prints the diagnostics for a human STOP/REVISE-vs-
+PROCEED call — it never decides this itself.
 
 ## Offline testing
 
@@ -81,10 +110,10 @@ CI runs this on every push; it requires no secrets or network access.
 ## Constraints
 
 - Do not reuse Test 1's benchmark cases as Test 2 training or evaluation
-  input.
-- No paid generation has started. `generate.py --provider openrouter` /
-  `verify.py --provider openrouter` both refuse to run — the real prompts
-  are not authored yet.
+  input. `benchmark/protected-cases.v1.json` guards this — populate it via
+  `pipeline/add_protected_case.py` before generating.
+- No paid generation has started; no full 5,000-example generation has
+  started either — only the smoke run above is prepared.
 - A completed training run is not sufficient to call the WebGPU target
   validated — see `benchmark/README.md`'s required smoke-test checklist.
 

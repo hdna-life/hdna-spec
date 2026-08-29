@@ -10,6 +10,7 @@ the canonical target on acceptance."""
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
 sys.path.insert(0, str(LIB_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
 from acceptance import VERIFIER_CONFIDENCE_THRESHOLD, decide_acceptance  # noqa: E402
+from budget import BudgetConfig, BudgetExceeded, BudgetTracker  # noqa: E402
 from jsonl_io import append_jsonl, read_ids, read_jsonl  # noqa: E402
 from policy import is_valid_dimensions_list, load_policy  # noqa: E402
 from providers import VerifierProvider  # noqa: E402
@@ -31,13 +33,14 @@ def run(
     failures_path: Path,
     policy: dict,
     confidence_threshold: float = VERIFIER_CONFIDENCE_THRESHOLD,
-) -> dict[str, int]:
+) -> dict[str, int | str | None]:
     # Permanently-rejected IDs (deterministic policy reasons) are skipped on
     # resume; provider_error entries are retried — a transient failure must
     # not permanently exclude a candidate.
     permanently_rejected = {r["id"] for r in read_jsonl(failures_path) if r.get("reason") != "provider_error"}
     already_done = read_ids(out_path) | permanently_rejected
     accepted = rejected = errors = 0
+    stopped_reason = None
 
     for record in read_jsonl(in_path):
         if record["id"] in already_done:
@@ -46,6 +49,9 @@ def run(
         blind_input = {field: record[field] for field in BLIND_INPUT_FIELDS}
         try:
             verifier_output = provider.verify(blind_input)
+        except BudgetExceeded as err:
+            stopped_reason = f"budget_exceeded: {err}"
+            break
         except Exception as err:  # noqa: BLE001
             append_jsonl(failures_path, {"id": record["id"], "reason": "provider_error", "detail": str(err)})
             errors += 1
@@ -70,7 +76,7 @@ def run(
             append_jsonl(failures_path, {"id": record["id"], "reason": decision["reason"]})
             rejected += 1
 
-    return {"accepted": accepted, "rejected": rejected, "provider_errors": errors}
+    return {"accepted": accepted, "rejected": rejected, "provider_errors": errors, "stopped_reason": stopped_reason}
 
 
 def main() -> None:
@@ -81,17 +87,31 @@ def main() -> None:
     parser.add_argument("--failures", default=str(base / "data" / "failures" / "verify.jsonl"))
     parser.add_argument("--confidence-threshold", type=float, default=VERIFIER_CONFIDENCE_THRESHOLD)
     parser.add_argument("--provider", choices=["mock", "openrouter"], default="openrouter")
+    parser.add_argument("--model-id", default=None, help="Required with --provider openrouter.")
+    parser.add_argument("--budget-requests", type=int, default=None, help="Required with --provider openrouter.")
+    parser.add_argument("--budget-usd", type=float, default=None)
+    parser.add_argument("--cost-per-request-usd", type=float, default=0.0)
     args = parser.parse_args()
 
-    if args.provider == "openrouter":
-        raise SystemExit(
-            "Real verification is not implemented in this pass — no paid calls. Use --provider mock for offline runs/tests."
-        )
-
     policy = load_policy()
-    from providers import MockVerifierProvider
 
-    provider = MockVerifierProvider(verdicts_by_id={})
+    if args.provider == "openrouter":
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise SystemExit("OPENROUTER_API_KEY is not set.")
+        if not args.model_id:
+            raise SystemExit("--model-id is required with --provider openrouter.")
+        if args.budget_requests is None:
+            raise SystemExit("--budget-requests is required with --provider openrouter — every real run needs a spend cap.")
+        from real_providers import OpenRouterVerifierProvider
+
+        budget = BudgetTracker(BudgetConfig(args.budget_requests, args.budget_usd, args.cost_per_request_usd))
+        provider = OpenRouterVerifierProvider(api_key, args.model_id, budget)
+    else:
+        from providers import MockVerifierProvider
+
+        provider = MockVerifierProvider(verdicts_by_id={})
+
     stats = run(provider, Path(args.input_path), Path(args.out), Path(args.failures), policy, args.confidence_threshold)
     print(stats)
 

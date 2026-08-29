@@ -21,6 +21,8 @@ from jsonl_io import read_jsonl  # noqa: E402
 from policy import is_valid_dimensions_list, load_policy  # noqa: E402
 from providers import MockGeneratorProvider, MockVerifierProvider  # noqa: E402
 
+from budget import BudgetConfig, BudgetTracker  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
 import build_dataset  # noqa: E402
 import dedupe as dedupe_stage  # noqa: E402
@@ -30,6 +32,24 @@ import verify  # noqa: E402
 
 
 POLICY = load_policy()
+
+
+class DistinctEmbeddingProvider:
+    """One-hot per unique text — guarantees zero similarity between
+    distinct texts, so this test's real records never look like near-dups."""
+
+    provider_id = "test-distinct"
+
+    def __init__(self):
+        self._index: dict[str, int] = {}
+
+    def embed(self, text: str) -> list[float]:
+        if text not in self._index:
+            self._index[text] = len(self._index)
+        i = self._index[text]
+        vec = [0.0] * (i + 1)
+        vec[i] = 1.0
+        return vec
 
 
 def candidate(kind, before, original, final, after, verdict, dims, language="en"):
@@ -217,7 +237,8 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
 
         deduped_path = self.data / "deduped.jsonl"
         dedup_report = self.data / "dedup_report.jsonl"
-        dedupe_stage.run(verified_path, deduped_path, dedup_report)
+        dedup_config = self.data / "dedup_config.json"
+        dedupe_stage.run(verified_path, deduped_path, dedup_report, dedup_config, mode="full", embedding_provider=DistinctEmbeddingProvider())
         self.assertEqual(sum(1 for _ in read_jsonl(deduped_path)), 4)
 
         registry_path = self.tmp / "protected-cases.json"
@@ -233,11 +254,97 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
         out_dir = self.data / "frozen"
         build_failures = self.data / "failures" / "build_dataset.jsonl"
         stats_build = build_dataset.run(
-            deduped_path, plan_path, registry_path, out_dir, build_failures, run_id="test-run", verifier_model_id="mock/verifier-v1",
+            deduped_path, plan_path, registry_path, out_dir, build_failures, run_id="test-run",
+            verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
         )
         self.assertEqual(stats_build["accepted"], 4)
         self.assertTrue((out_dir / "accepted.jsonl").exists())
         self.assertTrue((out_dir / "test-run.manifest.json").exists())
+
+    def test_verifier_blindness(self):
+        provider = MockVerifierProvider(verdicts_by_id={"c_1": {"verdict": "meaning_added", "dimensions": [], "confidence": 0.95}})
+        leaked_input = {"id": "c_1", "kind": "added", "originalText": "", "finalText": "x", "beforeContext": "", "afterContext": "", "proposedVerdict": "meaning_added"}
+        with self.assertRaises(ValueError):
+            provider.verify(leaked_input)
+
+    def test_spend_cap_stops_generation_safely(self):
+        class CountingGeneratorProvider:
+            model_id = "test/generator"
+
+            def __init__(self, budget):
+                self.budget = budget
+
+            def generate(self, coverage_item):
+                self.budget.charge()
+                return candidate("replaced", "a", "x", "y", "b", "no_meaningful_change", [])
+
+        plan = json.loads(self.build_plan(self.tmp).read_text())
+        budget = BudgetTracker(BudgetConfig(max_requests=2))
+        provider = CountingGeneratorProvider(budget)
+        generated_path = self.data / "generated.jsonl"
+        gen_failures = self.data / "failures" / "generate.jsonl"
+
+        stats = generate.run(provider, plan, generated_path, gen_failures)
+        self.assertEqual(stats["generated"], 2)
+        self.assertIn("budget_exceeded", stats["stopped_reason"])
+        self.assertEqual(sum(1 for _ in read_jsonl(generated_path)), 2)
+
+    def test_spend_cap_stops_verification_safely(self):
+        class CountingVerifierProvider:
+            model_id = "test/verifier"
+
+            def __init__(self, budget):
+                self.budget = budget
+
+            def verify(self, candidate_input):
+                self.budget.charge()
+                return {"verdict": "no_meaningful_change", "dimensions": [], "confidence": 0.95}
+
+        validated_path = self.tmp / "validated.jsonl"
+        from jsonl_io import write_jsonl
+
+        write_jsonl(validated_path, [
+            {"id": f"c_{i}", "kind": "replaced", "originalText": "x", "finalText": "y", "beforeContext": "", "afterContext": "",
+             "language": "en", "generator": {"proposedVerdict": "no_meaningful_change", "proposedDimensions": []}}
+            for i in range(3)
+        ])
+        budget = BudgetTracker(BudgetConfig(max_requests=1))
+        provider = CountingVerifierProvider(budget)
+        verified_path = self.tmp / "verified.jsonl"
+        verify_failures = self.tmp / "verify_failures.jsonl"
+
+        stats = verify.run(provider, validated_path, verified_path, verify_failures, POLICY)
+        self.assertEqual(stats["accepted"], 1)
+        self.assertIn("budget_exceeded", stats["stopped_reason"])
+
+    def test_smoke_mode_dedup_disabled_writes_marker(self):
+        verified_path = self.tmp / "verified.jsonl"
+        from jsonl_io import write_jsonl
+
+        write_jsonl(verified_path, [{"id": "c_1", "originalText": "x", "finalText": "y"}])
+        out = self.tmp / "deduped.jsonl"
+        report = self.tmp / "report.jsonl"
+        config = self.tmp / "dedup_config.json"
+        stats = dedupe_stage.run(verified_path, out, report, config, mode="smoke", embedding_provider=None)
+        self.assertEqual(stats["semantic_dedup"], "disabled")
+        self.assertEqual(json.loads(config.read_text())["mode"], "smoke")
+
+    def test_full_build_fails_closed_when_semantic_dedup_missing(self):
+        plan_path = self.build_plan(self.tmp)
+        deduped_path = self.tmp / "deduped.jsonl"
+        from jsonl_io import write_jsonl
+
+        write_jsonl(deduped_path, [])
+        dedup_config = self.tmp / "dedup_config.json"
+        dedup_config.write_text(json.dumps({"mode": "smoke", "semantic_dedup": "disabled"}), encoding="utf-8")
+        registry_path = self.tmp / "protected-cases.json"
+        registry_path.write_text(json.dumps({"protected_pair_hashes": []}), encoding="utf-8")
+
+        with self.assertRaises(SystemExit):
+            build_dataset.run(
+                deduped_path, plan_path, registry_path, self.tmp / "frozen", self.tmp / "build_failures.jsonl",
+                run_id="test-run", verifier_model_id="mock/verifier-v1", dedup_config_path=dedup_config,
+            )
 
 
 if __name__ == "__main__":

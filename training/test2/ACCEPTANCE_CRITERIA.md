@@ -4,27 +4,29 @@ Written before any Test 2 output exists. Test 2 is a feasibility/
 deployment gate, not production certification — see
 `docs/MVP_PRODUCT_CONTRACT.md`.
 
-## Primary model quality gate
+## Primary gate
 
 - Semantic verdict exact accuracy: **PASS >= 80%** (same standard Test 1 used).
 
-## Secondary quality
+## Additional required gates
+
+All of these must also pass — "additional," not optional:
 
 - Human acceptable rate: PASS >= 80%.
-- Schema-valid output rate: PASS >= 98%.
-- Provider/runtime failure rate: reported separately, never counted as a
-  semantic error. Malformed model output counts against schema-valid rate;
-  a transport failure does not.
+- Schema-valid output rate: PASS >= 98%. Malformed model output counts
+  against this rate; a transport failure does not (reported separately,
+  never counted as a semantic or schema error).
+- Dimension micro-F1: PASS >= 0.60. Test 1 showed the dimension axis is
+  much harder than the verdict axis — this is a required gate, but a
+  looser one than the primary gate; dimension exact-set accuracy is
+  never itself a PASS/FAIL gate.
+- Browser/WebGPU deployment succeeds (see below).
 
-## Dimension quality (secondary, not the main gate)
+## Reported diagnostics (not gates)
 
-Test 1 showed the dimension axis remains much harder — exact-set accuracy
-is not the pass gate here.
-
-- Dimension micro-F1: **PASS >= 0.60**.
-- Also report: dimension exact-set accuracy, per-dimension precision/
-  recall/F1, and confusion around the named boundary pairs in
-  `coverage-plan.v1.json`.
+- Dimension exact-set accuracy.
+- Per-dimension precision/recall/F1.
+- Confusion around the named boundary pairs in `coverage-plan.v1.json`.
 
 ## Fresh benchmark
 
@@ -54,11 +56,11 @@ engineering measurement, not a hard research gate.
 
 All of:
 
-- semantic exact gate passes
-- human acceptable gate passes
-- schema validity gate passes
-- dimension micro-F1 secondary gate passes
-- browser/WebGPU deployment succeeds
+- semantic exact gate passes (primary)
+- human acceptable gate passes (required)
+- schema validity gate passes (required)
+- dimension micro-F1 gate passes (required)
+- browser/WebGPU deployment succeeds (required)
 
 **A Test 2 PASS still does not prove the complete LEARN/REWRITE product
 loop.** It proves the narrow question in `training/test2/README.md`.

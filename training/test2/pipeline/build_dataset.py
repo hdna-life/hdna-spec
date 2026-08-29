@@ -8,6 +8,7 @@ and fresh."""
 from __future__ import annotations
 
 import argparse
+import json
 import random
 import sys
 from collections import Counter
@@ -23,6 +24,20 @@ from manifest import build_run_manifest, write_manifest  # noqa: E402
 TRAIN_FRACTION, VALID_FRACTION = 0.8, 0.1
 
 
+def require_semantic_dedup(dedup_config_path: Path) -> None:
+    """Fails closed: the full corpus must never be frozen from a dedup pass
+    that skipped semantic near-dedup."""
+    if not dedup_config_path.exists():
+        raise SystemExit(f"No dedup config at {dedup_config_path} — run dedupe.py --mode full first.")
+    config = json.loads(dedup_config_path.read_text(encoding="utf-8"))
+    if config.get("mode") != "full" or config.get("semantic_dedup") != "enabled":
+        raise SystemExit(
+            f"Refusing to freeze: dedup_config.json shows mode={config.get('mode')!r}, "
+            f"semantic_dedup={config.get('semantic_dedup')!r}. Semantic near-dedup is required before the "
+            "full build."
+        )
+
+
 def run(
     in_path: Path,
     coverage_plan_path: Path,
@@ -31,8 +46,10 @@ def run(
     failures_path: Path,
     run_id: str,
     verifier_model_id: str,
+    dedup_config_path: Path,
     seed: int = 42,
 ) -> dict:
+    require_semantic_dedup(dedup_config_path)
     records = list(read_jsonl(in_path))
     plan = load_coverage_plan(coverage_plan_path)
     protected_hashes = load_protected_hashes(protected_registry_path)
@@ -108,6 +125,7 @@ def main() -> None:
     base = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Test 2 dataset builder.")
     parser.add_argument("--in", dest="input_path", default=str(base / "data" / "deduped.jsonl"))
+    parser.add_argument("--dedup-config", default=str(base / "data" / "dedup_config.json"))
     parser.add_argument("--coverage-plan", default=str(base / "coverage-plan.v1.json"))
     parser.add_argument("--protected-registry", default=str(base / "benchmark" / "protected-cases.v1.json"))
     parser.add_argument("--out-dir", default=str(base / "data" / "frozen"))
@@ -119,7 +137,7 @@ def main() -> None:
 
     stats = run(
         Path(args.input_path), Path(args.coverage_plan), Path(args.protected_registry), Path(args.out_dir),
-        Path(args.failures), args.run_id, args.verifier_model_id, args.seed,
+        Path(args.failures), args.run_id, args.verifier_model_id, Path(args.dedup_config), args.seed,
     )
     print(stats)
     if stats["verdict_band_violations"] or stats["operation_minimum_violations"]:
