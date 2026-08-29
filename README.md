@@ -25,26 +25,28 @@ semantic verification
 adapted response
 ```
 
-HDNA watches how a user naturally writes — no persona questionnaire, no
-manual trait editor, no per-edit labeling. Eligible writing is processed
-locally in the background while the user continues normal browser use.
-The output is a structured, user-owned `.hdna` state: expression/style
-behavior (directness, formality, punctuation habits, etc.) and repeated
-preferences, each weighted by how strongly it's been observed. Raw
-personal writing is never part of the portable `.hdna` snapshot.
+The MVP is designed to learn from how a user naturally writes — no
+persona questionnaire, no manual trait editor, no per-edit labeling.
+Eligible writing will be processed locally in the background while the
+user continues normal browser use. The intended output is a structured,
+user-owned `.hdna` state: expression/style behavior (directness,
+formality, punctuation habits, etc.) and repeated preferences, each
+weighted by how strongly it's been observed. Raw personal writing is not
+meant to be part of the portable `.hdna` snapshot.
 
-The frontier model stays responsible for knowledge, reasoning, and
-content — HDNA never silently changes facts, decisions, recommendations,
-or semantic scope. It mainly adapts expression. A frontier response is
-rewritten locally against the user's `.hdna` state, then semantically
-verified against the original; if verification fails or is uncertain, the
-original frontier output is returned unchanged.
+The frontier model is intended to stay responsible for knowledge,
+reasoning, and content — HDNA is designed to never silently change facts,
+decisions, recommendations, or semantic scope, and to mainly adapt
+expression. The intended flow: a frontier response is rewritten locally
+against the user's `.hdna` state, then semantically verified against the
+original; if verification fails or is uncertain, the original frontier
+output is returned unchanged.
 
-HDNA may also learn repeated explicit preferences, but these never
-silently alter an answer. If a frontier recommendation conflicts with a
-sufficiently supported preference, HDNA may surface a small notice
-instead — never a silent rewrite. Full contract, boundaries, and privacy
-rules: [`docs/MVP_PRODUCT_CONTRACT.md`](docs/MVP_PRODUCT_CONTRACT.md).
+HDNA is also designed to learn repeated explicit preferences, without
+letting these silently alter an answer — if a frontier recommendation
+conflicts with a sufficiently supported preference, the plan is a small
+notice instead of a silent rewrite. Full contract, boundaries, and
+privacy rules: [`docs/MVP_PRODUCT_CONTRACT.md`](docs/MVP_PRODUCT_CONTRACT.md).
 
 The MVP targets one small local model running in the browser via WebGPU
 (planned Test 2 student: `google/gemma-3-270m-it`), with three
@@ -56,18 +58,18 @@ validated yet — see "Current evidence" below.
 
 ## How it is different
 
-Most current personalization approaches rely on a generated prose persona
-prompt (custom instructions, writing-assistant voice profiles) or
-provider-native memory tied to one vendor. Common AI memory systems store
-general biography/history rather than expression behavior specifically.
+Common approaches to AI personalization take a few different shapes:
+custom instructions / persona prompts (manual prose instructions),
+writing-assistant voice/profile systems (product-specific learned or
+configured voice profiles), AI memory systems (factual/history/context
+memory), provider-native personalization (state tied to one provider or
+product), and per-user fine-tuning (personalized model weights).
 
-| | Most current approaches | HDNA's design instead |
-|---|---|---|
-| Learning | Manual prompt/profile authoring | Automatic, from natural use |
-| State | Prose persona prompt | Structured behavioral state |
-| Portability | Provider-specific | Provider-independent |
-| Runtime | Server-side | Local (WebGPU) |
-| Personalization scope | General memory/biography | Expression/style behavior only |
+The HDNA design instead aims for: automatic learning from natural use,
+a structured user-owned behavioral state, portability across providers,
+and a local small runtime — not dependent on one vendor's memory/profile
+system, and not dependent on a generated prose persona prompt as the
+primary mechanism.
 
 ## Current evidence
 

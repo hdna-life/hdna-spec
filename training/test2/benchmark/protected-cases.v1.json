@@ -1,0 +1,5 @@
+{
+  "version": "v1",
+  "description": "Hashes only — never raw text. Any case whose normalized (originalText, finalText) pair hash appears here must never enter Test 2 generation, verification, or training prompts. Populate via pipeline/add_protected_case.py before generation begins.",
+  "protected_pair_hashes": []
+}

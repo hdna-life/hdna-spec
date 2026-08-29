@@ -1,24 +1,99 @@
 #!/usr/bin/env python3
-"""Blind verifier role. Receives ONLY kind/originalText/finalText/
-beforeContext/afterContext — never the generator's proposed verdict,
-dimensions, or explanation — and produces an independent judgment against
-training/phase5a/lore/policy-spec.v1.json. An example is accepted only
-when the verifier's judgment matches the generator's proposal exactly.
+"""Stage 3: blind verifier judgment + v1 acceptance policy.
 
-STUB. Not implemented. No API calls are made by this file.
-"""
+The verifier receives ONLY kind/originalText/finalText/beforeContext/
+afterContext — never the generator's proposal. Acceptance requires
+verdict agreement and verifier confidence >= threshold; dimension-set
+disagreement is recorded, not rejected — the verifier's dimensions become
+the canonical target on acceptance."""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
+sys.path.insert(0, str(LIB_DIR))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "phase5a" / "lore"))
+from acceptance import VERIFIER_CONFIDENCE_THRESHOLD, decide_acceptance  # noqa: E402
+from jsonl_io import append_jsonl, read_ids, read_jsonl  # noqa: E402
+from policy import is_valid_dimensions_list, load_policy  # noqa: E402
+from providers import VerifierProvider  # noqa: E402
+
+BLIND_INPUT_FIELDS = ("id", "kind", "originalText", "finalText", "beforeContext", "afterContext")
+
+
+def run(
+    provider: VerifierProvider,
+    in_path: Path,
+    out_path: Path,
+    failures_path: Path,
+    policy: dict,
+    confidence_threshold: float = VERIFIER_CONFIDENCE_THRESHOLD,
+) -> dict[str, int]:
+    # Permanently-rejected IDs (deterministic policy reasons) are skipped on
+    # resume; provider_error entries are retried — a transient failure must
+    # not permanently exclude a candidate.
+    permanently_rejected = {r["id"] for r in read_jsonl(failures_path) if r.get("reason") != "provider_error"}
+    already_done = read_ids(out_path) | permanently_rejected
+    accepted = rejected = errors = 0
+
+    for record in read_jsonl(in_path):
+        if record["id"] in already_done:
+            continue
+
+        blind_input = {field: record[field] for field in BLIND_INPUT_FIELDS}
+        try:
+            verifier_output = provider.verify(blind_input)
+        except Exception as err:  # noqa: BLE001
+            append_jsonl(failures_path, {"id": record["id"], "reason": "provider_error", "detail": str(err)})
+            errors += 1
+            continue
+
+        if verifier_output["verdict"] not in policy["verdicts"] or not is_valid_dimensions_list(
+            verifier_output["dimensions"], policy
+        ):
+            append_jsonl(failures_path, {"id": record["id"], "reason": "verifier_output_invalid"})
+            rejected += 1
+            continue
+
+        record = {**record, "verifier": {"model_id": provider.model_id, **verifier_output}}
+        decision = decide_acceptance(record, confidence_threshold)
+        if decision["accepted"]:
+            record["canonical_verdict"] = decision["canonical_verdict"]
+            record["canonical_dimensions"] = decision["canonical_dimensions"]
+            record["dimension_sets_equal"] = decision["dimension_sets_equal"]
+            append_jsonl(out_path, record)
+            accepted += 1
+        else:
+            append_jsonl(failures_path, {"id": record["id"], "reason": decision["reason"]})
+            rejected += 1
+
+    return {"accepted": accepted, "rejected": rejected, "provider_errors": errors}
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Test 2 blind verifier (stub, not implemented).")
-    parser.add_argument("--in", dest="input_path", default="data/validated.jsonl")
-    parser.add_argument("--out", default="data/verified.jsonl")
-    parser.parse_args()
-    raise NotImplementedError("Test 2 generation has not started. See training/test2/README.md.")
+    base = Path(__file__).resolve().parent.parent
+    parser = argparse.ArgumentParser(description="Test 2 blind verifier.")
+    parser.add_argument("--in", dest="input_path", default=str(base / "data" / "validated.jsonl"))
+    parser.add_argument("--out", default=str(base / "data" / "verified.jsonl"))
+    parser.add_argument("--failures", default=str(base / "data" / "failures" / "verify.jsonl"))
+    parser.add_argument("--confidence-threshold", type=float, default=VERIFIER_CONFIDENCE_THRESHOLD)
+    parser.add_argument("--provider", choices=["mock", "openrouter"], default="openrouter")
+    args = parser.parse_args()
+
+    if args.provider == "openrouter":
+        raise SystemExit(
+            "Real verification is not implemented in this pass — no paid calls. Use --provider mock for offline runs/tests."
+        )
+
+    policy = load_policy()
+    from providers import MockVerifierProvider
+
+    provider = MockVerifierProvider(verdicts_by_id={})
+    stats = run(provider, Path(args.input_path), Path(args.out), Path(args.failures), policy, args.confidence_threshold)
+    print(stats)
 
 
 if __name__ == "__main__":

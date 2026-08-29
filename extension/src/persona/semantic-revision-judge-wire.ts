@@ -2,33 +2,15 @@ import type { SemanticRevisionJudgeInput, SemanticRevisionJudgmentDraft } from '
 import { formatCanonicalDimensionDirections, isValidDimensionsArray } from './behavior-dimension';
 
 /**
- * Shared "untrusted JSON wire protocol" for any `SemanticRevisionJudgeProvider`
- * transport that cannot rely on a provider-enforced structured-output
- * contract (`response_format`/JSON-Schema) — currently only
- * `LocalMlxSemanticRevisionJudge` (docs/decisions/0016's Trial 3 "local MLX
- * transport" addendum), used for Trial 4's `base`/`trained` roles. It asks
- * the model, in-prompt, to return exactly one JSON object, then runs the
- * defensive parse/validate here — extracted to this module so the
- * "untrusted output, no repair, reject on malformed" discipline (Trial
- * 3 §10-11) is defined and tested in one place.
+ * Untrusted JSON wire protocol for transports with no provider-enforced
+ * structured-output contract (currently `LocalMlxSemanticRevisionJudge`
+ * only) — never repairs or guesses a malformed field; a response failing
+ * structural validation is a judge failure, not degraded evidence.
  *
- * **Test 1 / v3 addendum (docs/decisions/0017):** the prompt/parser here
- * now also cover the `dimensions` axis (`BehaviorDimensionChange[]`),
- * orthogonal to `verdict` — see `spec/protocol/semantic-revision-judge.ts`'s
- * `SemanticRevisionJudgmentDraft` docstring for the full semantic/behavior
- * axis split. Trial 4's `deepseek` frontier-reference role instead uses
- * `OpenRouterSemanticRevisionJudge` (reached via OpenRouter, not DeepSeek's
- * own API), which maintains its own semantically-equivalent v3 prompt/
- * schema — see this module's next paragraph for why the two are not
- * unified into one implementation.
- *
- * OpenRouter's provider (`openrouter-semantic-revision-judge.ts`) does NOT
- * use this module — it relies on OpenRouter's `response_format: json_schema`
- * strict structured output instead, a materially different (and stronger)
- * wire guarantee. Do not switch it to this module without a deliberate,
- * separate decision to give up that guarantee. It uses its own JSON Schema
- * (kept in sync with this module's verdict/dimension/direction values) and
- * the same `isValidDimensionsArray` validator from `behavior-dimension.ts`.
+ * `OpenRouterSemanticRevisionJudge` does NOT use this module — it relies
+ * on `response_format: json_schema` strict structured output instead, a
+ * stronger wire guarantee. Do not merge the two without a deliberate
+ * decision to give that up.
  */
 
 const THINK_BLOCK_PATTERN = /<think>[\s\S]*?<\/think>/i;
@@ -36,15 +18,7 @@ const MARKDOWN_JSON_FENCE_PATTERN = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
 /** The MLX-LM local server's Qwen chat template appends this end-of-turn transport token after the model's actual completion text — observed verbatim in real local Qwen3-0.6B output, both plain and fenced. Anchored to end-of-string (`$`) so only a genuine TRAILING token is stripped, never an occurrence elsewhere (never used to hunt for JSON embedded in prose). */
 const TRAILING_QWEN_IM_END_PATTERN = /\s*<\|im_end\|>\s*$/i;
 
-/**
- * Test 1's narrow judge prompt (docs/decisions/0016's Trial 3 §8,
- * extended by docs/decisions/0017's Test 1 addendum), deliberately kept
- * identical across every transport using this wire protocol, so a
- * benchmark comparing outputs across transports (Trial 4) is not
- * confounded by prompt differences — the only intended variable is the
- * model/weights behind the transport. Not enlarged beyond what the two
- * orthogonal axes require to compensate for a smaller model (Trial 3 §8).
- */
+/** Kept byte-identical across every transport so a benchmark comparing them isn't confounded by prompt differences — the only intended variable is the model/weights. */
 export function buildNarrowJudgePrompt(input: SemanticRevisionJudgeInput): string {
   return [
     'You are judging one localized human text revision.\n\n',
@@ -110,16 +84,7 @@ function stripMarkdownFence(content: string): string {
   return match ? match[1] : content;
 }
 
-/**
- * Strips ONLY an exact trailing `<|im_end|>` transport token (plus
- * surrounding whitespace), if present at the very end of the string.
- * Observed real local MLX/Qwen3-0.6B output: a valid JSON payload
- * immediately followed by this token, e.g. `{"verdict": ...}<|im_end|>` or
- * a fenced ` ```json\n{...}\n``` <|im_end|>`. Anchored to end-of-string —
- * never strips the token from the middle of prose, never a signal to hunt
- * for JSON elsewhere in the content (same "harmless transport formatting
- * only, never repair" discipline as `stripThinkingBlock`/`stripMarkdownFence`).
- */
+/** Anchored to end-of-string — never strips the token mid-prose, never a signal to hunt for JSON elsewhere in the content. */
 function stripTrailingQwenImEndToken(content: string): string {
   return content.replace(TRAILING_QWEN_IM_END_PATTERN, '');
 }
@@ -144,26 +109,10 @@ function isValidJudgmentWireShape(value: unknown): value is SemanticRevisionJudg
 }
 
 /**
- * Parses a raw chat-completion `content` string into a validated
- * `SemanticRevisionJudgmentDraft`, or throws. Tolerates only harmless
- * transport formatting (surrounding whitespace, one `<think>` block, one
- * trailing `<|im_end|>` transport token, one Markdown JSON fence) — never
- * repairs, guesses, or infers a missing/malformed field; a response that
- * fails structural validation is a judge failure, not degraded evidence
- * (Trial 3 §10-11). This includes `dimensions`: a missing/malformed
- * `dimensions` array, a duplicate dimension, an unrecognized dimension/
- * direction value, or a non-empty `dimensions` array on an `'uncertain'`
- * verdict are all rejected here, never silently repaired to `[]`.
- *
- * Normalization pipeline, in this exact order (each step only strips
- * known, harmless transport artifacts — never extracts `{...}` from
- * surrounding prose, never repairs malformed JSON):
- * 1. strip a leading `<think>...</think>` block, if present
- * 2. strip a trailing `<|im_end|>` token, if present
- * 3. trim surrounding whitespace
- * 4. strip a single surrounding Markdown JSON fence, if present
- * 5. `JSON.parse`
- * 6. strict schema validation (`isValidJudgmentWireShape`)
+ * Tolerates only harmless transport formatting (whitespace, one `<think>`
+ * block, trailing `<|im_end|>`, one Markdown fence), in that order, before
+ * `JSON.parse` + schema validation — never repairs or guesses a malformed
+ * field, never extracts `{...}` from surrounding prose.
  */
 export function parseUntrustedJudgmentText(content: string): SemanticRevisionJudgmentDraft {
   const withoutThinking = stripThinkingBlock(content);

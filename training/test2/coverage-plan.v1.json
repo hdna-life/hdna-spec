@@ -1,20 +1,48 @@
 {
   "version": "v1",
+  "status": "frozen — predeclared before generation begins",
   "target_accepted_examples": 5000,
   "policy_spec": "training/phase5a/lore/policy-spec.v1.json",
-  "priority_boundaries": [
-    { "boundary": "meaning_added_vs_meaning_transformed", "reason": "Test 1 weakness: verdict confusion at this boundary" },
-    { "boundary": "scope_vs_specificity", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "certainty_vs_evidentiality", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "certainty_vs_commitment", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "politeness_vs_directness", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "directness_vs_directive_force", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "factual_content_vs_action_or_decision", "reason": "Test 1 weakness: dimension boundary confusion" },
-    { "boundary": "conditionality", "reason": "Test 1 weakness: low support, easily confused with temporal sequence" },
-    { "boundary": "expressed_affect_vs_inferred_internal_emotion", "reason": "core contract guardrail — must never be crossed" },
-    { "boundary": "hard_no_meaningful_change_negatives", "reason": "Test 1 false-positive dimension rate was high" },
-    { "boundary": "uncertain_abstention", "reason": "abstention must remain a genuine, well-calibrated outcome" }
+
+  "coverage_buckets": [
+    { "bucket": "basic_clean", "quota": 1000, "fraction": 0.20, "description": "clear single-axis examples, clean no-change examples, straightforward verdicts" },
+    { "bucket": "hard_no_meaningful_change", "quota": 750, "fraction": 0.15, "description": "substantial wording changes with preserved proposition; tone/formality/directness shifts without semantic change" },
+    { "bucket": "taxonomy_boundary_meaning_added_vs_transformed", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_scope_vs_specificity", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_certainty_vs_evidentiality", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_certainty_vs_commitment", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_politeness_vs_directness", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_directness_vs_directive_force", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_factual_content_vs_action_or_decision", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_conditionality_vs_temporal_sequence", "quota": 167, "fraction": 0.0334 },
+    { "bucket": "taxonomy_boundary_expressed_affect_vs_inferred_psychology", "quota": 164, "fraction": 0.0328, "note": "core contract guardrail — this bucket exists to generate negative/adversarial examples the verifier must correctly reject as over-inference, not to normalize the violation" },
+    { "bucket": "multi_dimension", "quota": 1000, "fraction": 0.20, "description": "multiple valid behavioral dimension changes in one candidate; avoid template repetition" },
+    { "bucket": "uncertain_adversarial_edge", "quota": 750, "fraction": 0.15, "description": "genuinely ambiguous cases, malformed-looking but valid language, subtle multilingual cases, abstention calibration" }
   ],
-  "language_mix": { "note": "not yet decided — set before generation begins" },
-  "status": "not started — no generation has run"
+  "taxonomy_boundary_bucket_total": 1500,
+  "taxonomy_boundary_bucket_fraction": 0.30,
+
+  "language_mix": { "tr": 0.50, "en": 0.50 },
+
+  "verdict_bands": {
+    "no_meaningful_change": { "min_fraction": 0.20, "max_fraction": 0.30 },
+    "meaning_added": { "min_fraction": 0.15, "max_fraction": 0.25 },
+    "meaning_removed": { "min_fraction": 0.15, "max_fraction": 0.25 },
+    "meaning_transformed": { "min_fraction": 0.20, "max_fraction": 0.30 },
+    "uncertain": { "min_fraction": 0.05, "max_fraction": 0.15 }
+  },
+  "verdict_band_note": "Bands, not fixed targets — do not force exact equality if it harms natural coverage. build_dataset.py must still verify the accepted corpus falls within these bands before freezing.",
+
+  "operation_minimums": {
+    "added": 500,
+    "removed": 500,
+    "replaced": 2000,
+    "reordered": 150
+  },
+  "operation_note": "replaced may be the largest class, but every operation must clear its minimum — no supported operation may end up near-zero.",
+
+  "generator_must_not": [
+    "silently satisfy quota with repeated near-identical templates",
+    "reuse the same sentence skeleton across more than a small number of examples per bucket"
+  ]
 }

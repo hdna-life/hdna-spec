@@ -10,6 +10,7 @@ set -euo pipefail
 #   ADAPTER_PATH       Output adapter directory (default: adapters/v1)
 #   ITERS              Training iterations (default: 400)
 #   CONTRACT_VERSION    task-contract version this run trains against (default: v3)
+#   DATASET_SOURCE_PATH frozen source dataset to checksum in the manifest (default: dataset/frozen/trial4-v3-human-183.json)
 
 MODEL="${MODEL:-Qwen/Qwen3-0.6B}"
 DATA_DIR="${DATA_DIR:-dataset/prepared}"
@@ -18,6 +19,7 @@ ITERS="${ITERS:-400}"
 BATCH_SIZE="${BATCH_SIZE:-4}"
 LEARNING_RATE="${LEARNING_RATE:-1e-5}"
 CONTRACT_VERSION="${CONTRACT_VERSION:-v3}"
+DATASET_SOURCE_PATH="${DATASET_SOURCE_PATH:-dataset/frozen/trial4-v3-human-183.json}"
 
 echo "Phase 5A Trial 4 LoRA Training (Test 1 reproduction)"
 echo "======================================================"
@@ -56,6 +58,7 @@ python3 write_manifest.py \
     --base-model "$MODEL" \
     --out "$ADAPTER_PATH/manifest.json" \
     --policy-spec-path "lore/policy-spec.v1.json" \
+    --dataset-source-path "$DATASET_SOURCE_PATH" \
     --iters "$ITERS" \
     --batch-size "$BATCH_SIZE" \
     --learning-rate "$LEARNING_RATE"

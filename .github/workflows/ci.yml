@@ -30,6 +30,10 @@ jobs:
           python-version: "3.11"
       - name: Syntax check
         run: |
-          python3 -m py_compile training/phase5a/*.py training/phase5a/dataset/*.py training/phase5a/lore/*.py training/test2/pipeline/*.py
+          python3 -m py_compile training/phase5a/*.py training/phase5a/dataset/*.py training/phase5a/lore/*.py training/phase5a/tests/*.py training/test2/lib/*.py training/test2/pipeline/*.py training/test2/tests/*.py
       - name: Policy drift check
         run: python3 training/phase5a/lore/test_policy_drift.py -v
+      - name: Test 1 frozen dataset manifest integrity
+        run: python3 training/phase5a/tests/test_frozen_dataset_integrity.py -v
+      - name: Test 2 offline pipeline tests
+        run: python3 -m unittest training.test2.tests.test_pipeline_e2e -v

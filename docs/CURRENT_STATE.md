@@ -28,13 +28,14 @@ user's psychology, motivation, emotional state, or identity.
   `training/phase5a/benchmark/test1-final-result.md`.
 - **Test 2 is next:** automated synthetic distillation (~5,000 accepted
   examples, frontier-generated + independently filtered) targeting a
-  smaller WebGPU-oriented student, `google/gemma-3-270m-it`. Not started —
-  see "Next" below.
+  smaller WebGPU-oriented student, `google/gemma-3-270m-it`. Pipeline
+  implemented and offline-tested; no generation has run, no paid API
+  calls made — see "Next" below.
 - The MV3 extension runtime (storage, job queue, governor, deterministic
   Phase 1-4 evidence pipeline, T3 OpenRouter persona interpretation, Phase
   5A semantic-delta extraction, and the Trial 4 benchmark Dashboard) is
-  implemented and tested. See `docs/architecture/mvp-scope.md` for the
-  MVP_REQUIRED/PLANNED/EXPERIMENTAL scope breakdown.
+  implemented and tested — see `docs/architecture/mvp-scope.md` for which
+  of it is retained product foundation vs. superseded experimental runtime.
 
 ## Two things not to confuse
 
@@ -128,18 +129,22 @@ validate the complete LEARN/REWRITE product loop — that loop is product
 work, implemented immediately after Test 2 passes, using normal product
 acceptance tests rather than another broad research phase.
 
-- Pipeline: `policy/coverage spec -> frontier synthetic generation ->
-  independent frontier verification/filtering -> schema+taxonomy
-  validation -> dedup -> coverage balancing -> frozen synthetic corpus ->
-  LoRA/SFT -> fresh held-out benchmark -> failure analysis -> targeted
-  next iteration`. Skeleton: `training/test2/`.
-- Target: ~5,000 accepted examples, targeted at difficult taxonomy
+- Pipeline: `policy/coverage spec -> generator candidate -> deterministic
+  schema/policy validation -> blind verifier -> acceptance/dedup ->
+  coverage balancing -> frozen accepted corpus -> LoRA/SFT -> fresh
+  held-out benchmark`. Implemented and offline-tested (mock providers, no
+  network) in `training/test2/`; no paid generation has run.
+- Target: ~5,000 accepted examples against a frozen coverage plan
+  (`training/test2/coverage-plan.v1.json`) targeted at difficult taxonomy
   boundaries rather than scaling random examples.
-- Must include a real browser/WebGPU deployment smoke test of the
-  quantized artifact — a training run alone does not validate the WebGPU
-  target.
+- Frozen pass/fail criteria before any output exists:
+  `training/test2/ACCEPTANCE_CRITERIA.md` — semantic exact >=80%, human
+  acceptable >=80%, schema-valid >=98%, dimension micro-F1 >=0.60, n>=100
+  fresh benchmark cases, plus a required browser/WebGPU deployment smoke
+  test (a training run alone does not validate the WebGPU target).
 - A completely new held-out evaluation — Test 1's benchmark cases must
-  not be reused as Test 2's scored benchmark.
+  not be reused as Test 2's scored benchmark, guarded by a committed
+  content-hash registry (`training/test2/benchmark/protected-cases.v1.json`).
 
 **If Test 2 passes:** implement the LEARN/REWRITE/VERIFY product loop per
 `docs/MVP_PRODUCT_CONTRACT.md`.
