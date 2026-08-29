@@ -4,25 +4,20 @@ import type {
   SemanticRevisionJudgmentDraft,
 } from '@spec/protocol/semantic-revision-judge';
 import { SEMANTIC_REVISION_JUDGE_VERSION } from './semantic-revision-judge-identity';
-import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from './behavior-dimension';
+import {
+  BEHAVIOR_DIMENSIONS,
+  CANONICAL_DIMENSION_DIRECTIONS,
+  formatCanonicalDimensionDirections,
+  isValidDimensionsArray,
+} from './behavior-dimension';
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Re-exported for existing call sites/tests that import the version
-// constant from this file — the canonical definition now lives in
-// semantic-revision-judge-identity.ts, shared with
-// local-mlx-semantic-revision-judge.ts, so the two transports' receipt
-// identities can never silently drift apart. See that file's docstring.
 export { SEMANTIC_REVISION_JUDGE_VERSION };
 
 // Strict OpenAI/Azure-compatible structured outputs require every
-// `properties` key to also appear in `required` (the same real HTTP 400
-// documented in docs/decisions/0016's "Post-implementation fix" section)
-// — `description` is therefore always-present but nullable
-// (`type: ['string', 'null']`), matching `SemanticRevisionJudgmentDraft`'s
-// domain shape directly (no wire/domain normalization layer is needed
-// here, unlike `preferred`/`rejected` in the Trial 0-2 provider, because
-// the domain type itself already declares `description: string | null`).
+// `properties` key to also appear in `required`, and every nested object
+// to declare `additionalProperties: false`.
 const JUDGMENT_JSON_SCHEMA = {
   type: 'object',
   properties: {
@@ -30,21 +25,21 @@ const JUDGMENT_JSON_SCHEMA = {
       type: 'string',
       enum: ['no_meaningful_change', 'meaning_added', 'meaning_removed', 'meaning_transformed', 'uncertain'],
     },
-    // Test 1 addendum (docs/decisions/0017) — the orthogonal observable-
-    // behavior axis. Strict structured outputs require every nested object
-    // to also declare `additionalProperties: false` and list every one of
-    // its own properties in its own `required` array (the same rule that
-    // already governs the top-level schema below).
     dimensions: {
       type: 'array',
       items: {
-        type: 'object',
-        properties: {
-          dimension: { type: 'string', enum: BEHAVIOR_DIMENSIONS },
-          direction: { type: 'string', enum: BEHAVIOR_DIRECTIONS },
-        },
-        required: ['dimension', 'direction'],
-        additionalProperties: false,
+        // One branch per canonical dimension, each constraining `direction`
+        // to that dimension's own allowed set — the schema itself rejects
+        // e.g. `factual_content -> increased`, not just post-parse validation.
+        anyOf: BEHAVIOR_DIMENSIONS.map((dimension) => ({
+          type: 'object',
+          properties: {
+            dimension: { type: 'string', enum: [dimension] },
+            direction: { type: 'string', enum: [...CANONICAL_DIMENSION_DIRECTIONS[dimension]] },
+          },
+          required: ['dimension', 'direction'],
+          additionalProperties: false,
+        })),
       },
     },
     description: { type: ['string', 'null'] },
@@ -95,8 +90,7 @@ function buildPrompt(input: SemanticRevisionJudgeInput): string {
     'change here does NOT require a semantic verdict other than ',
     '"no_meaningful_change" — many genuine dimension changes happen while ',
     'the underlying proposition stays exactly the same.\n\n',
-    `Allowed dimensions: ${BEHAVIOR_DIMENSIONS.join(', ')}.\n`,
-    `Allowed directions: ${BEHAVIOR_DIRECTIONS.join(', ')}.\n\n`,
+    `Allowed dimension(direction) pairs — ONLY these pairings are valid: ${formatCanonicalDimensionDirections()}.\n\n`,
     'Only describe DIRECTLY OBSERVABLE changes in expressed wording/stance ',
     '— never infer the human\'s actual internal emotion, mood, or ',
     'psychological state.\n\n',

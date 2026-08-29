@@ -103,7 +103,7 @@ describe('OpenRouterSemanticRevisionJudge', () => {
   });
 
   describe('dimensions (Test 1 / v3 addendum, docs/decisions/0017)', () => {
-    it('declares the dimensions array item schema with dimension/direction enums, both required, under strict mode', async () => {
+    it('declares one anyOf schema branch per canonical dimension, each constraining direction to that dimension\'s own allowed set', async () => {
       const fetchImpl = fakeFetchReturning(
         JSON.stringify({ verdict: 'no_meaningful_change', dimensions: [], description: null, confidence: 0.9 }),
       );
@@ -111,11 +111,18 @@ describe('OpenRouterSemanticRevisionJudge', () => {
       await judge.judge(input);
       const [, init] = (fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0];
       const body = JSON.parse(init.body);
-      const itemSchema = body.response_format.json_schema.schema.properties.dimensions.items;
-      expect(itemSchema.required.sort()).toEqual(['dimension', 'direction'].sort());
-      expect(itemSchema.additionalProperties).toBe(false);
-      expect(itemSchema.properties.dimension.enum).toContain('certainty');
-      expect(itemSchema.properties.direction.enum).toContain('increased');
+      const branches = body.response_format.json_schema.schema.properties.dimensions.items.anyOf as Array<{
+        properties: { dimension: { enum: string[] }; direction: { enum: string[] } };
+        required: string[];
+        additionalProperties: boolean;
+      }>;
+      expect(branches).toHaveLength(15);
+      const certaintyBranch = branches.find((b) => b.properties.dimension.enum[0] === 'certainty')!;
+      expect(certaintyBranch.properties.direction.enum.sort()).toEqual(['decreased', 'increased']);
+      expect(certaintyBranch.required.sort()).toEqual(['dimension', 'direction']);
+      expect(certaintyBranch.additionalProperties).toBe(false);
+      const evidentialityBranch = branches.find((b) => b.properties.dimension.enum[0] === 'evidentiality')!;
+      expect(evidentialityBranch.properties.direction.enum).toEqual(['changed']);
     });
 
     it('parses a judgment with a non-empty dimensions array', async () => {
@@ -142,6 +149,19 @@ describe('OpenRouterSemanticRevisionJudge', () => {
             { dimension: 'certainty', direction: 'decreased' },
           ],
           description: 'x',
+          confidence: 0.5,
+        }),
+      );
+      const judge = new OpenRouterSemanticRevisionJudge('sk-or-test', 'qwen/qwen3-1.7b', fetchImpl);
+      await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
+    });
+
+    it('rejects a canonically invalid dimension/direction pair (globally valid direction, wrong for this dimension)', async () => {
+      const fetchImpl = fakeFetchReturning(
+        JSON.stringify({
+          verdict: 'no_meaningful_change',
+          dimensions: [{ dimension: 'factual_content', direction: 'increased' }],
+          description: null,
           confidence: 0.5,
         }),
       );

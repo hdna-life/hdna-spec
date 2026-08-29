@@ -116,6 +116,31 @@ describe('isValidDimensionsArray', () => {
     expect(isValidDimensionsArray([{ dimension: 'certainty', direction: 'sideways' }])).toBe(false);
   });
 
+  describe('rejects a direction that is globally valid but invalid for that specific dimension (productization cleanup phase 2 — regression for previously-observed invalid pairs)', () => {
+    const invalidPairs: [string, string][] = [
+      ['factual_content', 'increased'],
+      ['politeness', 'changed'],
+      ['conditionality', 'increased'],
+      ['expressed_affect_valence', 'decreased'],
+      ['expressed_affect_valence', 'increased'],
+      ['evidentiality', 'increased'],
+      ['evidentiality', 'added'],
+      ['scope', 'increased'],
+      ['scope', 'added'],
+      ['rationale', 'changed'],
+      ['rationale', 'increased'],
+      ['action_or_decision', 'increased'],
+      ['action_or_decision', 'added'],
+      ['directive_force', 'added'],
+      ['certainty', 'more_positive'],
+    ];
+    for (const [dimension, direction] of invalidPairs) {
+      it(`${dimension} -> ${direction}`, () => {
+        expect(isValidDimensionsArray([{ dimension, direction }])).toBe(false);
+      });
+    }
+  });
+
   it('rejects a non-array value', () => {
     expect(isValidDimensionsArray(null)).toBe(false);
     expect(isValidDimensionsArray(undefined)).toBe(false);

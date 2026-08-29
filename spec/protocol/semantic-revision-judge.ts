@@ -87,12 +87,16 @@ export type BehaviorDimension =
 
 /**
  * Direction/change value for one `BehaviorDimensionChange`. Not every
- * direction is a sensible pairing for every dimension (e.g.
- * `expressed_affect_valence` pairs with `more_positive`/`more_negative`,
- * not `increased`/`decreased`) — the sensible combinations are documented
- * in `training/phase5a/lore/task-contract.v3.md`, not enforced here as a
- * closed per-dimension mapping, to avoid building a rigid ontology
- * platform for a first Test 1 pass.
+ * direction is a valid pairing for every dimension (e.g.
+ * `expressed_affect_valence` pairs only with `more_positive`/
+ * `more_negative`, never `increased`/`decreased`) — the canonical,
+ * **normatively enforced** per-dimension mapping lives in
+ * `extension/src/persona/behavior-dimension.ts`'s
+ * `CANONICAL_DIMENSION_DIRECTIONS` (kept in exact agreement with
+ * `training/phase5a/lore/task-contract.v3.md` §3.2 and
+ * `training/phase5a/lore/policy-spec.v1.json`). `isValidDimensionsArray`
+ * rejects a `{dimension, direction}` pair outside that dimension's
+ * allowed set, even though `direction` alone is a member of this union.
  */
 export type BehaviorDirection =
   | 'increased'

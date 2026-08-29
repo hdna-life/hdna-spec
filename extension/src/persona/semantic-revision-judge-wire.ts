@@ -1,5 +1,5 @@
 import type { SemanticRevisionJudgeInput, SemanticRevisionJudgmentDraft } from '@spec/protocol/semantic-revision-judge';
-import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS, isValidDimensionsArray } from './behavior-dimension';
+import { formatCanonicalDimensionDirections, isValidDimensionsArray } from './behavior-dimension';
 
 /**
  * Shared "untrusted JSON wire protocol" for any `SemanticRevisionJudgeProvider`
@@ -76,8 +76,7 @@ export function buildNarrowJudgePrompt(input: SemanticRevisionJudgeInput): strin
     '"no_meaningful_change" — many genuine dimension changes happen while ',
     'the underlying proposition stays exactly the same (e.g. tone, ',
     'certainty, or politeness shifting while the claim itself does not).\n\n',
-    `Allowed dimensions: ${BEHAVIOR_DIMENSIONS.join(', ')}.\n`,
-    `Allowed directions: ${BEHAVIOR_DIRECTIONS.join(', ')}.\n\n`,
+    `Allowed dimension(direction) pairs — ONLY these pairings are valid: ${formatCanonicalDimensionDirections()}.\n\n`,
     'Only describe DIRECTLY OBSERVABLE changes in expressed wording/stance ',
     '— never infer the human\'s actual internal emotion, mood, or ',
     'psychological state. "expressed_affect_valence"/"expressed_affect_intensity" ',

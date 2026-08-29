@@ -118,8 +118,15 @@ describe('Trial 4 benchmark prompt/contract fairness (Base vs. Trained vs. DeepS
       'meaning_transformed',
       'uncertain',
     ]);
-    expect(schema.properties.dimensions.items.properties.dimension.enum).toEqual(BEHAVIOR_DIMENSIONS);
-    expect(schema.properties.dimensions.items.properties.direction.enum).toEqual(BEHAVIOR_DIRECTIONS);
+    const branches = schema.properties.dimensions.items.anyOf as Array<{
+      properties: { dimension: { enum: string[] }; direction: { enum: string[] } };
+    }>;
+    expect(branches.map((b) => b.properties.dimension.enum[0])).toEqual(BEHAVIOR_DIMENSIONS);
+    for (const branch of branches) {
+      for (const direction of branch.properties.direction.enum) {
+        expect(BEHAVIOR_DIRECTIONS).toContain(direction);
+      }
+    }
 
     // Same reasoning/task framing as the local prompt — the prose prompt
     // (also sent, as a user message, since OpenRouter's structured output

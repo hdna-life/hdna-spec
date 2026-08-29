@@ -1,26 +1,32 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BEHAVIOR_DIMENSIONS, BEHAVIOR_DIRECTIONS } from '../../src/persona/behavior-dimension';
+import {
+  BEHAVIOR_DIMENSIONS,
+  BEHAVIOR_DIRECTIONS,
+  CANONICAL_DIMENSION_DIRECTIONS,
+  isValidDimensionsArray,
+} from '../../src/persona/behavior-dimension';
 
 /**
- * Deterministic consistency check between the two active sources of truth
- * for the localized edit-judgment policy:
+ * Deterministic consistency check between the three active sources of
+ * truth for the localized edit-judgment policy:
  *
  * 1. `training/phase5a/lore/task-contract.v3.md` — the human-authored
- *    canonical contract (productization cleanup, see this repo's history).
+ *    canonical contract.
  * 2. `training/phase5a/lore/policy-spec.v1.json` — its machine-readable
- *    counterpart, for future Test 2 generator/verifier/runtime tooling.
+ *    counterpart, for Test 2 generator/verifier/runtime tooling.
+ * 3. `behavior-dimension.ts`'s `CANONICAL_DIMENSION_DIRECTIONS` — the
+ *    ACTUAL runtime enforcement `isValidDimensionsArray` applies to every
+ *    provider (local MLX, OpenRouter) and every review UI.
  *
- * Both must agree exactly with each other AND with the actual runtime
- * closed sets this codebase already validates against
- * (`behavior-dimension.ts`'s `BEHAVIOR_DIMENSIONS`/`BEHAVIOR_DIRECTIONS`) —
- * so a future edit to any one of the three can never silently drift out of
- * sync with the other two. Deliberately does NOT assert that runtime
- * validation enforces the policy JSON's narrower per-dimension direction
- * mapping (`isValidDimensionsArray` only checks flat set membership, by
- * design — see that module's own docstring) — this test is a documentation/
- * policy-consistency check, not a claim that evaluation code changed.
+ * All three must agree exactly, so a future edit to any one can never
+ * silently drift out of sync with the other two — this is not merely a
+ * documentation-consistency check: it proves the runtime rejects the
+ * narrower per-dimension pairing the policy defines, not just flat
+ * dimension/direction set membership (productization cleanup phase 2 —
+ * this file previously only checked flat set membership, before
+ * `isValidDimensionsArray` enforced the per-dimension mapping at all).
  */
 
 const REPO_ROOT = path.resolve(__dirname, '../../..');
@@ -122,5 +128,40 @@ describe('policy-spec.v1.json <-> runtime closed sets consistency', () => {
       'meaning_transformed',
       'uncertain',
     ]);
+  });
+});
+
+describe('policy-spec.v1.json <-> ACTUAL runtime enforcement (isValidDimensionsArray)', () => {
+  const policySpec = loadPolicySpec();
+
+  it('CANONICAL_DIMENSION_DIRECTIONS matches policy-spec.v1.json exactly, key-for-key and direction-for-direction', () => {
+    const runtimeMapping = Object.fromEntries(
+      Object.entries(CANONICAL_DIMENSION_DIRECTIONS).map(([dimension, directions]) => [dimension, [...directions]]),
+    );
+    expect(runtimeMapping).toEqual(policySpec.dimensions);
+  });
+
+  it('isValidDimensionsArray ACCEPTS every pair the policy spec allows', () => {
+    for (const [dimension, directions] of Object.entries(policySpec.dimensions)) {
+      for (const direction of directions) {
+        expect(
+          isValidDimensionsArray([{ dimension, direction }]),
+          `expected ${dimension} -> ${direction} to be accepted (policy spec allows it)`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('isValidDimensionsArray REJECTS every globally-valid direction the policy spec does NOT allow for that dimension', () => {
+    for (const dimension of BEHAVIOR_DIMENSIONS) {
+      const allowed = new Set(policySpec.dimensions[dimension]);
+      for (const direction of BEHAVIOR_DIRECTIONS) {
+        if (allowed.has(direction)) continue;
+        expect(
+          isValidDimensionsArray([{ dimension, direction }]),
+          `expected ${dimension} -> ${direction} to be REJECTED (policy spec does not allow it for this dimension)`,
+        ).toBe(false);
+      }
+    }
   });
 });

@@ -272,6 +272,19 @@ describe('LocalMlxSemanticRevisionJudge', () => {
       const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
       await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
     });
+
+    it('rejects a canonically invalid dimension/direction pair (globally valid direction, wrong for this dimension) end-to-end', async () => {
+      const fetchImpl = fakeFetchReturning(
+        JSON.stringify({
+          verdict: 'no_meaningful_change',
+          dimensions: [{ dimension: 'conditionality', direction: 'increased' }],
+          description: null,
+          confidence: 0.5,
+        }),
+      );
+      const judge = new LocalMlxSemanticRevisionJudge('http://127.0.0.1:8080', 'Qwen/Qwen3-0.6B', fetchImpl);
+      await expect(judge.judge(input)).rejects.toThrow(/expected semantic revision judgment schema/);
+    });
   });
 
   describe('provider identity', () => {
