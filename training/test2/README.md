@@ -144,10 +144,18 @@ never touches another run's artifacts. Re-running the same `--run-id`
   full accumulated artifacts, so they describe the whole run_id, not
   just the latest invocation.
 
-The generator and verifier refuse to start if `benchmark/protected-cases.v1.json`
-is still empty, unless `--allow-empty-protected-registry-smoke-only` is
-passed deliberately (recorded in the manifest; never honored by the full
-build — see `pipeline/full_run.py`).
+Before any generator/verifier request, `smoke.py` gates on the same
+readiness check as `pipeline/check_protected_registry.py`
+(`lib/protected_registry.py`'s `require_ready`): the registry must have
+valid v1 schema and at least 10 unique, well-formed protected-case
+hashes, or the run refuses before touching the network. This is not
+merely a "non-empty" check — a registry with 1-9 of the 10 required
+hashes, or a malformed one, refuses identically to an empty one.
+`--allow-empty-protected-registry-smoke-only` narrowly overrides ONLY the
+genuinely-empty case (0 hashes, valid schema) for deliberate
+infrastructure testing (recorded in the manifest); it never bypasses a
+malformed or partially populated registry, and is never honored by the
+full build — see `pipeline/full_run.py`, which has no override at all.
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
@@ -179,10 +187,14 @@ reached, or every still-short bucket hits its own
 for either ceiling — a real full run must pass them explicitly. Hitting
 a ceiling before every quota is met stops safely, preserves progress,
 and reports the shortfall; it never freezes a corpus with missing
-quotas (`build_dataset.py` refuses that unconditionally). Unlike smoke,
-full-run generation requires a populated protected-case registry with no
-override, and semantic near-dedup requires an explicitly configured
-embedding provider — this module does not pick one.
+quotas (`build_dataset.py` refuses that unconditionally). Before any
+generation or provider work begins, `replenish_to_accepted_quota()` calls
+the same canonical `require_ready(..., expected_count=10)` gate as
+`check_protected_registry.py` — an empty, malformed, or partially
+populated (1-9 of 10) registry all refuse identically, and unlike smoke
+there is no override of any kind. Semantic near-dedup requires an
+explicitly configured embedding provider — this module does not pick
+one.
 
 ## Offline testing
 

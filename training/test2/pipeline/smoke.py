@@ -35,6 +35,7 @@ from contamination import filter_contaminated, load_protected_hashes  # noqa: E4
 from coverage import load_coverage_plan  # noqa: E402
 from jsonl_io import append_jsonl, read_jsonl, write_jsonl  # noqa: E402
 from manifest import build_run_manifest, write_manifest  # noqa: E402
+from protected_registry import registry_status  # noqa: E402
 from run_state import BUDGET_STATE_FILENAME, RUN_CONFIG_FILENAME, build_run_config, load_budget_state, load_or_create_run_config, save_budget_state  # noqa: E402
 from smoke_report import build_smoke_diagnostics  # noqa: E402
 
@@ -103,22 +104,40 @@ def run_smoke(
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "failures").mkdir(parents=True, exist_ok=True)
 
-    protected_hashes = load_protected_hashes(protected_registry_path)
+    # Canonical readiness gate (training/test2/lib/protected_registry.py) —
+    # runs before any provider is constructed or any request is made. The
+    # explicit override below permits ONLY a genuinely empty, well-formed
+    # registry (deliberate infrastructure smoke testing); it never bypasses
+    # a malformed or partially populated (1-9 of 10) registry.
+    status = registry_status(protected_registry_path, expected_count=10)
     registry_override_used = False
-    if not protected_hashes:
-        if not allow_empty_protected_registry:
-            raise SystemExit(
-                "Protected Test 1 benchmark registry is empty (0 populated) — refusing real paid generation "
-                "with no contamination guard in place. Populate it via pipeline/add_protected_case.py, or pass "
-                "--allow-empty-protected-registry-smoke-only if this is deliberate temporary infrastructure "
-                "smoke testing only (never for a real corpus-bound smoke run)."
+    if not status["ready"]:
+        is_genuinely_empty = status["ok"] and status["unique_count"] == 0
+        if is_genuinely_empty and allow_empty_protected_registry:
+            registry_override_used = True
+            print(
+                "WARNING: proceeding with an EMPTY protected-case registry via "
+                "--allow-empty-protected-registry-smoke-only — no contamination guard is active this run.",
+                file=sys.stderr,
             )
-        registry_override_used = True
-        print(
-            "WARNING: proceeding with an EMPTY protected-case registry via "
-            "--allow-empty-protected-registry-smoke-only — no contamination guard is active this run.",
-            file=sys.stderr,
-        )
+        else:
+            detail = status.get("error") or (
+                f"only {status['unique_count']} of {status['expected_count']} required unique protected-case "
+                f"hashes are populated"
+            )
+            override_note = (
+                "" if is_genuinely_empty else
+                " --allow-empty-protected-registry-smoke-only only bypasses a genuinely EMPTY registry for "
+                "deliberate infrastructure smoke testing — it never bypasses a malformed or partially "
+                "populated registry."
+            )
+            raise SystemExit(
+                f"Protected Test 1 benchmark registry is not ready ({protected_registry_path}): {detail} — "
+                f"refusing real paid generation. Populate it via pipeline/add_protected_case.py and verify "
+                f"with pipeline/check_protected_registry.py.{override_note}"
+            )
+
+    protected_hashes = load_protected_hashes(protected_registry_path)
 
     # Immutable run configuration: first invocation persists it; a resumed
     # invocation must match it exactly or is refused.
@@ -270,7 +289,11 @@ def main() -> None:
     parser.add_argument(
         "--allow-empty-protected-registry-smoke-only",
         action="store_true",
-        help="Bypass the empty-registry refusal. Smoke-only infrastructure testing — never use for a real corpus-bound run.",
+        help=(
+            "Bypass the refusal ONLY when the registry is genuinely empty (0 hashes, valid schema). Never "
+            "bypasses a malformed or partially populated (1-9 of 10) registry. Smoke-only infrastructure "
+            "testing — never use for a real corpus-bound run."
+        ),
     )
     args = parser.parse_args()
 

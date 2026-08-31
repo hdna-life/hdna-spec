@@ -36,6 +36,9 @@ from contamination import filter_contaminated, load_protected_hashes  # noqa: E4
 from coverage import bucket_quotas, load_coverage_plan  # noqa: E402
 from ids import candidate_id  # noqa: E402
 from jsonl_io import append_jsonl, read_jsonl, write_jsonl  # noqa: E402
+from protected_registry import require_ready  # noqa: E402
+
+PROTECTED_REGISTRY_EXPECTED_COUNT = 10
 
 import dedupe  # noqa: E402
 import generate  # noqa: E402
@@ -71,7 +74,7 @@ def replenish_to_accepted_quota(
     generator,
     verifier,
     coverage_plan: dict,
-    protected_hashes: set[str],
+    protected_registry_path: Path,
     policy: dict,
     out_dir: Path,
     max_total_requests: int,
@@ -85,11 +88,12 @@ def replenish_to_accepted_quota(
     -> contamination once for the whole round. Stops when every bucket's
     quota is met, or `max_total_requests` generator attempts are used up,
     or every still-short bucket has hit `max_attempts_per_bucket`."""
-    if not protected_hashes:
-        raise SystemExit(
-            "Full-run generation requires a populated protected-case registry — refusing to start with zero "
-            "protected hashes. Unlike the smoke command, there is no override for this in full mode."
-        )
+    # Canonical readiness gate (training/test2/lib/protected_registry.py) —
+    # runs before any generation/provider work begins. Unlike smoke, there
+    # is NO override here: an empty, malformed, or partially populated
+    # (1-9 of 10) registry all refuse identically.
+    require_ready(protected_registry_path, expected_count=PROTECTED_REGISTRY_EXPECTED_COUNT)
+    protected_hashes = load_protected_hashes(protected_registry_path)
 
     quotas = bucket_quotas(coverage_plan)
     languages = generate.language_cycle(coverage_plan)

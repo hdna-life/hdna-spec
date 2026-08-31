@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
+from unittest.mock import patch
 
 LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
 sys.path.insert(0, str(LIB_DIR))
@@ -768,9 +770,51 @@ class TestPipelineE2E(unittest.TestCase, MiniCoveragePlanMixin):
             def generate(self, coverage_item):
                 raise AssertionError("must never be called with an empty registry")
 
+        registry_path = self.tmp / "protected-cases-empty.json"
+        registry_path.write_text(json.dumps({"version": "v1", "protected_pair_hashes": []}), encoding="utf-8")
+
         with self.assertRaises(SystemExit):
             full_run.replenish_to_accepted_quota(
-                UnusedProvider(), UnusedProvider(), plan, protected_hashes=set(), policy=POLICY,
+                UnusedProvider(), UnusedProvider(), plan, protected_registry_path=registry_path, policy=POLICY,
+                out_dir=self.data, max_total_requests=10, max_attempts_per_bucket=5,
+            )
+
+    def test_full_run_refuses_with_partially_populated_protected_registry(self):
+        plan = {"coverage_buckets": [{"bucket": "b1", "quota": 1}], "language_mix": {"en": 1.0}}
+
+        class UnusedProvider:
+            model_id = "unused"
+
+            def generate(self, coverage_item):
+                raise AssertionError("must never be called with a partially populated registry")
+
+        nine_hashes = [normalized_pair_hash(f"unrelated {i}", f"unrelated final {i}") for i in range(9)]
+        registry_path = self.tmp / "protected-cases-partial.json"
+        registry_path.write_text(json.dumps({"version": "v1", "protected_pair_hashes": nine_hashes}), encoding="utf-8")
+
+        with self.assertRaises(SystemExit):
+            full_run.replenish_to_accepted_quota(
+                UnusedProvider(), UnusedProvider(), plan, protected_registry_path=registry_path, policy=POLICY,
+                out_dir=self.data, max_total_requests=10, max_attempts_per_bucket=5,
+            )
+
+    def test_full_run_refuses_with_malformed_protected_registry(self):
+        plan = {"coverage_buckets": [{"bucket": "b1", "quota": 1}], "language_mix": {"en": 1.0}}
+
+        class UnusedProvider:
+            model_id = "unused"
+
+            def generate(self, coverage_item):
+                raise AssertionError("must never be called with a malformed registry")
+
+        registry_path = self.tmp / "protected-cases-malformed.json"
+        registry_path.write_text(
+            json.dumps({"version": "v1", "protected_pair_hashes": ["not-a-real-sha256-hash"]}), encoding="utf-8"
+        )
+
+        with self.assertRaises(SystemExit):
+            full_run.replenish_to_accepted_quota(
+                UnusedProvider(), UnusedProvider(), plan, protected_registry_path=registry_path, policy=POLICY,
                 out_dir=self.data, max_total_requests=10, max_attempts_per_bucket=5,
             )
 
@@ -810,6 +854,14 @@ class TestFullRunReplenishment(unittest.TestCase):
         self._tmp_ctx = tempfile.TemporaryDirectory()
         self.tmp = Path(self._tmp_ctx.name)
         self.out_dir = self.tmp / "full_run"
+        # A ready (10 unique, well-formed, unrelated) protected-case registry —
+        # these tests exercise replenishment behavior, not the registry gate,
+        # so it must pass require_ready() without matching any real candidate.
+        self.protected_hashes = [normalized_pair_hash(f"unrelated {i}", f"unrelated final {i}") for i in range(10)]
+        self.registry_path = self.tmp / "protected-cases-ready.json"
+        self.registry_path.write_text(
+            json.dumps({"version": "v1", "protected_pair_hashes": self.protected_hashes}), encoding="utf-8"
+        )
 
     def tearDown(self):
         self._tmp_ctx.cleanup()
@@ -821,10 +873,9 @@ class TestFullRunReplenishment(unittest.TestCase):
         }
         generator = ScriptedReplenishGenerator(fail_for_by_bucket={"b1": 4})  # 4 schema-invalid, then all valid
         verifier = AlwaysAgreesVerifier()
-        protected_hashes = {"unrelated-hash-not-matching-anything"}
 
         result = full_run.replenish_to_accepted_quota(
-            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            generator, verifier, plan, self.registry_path, POLICY, self.out_dir,
             max_total_requests=50, max_attempts_per_bucket=20,
         )
         self.assertEqual(result["missing_quotas"], {})
@@ -842,10 +893,9 @@ class TestFullRunReplenishment(unittest.TestCase):
         # "impossible" always fails schema validation — can never be satisfied.
         generator = ScriptedReplenishGenerator(fail_for_by_bucket={"good": 0, "impossible": 10_000})
         verifier = AlwaysAgreesVerifier()
-        protected_hashes = {"unrelated-hash-not-matching-anything"}
 
         result = full_run.replenish_to_accepted_quota(
-            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            generator, verifier, plan, self.registry_path, POLICY, self.out_dir,
             max_total_requests=200, max_attempts_per_bucket=5,
         )
         self.assertEqual(result["accepted_counts"].get("good"), 2)  # the satisfiable bucket still completes
@@ -869,20 +919,188 @@ class TestFullRunReplenishment(unittest.TestCase):
         # A ceiling far too low to ever reach the quota of 5.
         generator = ScriptedReplenishGenerator(fail_for_by_bucket={"b1": 0})
         verifier = AlwaysAgreesVerifier()
-        protected_hashes = {"unrelated-hash-not-matching-anything"}
         result = full_run.replenish_to_accepted_quota(
-            generator, verifier, plan, protected_hashes, POLICY, self.out_dir,
+            generator, verifier, plan, self.registry_path, POLICY, self.out_dir,
             max_total_requests=2, max_attempts_per_bucket=2,
         )
         self.assertIn("b1", result["missing_quotas"])
 
-        registry_path = self.tmp / "protected-cases.json"
-        registry_path.write_text(json.dumps({"protected_pair_hashes": list(protected_hashes)}), encoding="utf-8")
         with self.assertRaises(SystemExit):
             build_dataset.run(
-                self.out_dir / "deduped.jsonl", plan_path, registry_path, self.tmp / "frozen",
+                self.out_dir / "deduped.jsonl", plan_path, self.registry_path, self.tmp / "frozen",
                 self.tmp / "build_failures.jsonl", run_id="incomplete-run", dedup_config_path=self.out_dir / "dedup_config.json",
             )
+
+
+class TestSmokeProtectedRegistryGate(unittest.TestCase, MiniCoveragePlanMixin):
+    """Proves smoke.py's registry readiness gate — not just the standalone
+    checker — actually blocks real generation, and does so before any
+    network call. urllib.request.urlopen is patched to raise if reached at
+    all; a SystemExit (not that AssertionError) proves the gate fired
+    first."""
+
+    def setUp(self):
+        self._tmp_ctx = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp_ctx.name)
+        self.plan_path = self.build_plan(self.tmp)
+        self.env_patch = patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key-not-real"})
+        self.env_patch.start()
+        self.urlopen_patch = patch(
+            "urllib.request.urlopen", side_effect=AssertionError("must never reach the network")
+        )
+        self.mock_urlopen = self.urlopen_patch.start()
+
+    def tearDown(self):
+        self.urlopen_patch.stop()
+        self.env_patch.stop()
+        self._tmp_ctx.cleanup()
+
+    def _run_smoke(self, registry_path: Path, run_id: str, allow_empty: bool = False) -> None:
+        smoke.run_smoke(
+            self.plan_path, registry_path, self.tmp / "data" / "smoke", run_id,
+            generator_model_id="mock/gen", verifier_model_id="mock/verify",
+            max_candidates=5, generator_budget_requests=5, verifier_budget_requests=5,
+            allow_empty_protected_registry=allow_empty,
+        )
+
+    def _write_registry(self, name: str, hashes: list[str], version: str = "v1") -> Path:
+        path = self.tmp / name
+        path.write_text(json.dumps({"version": version, "protected_pair_hashes": hashes}), encoding="utf-8")
+        return path
+
+    def test_zero_of_ten_refuses_without_override(self):
+        registry_path = self._write_registry("reg-0.json", [])
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-0-of-10")
+        self.mock_urlopen.assert_not_called()
+
+    def test_zero_of_ten_passes_gate_with_explicit_empty_override(self):
+        registry_path = self._write_registry("reg-0-override.json", [])
+        # The override permits proceeding past the gate. generate.py treats
+        # a per-candidate provider exception (our patched urlopen raising)
+        # as a recorded failure, not a crash, so this call completes
+        # normally — the network attempt itself is what proves the gate
+        # was passed.
+        self._run_smoke(registry_path, "smoke-0-of-10-override", allow_empty=True)
+        self.mock_urlopen.assert_called()
+
+    def test_one_of_ten_refuses(self):
+        hashes = [normalized_pair_hash("o", "f")]
+        registry_path = self._write_registry("reg-1.json", hashes)
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-1-of-10")
+        self.mock_urlopen.assert_not_called()
+
+    def test_one_of_ten_refuses_even_with_override_flag(self):
+        hashes = [normalized_pair_hash("o", "f")]
+        registry_path = self._write_registry("reg-1-override.json", hashes)
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-1-of-10-override", allow_empty=True)
+        self.mock_urlopen.assert_not_called()
+
+    def test_nine_of_ten_refuses(self):
+        hashes = [normalized_pair_hash(f"o{i}", f"f{i}") for i in range(9)]
+        registry_path = self._write_registry("reg-9.json", hashes)
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-9-of-10")
+        self.mock_urlopen.assert_not_called()
+
+    def test_malformed_registry_refuses(self):
+        registry_path = self._write_registry("reg-bad.json", ["not-a-real-sha256-hash"])
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-malformed")
+        self.mock_urlopen.assert_not_called()
+
+    def test_malformed_registry_refuses_even_with_override_flag(self):
+        registry_path = self._write_registry("reg-bad-override.json", ["not-a-real-sha256-hash"])
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-malformed-override", allow_empty=True)
+        self.mock_urlopen.assert_not_called()
+
+    def test_wrong_version_refuses(self):
+        registry_path = self._write_registry("reg-wrong-version.json", [], version="v2")
+        with self.assertRaises(SystemExit):
+            self._run_smoke(registry_path, "smoke-wrong-version")
+        self.mock_urlopen.assert_not_called()
+
+    def test_ten_of_ten_passes_gate(self):
+        hashes = [normalized_pair_hash(f"o{i}", f"f{i}") for i in range(10)]
+        registry_path = self._write_registry("reg-10.json", hashes)
+        # Past the gate, generation proceeds to the network — the patched
+        # urlopen being called (its exception is swallowed per-candidate
+        # by generate.py, not propagated) proves the registry gate passed.
+        self._run_smoke(registry_path, "smoke-10-of-10")
+        self.mock_urlopen.assert_called()
+
+
+class TestFullRunProtectedRegistryGate(unittest.TestCase):
+    """Proves full_run.py's readiness gate blocks generation before any
+    provider call — the provider fixture raises if ever invoked, and
+    there is no override path at all."""
+
+    def setUp(self):
+        self._tmp_ctx = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp_ctx.name)
+        self.plan = {"coverage_buckets": [{"bucket": "b1", "quota": 1}], "language_mix": {"en": 1.0}}
+
+    def tearDown(self):
+        self._tmp_ctx.cleanup()
+
+    def _write_registry(self, name: str, hashes: list[str], version: str = "v1") -> Path:
+        path = self.tmp / name
+        path.write_text(json.dumps({"version": version, "protected_pair_hashes": hashes}), encoding="utf-8")
+        return path
+
+    def _assert_refuses_before_any_provider_call(self, registry_path: Path) -> None:
+        class ProviderThatMustNeverBeCalled:
+            model_id = "unused"
+
+            def generate(self, coverage_item):
+                raise AssertionError("must never be called before the registry gate passes")
+
+        with self.assertRaises(SystemExit):
+            full_run.replenish_to_accepted_quota(
+                ProviderThatMustNeverBeCalled(), ProviderThatMustNeverBeCalled(), self.plan,
+                registry_path, POLICY, self.tmp / "full_run", max_total_requests=10, max_attempts_per_bucket=5,
+            )
+
+    def test_zero_of_ten_refuses(self):
+        self._assert_refuses_before_any_provider_call(self._write_registry("reg-0.json", []))
+
+    def test_one_of_ten_refuses(self):
+        hashes = [normalized_pair_hash("o", "f")]
+        self._assert_refuses_before_any_provider_call(self._write_registry("reg-1.json", hashes))
+
+    def test_nine_of_ten_refuses(self):
+        hashes = [normalized_pair_hash(f"o{i}", f"f{i}") for i in range(9)]
+        self._assert_refuses_before_any_provider_call(self._write_registry("reg-9.json", hashes))
+
+    def test_malformed_registry_refuses(self):
+        self._assert_refuses_before_any_provider_call(
+            self._write_registry("reg-bad.json", ["not-a-real-sha256-hash"])
+        )
+
+    def test_ten_of_ten_passes_gate(self):
+        hashes = [normalized_pair_hash(f"o{i}", f"f{i}") for i in range(10)]
+        registry_path = self._write_registry("reg-10.json", hashes)
+
+        class OneShotGenerator:
+            model_id = "mock/gen"
+
+            def generate(self, coverage_item):
+                return candidate("replaced", "", "x", "y", "", "no_meaningful_change", [], language="en")
+
+        class AgreesVerifier:
+            model_id = "mock/verify"
+
+            def verify(self, candidate_input):
+                return {"verdict": "no_meaningful_change", "dimensions": [], "confidence": 0.95}
+
+        result = full_run.replenish_to_accepted_quota(
+            OneShotGenerator(), AgreesVerifier(), self.plan, registry_path, POLICY,
+            self.tmp / "full_run", max_total_requests=10, max_attempts_per_bucket=5,
+        )
+        self.assertEqual(result["missing_quotas"], {})
 
 
 if __name__ == "__main__":
