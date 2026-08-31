@@ -1,6 +1,6 @@
 {
   "version": "v1",
   "description": "Hashes only — never raw text. Any case whose normalized (originalText, finalText) pair hash appears here must never enter Test 2 generation, verification, or training prompts. Populate via pipeline/add_protected_case.py before generation begins.",
-  "test1_final_benchmark_status": "0 of 10 populated — the final Test 1 benchmark (training/phase5a/benchmark/test1-final-result.md, 'Final validation round') is operator-local and not present anywhere in this repository (tracked or untracked), by evaluation-integrity design. Populate this registry from that local file with add_protected_case.py before running real Test 2 generation.",
+  "test1_final_benchmark_status": "0 of 10 populated — the final Test 1 benchmark's 10 held-out cases are operator-local and not present anywhere in this repository (tracked or untracked), by evaluation-integrity design; only aggregate metrics about that round are documented in training/phase5a/benchmark/test1-final-result.md ('Final validation round'), never the case text itself. Populate this registry from the operator-local cases with pipeline/add_protected_case.py --pairs-file before running real Test 2 generation, then verify with pipeline/check_protected_registry.py.",
   "protected_pair_hashes": []
 }

@@ -59,6 +59,39 @@ pair hash matches a protected entry before freezing the corpus. Populate
 it via `pipeline/add_protected_case.py` (local text in, hash out — the
 text itself is never written to this repository).
 
+### Populating the registry with Test 1's 10 final held-out cases
+
+Keep the 10 Test 1 pairs in a local file (JSON array or JSONL, each entry
+`{"originalText": ..., "finalText": ...}`) **outside this repository** —
+this tool only ever reads it, never copies or commits it:
+
+```bash
+python3 training/test2/pipeline/add_protected_case.py \
+  --pairs-file /path/outside/repo/test1-final-10-pairs.json
+```
+
+For a single ad-hoc case (e.g. one of Test 2's own held-out cases):
+
+```bash
+python3 training/test2/pipeline/add_protected_case.py \
+  --original-text "..." --final-text "..."
+```
+
+Both modes are idempotent — re-adding an already-present pair does not
+create a duplicate registry entry. Only the sha256 content hash is ever
+written to `protected-cases.v1.json`.
+
+### Verifying readiness before any real smoke/full generation
+
+```bash
+python3 training/test2/pipeline/check_protected_registry.py
+```
+
+Exits `0` (`READY`) only if the registry has valid v1 schema, every entry
+is a well-formed sha256 hash, and at least 10 *unique* hashes are present
+(duplicates are never double-counted). Exits `1` (`NOT READY`) otherwise
+— run this before `smoke.py` or any future `full_run.py` invocation.
+
 ## Dedup
 
 Exact normalized dedup always runs. Semantic near-dedup requires an
@@ -154,10 +187,13 @@ embedding provider — this module does not pick one.
 ## Offline testing
 
 `tests/test_pipeline_e2e.py` runs the entire pipeline end to end with
-mock generator/verifier fixtures — no network. Run:
+mock generator/verifier fixtures — no network. `tests/test_protected_registry.py`
+covers the protected-case registry's hashing/validation contract and its
+CLIs. Run:
 
 ```bash
 python3 -m unittest training.test2.tests.test_pipeline_e2e -v
+python3 -m unittest training.test2.tests.test_protected_registry -v
 ```
 
 CI runs this on every push; it requires no secrets or network access.
@@ -166,7 +202,8 @@ CI runs this on every push; it requires no secrets or network access.
 
 - Do not reuse Test 1's benchmark cases as Test 2 training or evaluation
   input. `benchmark/protected-cases.v1.json` guards this — populate it via
-  `pipeline/add_protected_case.py` before generating.
+  `pipeline/add_protected_case.py --pairs-file` before generating, and
+  verify with `pipeline/check_protected_registry.py`.
 - No paid generation has started; no full 5,000-example generation has
   started either — only the smoke run above is prepared.
 - A completed training run is not sufficient to call the WebGPU target
@@ -181,10 +218,11 @@ training/test2/
   coverage-plan.v1.json
   lib/                shared modules (ids, jsonl_io, providers, real_providers,
                        dedup, contamination, coverage, acceptance, budget,
-                       run_state, manifest, smoke_report)
+                       run_state, manifest, smoke_report, protected_registry)
   pipeline/            the five stage scripts + smoke.py + full_run.py +
-                       review_smoke.py + add_protected_case.py
-  tests/               offline end-to-end pipeline test
+                       review_smoke.py + add_protected_case.py +
+                       check_protected_registry.py
+  tests/               offline end-to-end pipeline test + protected-registry test
   data/                generated/accepted corpus (gitignored)
   benchmark/
     README.md            WebGPU deployment validation checklist
